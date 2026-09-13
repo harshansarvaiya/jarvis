@@ -24,9 +24,10 @@ export interface JarvisAgentOptions {
 export function normalizeModel(m?: string): string {
   if (!m) return 'gemini-3.8-flash';
   const clean = m.trim().toLowerCase();
-  if (clean.includes('3.8') || clean.includes('3.7') || clean.includes('3.5')) {
-    return 'gemini-3.8-flash';
-  }
+  if (clean.includes('3.8')) return 'gemini-3.8-flash';
+  if (clean.includes('3.7')) return 'gemini-3.7-flash';
+  if (clean.includes('3.6')) return 'gemini-3.6-flash';
+  if (clean.includes('3.5')) return 'gemini-3.5-flash';
   if (clean.includes('2.0') || clean.includes('2.5') || clean === 'gemini-flash') {
     return 'gemini-2.0-flash';
   }
@@ -39,6 +40,30 @@ export function normalizeModel(m?: string): string {
   return clean;
 }
 
+/**
+ * Sequential Stepwise Fallback Hierarchy
+ * Strict rule: Never jump directly from 3.x to 2.x; always step one version down.
+ */
+export function getModelFallbackHierarchy(requestedModel: string): string[] {
+  const masterHierarchy = [
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+  ];
+
+  const primary = normalizeModel(requestedModel);
+  const startIndex = masterHierarchy.indexOf(primary);
+
+  if (startIndex !== -1) {
+    return masterHierarchy.slice(startIndex);
+  }
+
+  return [primary, ...masterHierarchy].filter((v, i, a) => a.indexOf(v) === i);
+}
+
 export async function runJarvisAgent(
   messages: ChatMessage[],
   options: JarvisAgentOptions = {}
@@ -49,7 +74,7 @@ export async function runJarvisAgent(
   error?: string;
 }> {
   const apiKey = options.apiKey || process.env.GEMINI_API_KEY || '';
-  const model = normalizeModel(options.model || 'gemini-2.0-flash');
+  const model = normalizeModel(options.model || 'gemini-3.8-flash');
 
   const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
   if (!lastUserMessage) {
@@ -127,13 +152,12 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       contents.push({ role, parts });
     }
 
-    const primaryModel = normalizeModel(model);
-    const candidateModels = [primaryModel, 'gemini-3.8-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
-      .filter((v, i, a) => a.indexOf(v) === i);
+    const candidateModels = getModelFallbackHierarchy(model);
 
     let response: Response | null = null;
     let activeApiUrl = '';
     let lastErrorText = '';
+    let selectedModel = candidateModels[0] || 'gemini-3.8-flash';
 
     for (const candidateModel of candidateModels) {
       const is3x = candidateModel.includes('3.');
@@ -148,31 +172,41 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           };
 
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${candidateModel}:generateContent?key=${apiKey}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents,
-          systemInstruction,
-          tools: geminiTools,
-          generationConfig,
-        }),
-      });
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents,
+            systemInstruction,
+            tools: geminiTools,
+            generationConfig,
+          }),
+        });
 
-      if (res.ok) {
+        if (res.ok) {
+          response = res;
+          activeApiUrl = url;
+          selectedModel = candidateModel;
+          break;
+        }
+
+        lastErrorText = await res.text();
+        console.warn(`[Quantum Fallback] Model ${candidateModel} failed with HTTP ${res.status}:`, lastErrorText);
+
+        // Fall back one version down on 404 (not found), 400 (config mismatch), 429 (rate limit), or 503 (overload)
+        if (res.status === 404 || res.status === 400 || res.status === 429 || res.status === 503) {
+          continue;
+        }
+
+        // Fatal errors like 401 Unauthorized API key should stop immediately
         response = res;
         activeApiUrl = url;
         break;
-      }
-
-      lastErrorText = await res.text();
-      console.warn(`Gemini model ${candidateModel} returned ${res.status}:`, lastErrorText);
-
-      // If model not found (404), fall back to next model candidate
-      if (res.status !== 404) {
-        response = res;
-        activeApiUrl = url;
-        break;
+      } catch (fetchErr: any) {
+        lastErrorText = fetchErr?.message || 'Network request failed';
+        console.warn(`[Quantum Fallback] Network exception attempting ${candidateModel}:`, lastErrorText);
+        continue;
       }
     }
 
@@ -227,6 +261,17 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       });
 
       // Query Gemini again with tool output
+      const is3x = selectedModel.includes('3.');
+      const toolGenerationConfig = is3x
+        ? {
+            thinking_level: 'medium',
+            maxOutputTokens: 4096,
+          }
+        : {
+            temperature: 0.4,
+            maxOutputTokens: 2048,
+          };
+
       response = await fetch(activeApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -234,6 +279,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           contents,
           systemInstruction,
           tools: geminiTools,
+          generationConfig: toolGenerationConfig,
         }),
       });
 

@@ -99,14 +99,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* Model Selection */}
           <div>
-            <label className="block text-xs font-mono text-cyan-400 mb-1.5">
-              NEURAL ENGINE MODEL
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-mono text-cyan-400">
+                NEURAL ENGINE MODEL
+              </label>
+              <span className="text-[10px] font-mono text-emerald-400">
+                Stepwise Quantum Fallback Active
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {[
                 { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', desc: 'Flagship 2026 Agent & Reasoning' },
-                { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'High-speed sub-second reflex' },
-                { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', desc: 'Deep synthesis & analysis' },
+                { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', desc: 'Hybrid Thinking Core' },
+                { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', desc: 'Scaled Production Agent' },
+                { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', desc: 'High-Throughput Multimodal' },
+                { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'High-speed Sub-second Reflex' },
+                { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', desc: 'Deep Synthesis & Analysis' },
               ].map((m) => (
                 <button
                   type="button"
@@ -123,6 +131,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </button>
               ))}
             </div>
+            <p className="text-[10px] text-slate-500 font-mono mt-1.5">
+              Quantum Fallback Cascade: 3.8 &rarr; 3.7 &rarr; 3.6 &rarr; 3.5 &rarr; 2.0 &rarr; 1.5 (Graceful single-version degradation)
+            </p>
           </div>
 
           {/* Voice Synthesis (TTS) Toggle */}
