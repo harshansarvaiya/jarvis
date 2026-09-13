@@ -89,6 +89,17 @@ export default function JarvisDashboard() {
 
     const verifyAuth = async () => {
       try {
+        const hasEnrolledBiometrics =
+          typeof window !== 'undefined' &&
+          (!!localStorage.getItem('jarvis_bio_cred_id') ||
+            localStorage.getItem('jarvis_bio_enrolled') === 'true');
+
+        // If device has biometric protection enrolled, ALWAYS require Face ID on restart
+        if (hasEnrolledBiometrics) {
+          setIsUnlocked(false);
+          return;
+        }
+
         const res = await fetch('/api/jarvis/auth/status');
         const data = await res.json();
         if (res.ok && data.authenticated) {
@@ -112,6 +123,26 @@ export default function JarvisDashboard() {
     setApiKey(savedKey);
     setSelectedModel(savedModel);
     if (savedTts !== null) setTtsEnabled(savedTts === 'true');
+  }, []);
+
+  // Auto-lock with Face ID when phone is locked or app is minimized
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        const hasEnrolledBiometrics =
+          typeof window !== 'undefined' &&
+          (!!localStorage.getItem('jarvis_bio_cred_id') ||
+            localStorage.getItem('jarvis_bio_enrolled') === 'true');
+        if (hasEnrolledBiometrics) {
+          setIsUnlocked(false);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   // Auto-scroll chat

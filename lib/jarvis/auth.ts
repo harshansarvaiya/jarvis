@@ -173,4 +173,77 @@ export function resetRateLimit(ip: string): void {
   rateLimitMap.delete(ip);
 }
 
+/**
+ * Stateless WebAuthn Challenge Token Authority (Vercel Serverless Ready)
+ */
+export async function createChallengeToken(challenge: string): Promise<string> {
+  const secret = getAuthSecret();
+  const key = await getCryptoKey(secret);
+  const timestamp = Date.now().toString();
+  const enc = new TextEncoder();
+  const data = `${challenge}.${timestamp}`;
+  const sigBuf = await crypto.subtle.sign('HMAC', key, enc.encode(data));
+  const sigBase64 = bufferToBase64Url(new Uint8Array(sigBuf));
+  return `${challenge}.${timestamp}.${sigBase64}`;
+}
+
+export async function verifyChallengeToken(token: string): Promise<{ valid: boolean; challenge?: string }> {
+  if (!token) return { valid: false };
+  const parts = token.split('.');
+  if (parts.length !== 3) return { valid: false };
+  const [challenge, timestampStr, sigBase64] = parts;
+  const timestamp = parseInt(timestampStr, 10);
+  // Valid for 5 minutes
+  if (isNaN(timestamp) || Date.now() - timestamp > 5 * 60 * 1000) {
+    return { valid: false };
+  }
+  const secret = getAuthSecret();
+  const key = await getCryptoKey(secret);
+  const enc = new TextEncoder();
+  const data = `${challenge}.${timestampStr}`;
+  const sigBytes = base64UrlToBuffer(sigBase64);
+  const isValid = await crypto.subtle.verify(
+    'HMAC',
+    key,
+    sigBytes as unknown as BufferSource,
+    enc.encode(data)
+  );
+  if (!isValid) return { valid: false };
+  return { valid: true, challenge };
+}
+
+/**
+ * Stateless Biometric Enrollment Token Authority
+ */
+export async function createBiometricEnrollmentToken(credentialId: string): Promise<string> {
+  const secret = getAuthSecret();
+  const key = await getCryptoKey(secret);
+  const timestamp = Date.now().toString();
+  const enc = new TextEncoder();
+  const data = `bio:${credentialId}.${timestamp}`;
+  const sigBuf = await crypto.subtle.sign('HMAC', key, enc.encode(data));
+  const sigBase64 = bufferToBase64Url(new Uint8Array(sigBuf));
+  return `${credentialId}.${timestamp}.${sigBase64}`;
+}
+
+export async function verifyBiometricEnrollmentToken(token: string, candidateCredId: string): Promise<boolean> {
+  if (!token || !candidateCredId) return false;
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  const [credId, timestampStr, sigBase64] = parts;
+  if (credId !== candidateCredId) return false;
+  const secret = getAuthSecret();
+  const key = await getCryptoKey(secret);
+  const enc = new TextEncoder();
+  const data = `bio:${credId}.${timestampStr}`;
+  const sigBytes = base64UrlToBuffer(sigBase64);
+  return await crypto.subtle.verify(
+    'HMAC',
+    key,
+    sigBytes as unknown as BufferSource,
+    enc.encode(data)
+  );
+}
+
 export { SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS };
+

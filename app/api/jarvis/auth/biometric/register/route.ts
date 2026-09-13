@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   verifySessionToken,
   verifyMasterKey,
+  createBiometricEnrollmentToken,
+  verifyChallengeToken,
   SESSION_COOKIE_NAME,
 } from '@/lib/jarvis/auth';
 import { saveRegisteredCredential, verifyChallenge } from '@/lib/jarvis/webauthn';
@@ -12,7 +14,7 @@ export async function POST(req: NextRequest) {
     const isSessionValid = await verifySessionToken(sessionCookie);
 
     const body = await req.json().catch(() => ({}));
-    const { credentialId, deviceName, challenge, deviceId, masterKey } = body;
+    const { credentialId, deviceName, challenge, challengeToken, deviceId, masterKey } = body;
 
     const isMasterValid = masterKey ? verifyMasterKey(masterKey) : false;
 
@@ -34,7 +36,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (challenge && deviceId) {
+    // Verify challenge via stateless token or in-memory map
+    if (challengeToken) {
+      const challengeCheck = await verifyChallengeToken(challengeToken);
+      if (!challengeCheck.valid) {
+        return NextResponse.json(
+          { error: 'Biometric challenge token expired or invalid.' },
+          { status: 400 }
+        );
+      }
+    } else if (challenge && deviceId) {
       const isValidChallenge = verifyChallenge(deviceId, challenge);
       if (!isValidChallenge) {
         return NextResponse.json(
@@ -43,6 +54,9 @@ export async function POST(req: NextRequest) {
         );
       }
     }
+
+    // Issue cryptographic device token
+    const bioToken = await createBiometricEnrollmentToken(credentialId);
 
     saveRegisteredCredential({
       id: credentialId,
@@ -53,6 +67,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'BIOMETRIC SIGNATURE ENROLLED // DIRECTIVE 01 SATISFIED',
+      bioToken,
     });
   } catch (error: any) {
     return NextResponse.json(

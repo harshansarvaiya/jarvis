@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateWebAuthnChallenge, getRegisteredCredentials } from '@/lib/jarvis/webauthn';
+import { createChallengeToken } from '@/lib/jarvis/auth';
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,10 +8,12 @@ export async function POST(req: NextRequest) {
     const deviceId = body.deviceId || 'jarvis-primary-device';
 
     const challenge = generateWebAuthnChallenge(deviceId);
+    const challengeToken = await createChallengeToken(challenge);
     const registered = getRegisteredCredentials();
 
     return NextResponse.json({
       challenge,
+      challengeToken,
       rp: {
         name: 'J.A.R.V.I.S. Core Matrix',
         id: req.nextUrl.hostname,

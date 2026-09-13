@@ -6,10 +6,12 @@ import {
   KeyRound,
   AlertCircle,
   Fingerprint,
-  Smartphone,
   CheckCircle2,
   Lock,
   Loader2,
+  ScanFace,
+  ChevronRight,
+  Sparkles,
 } from 'lucide-react';
 
 interface SecurityGateModalProps {
@@ -21,7 +23,7 @@ interface SecurityGateModalProps {
 function bufferToBase64Url(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
+  for (let i = 0; i < buffer.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
   return btoa(binary)
@@ -56,17 +58,19 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
   // Biometric state
   const [hasBiometricsSupport, setHasBiometricsSupport] = useState(false);
   const [isBiometricsEnrolled, setIsBiometricsEnrolled] = useState(false);
+  const [usePasscodeFallback, setUsePasscodeFallback] = useState(false);
   const [showEnrollPrompt, setShowEnrollPrompt] = useState(false);
   const [enrollSuccess, setEnrollSuccess] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
 
   useEffect(() => {
-    // Check WebAuthn platform authenticator support (Face ID / Touch ID / Windows Hello)
     if (typeof window !== 'undefined' && window.PublicKeyCredential) {
       window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
         .then((available) => {
           setHasBiometricsSupport(available);
-          const enrolledId = localStorage.getItem('jarvis_bio_cred_id');
+          const enrolledId =
+            localStorage.getItem('jarvis_bio_cred_id') ||
+            localStorage.getItem('jarvis_bio_enrolled');
           if (enrolledId) {
             setIsBiometricsEnrolled(true);
           }
@@ -150,7 +154,7 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
     setErrorMessage('');
 
     try {
-      // 1. Request Challenge from Server
+      // 1. Request Stateless Challenge from Server
       const challengeRes = await fetch('/api/jarvis/auth/biometric/challenge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -163,8 +167,9 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
       }
 
       const enrolledCredId = localStorage.getItem('jarvis_bio_cred_id');
+      const bioToken = localStorage.getItem('jarvis_bio_token') || undefined;
 
-      // 2. Prompt Hardware Biometrics
+      // 2. Prompt Hardware Face ID / Touch ID
       const credential = (await navigator.credentials.get({
         publicKey: {
           challenge: base64UrlToBuffer(challengeData.challenge),
@@ -192,6 +197,8 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
         body: JSON.stringify({
           credentialId,
           challenge: challengeData.challenge,
+          challengeToken: challengeData.challengeToken,
+          bioToken,
           deviceId: 'mobile-node-primary',
         }),
       });
@@ -200,6 +207,7 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
 
       if (verifyRes.ok && verifyData.success) {
         localStorage.setItem('jarvis_guardian_auth', 'authenticated');
+        localStorage.setItem('jarvis_bio_enrolled', 'true');
         if (verifyData.token) {
           localStorage.setItem('jarvis_auth_token', verifyData.token);
         }
@@ -248,6 +256,7 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
           authenticatorSelection: {
             authenticatorAttachment: 'platform',
             userVerification: 'required',
+            residentKey: 'preferred',
           },
           timeout: 60000,
         },
@@ -268,6 +277,7 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
             ? 'Android Biometrics'
             : 'Workstation Biometrics',
           challenge: challengeData.challenge,
+          challengeToken: challengeData.challengeToken,
           deviceId: 'mobile-node-primary',
         }),
       });
@@ -276,6 +286,10 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
 
       if (regRes.ok && regData.success) {
         localStorage.setItem('jarvis_bio_cred_id', credentialId);
+        localStorage.setItem('jarvis_bio_enrolled', 'true');
+        if (regData.bioToken) {
+          localStorage.setItem('jarvis_bio_token', regData.bioToken);
+        }
         setIsBiometricsEnrolled(true);
         setEnrollSuccess(true);
         setTimeout(() => {
@@ -349,7 +363,78 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
     );
   }
 
-  // Primary Security Gate Modal
+  // 4. Primary Biometric Mode (When enrolled on phone / workstation)
+  if (isBiometricsEnrolled && !usePasscodeFallback) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-fadeIn">
+        <div className="relative w-full max-w-sm bg-slate-950 border border-cyan-500/50 rounded-2xl p-6 shadow-[0_0_70px_rgba(0,229,255,0.3)] text-center">
+          {/* Animated Arc Reactor Core Biometric Scanner */}
+          <div className="relative mx-auto w-24 h-24 mb-6 flex items-center justify-center">
+            <div className="absolute inset-0 rounded-full border border-cyan-500/30 animate-ping opacity-30" />
+            <div className="absolute inset-1 rounded-full border-2 border-dashed border-cyan-400/60 animate-spin-slow" />
+            <button
+              onClick={handleBiometricAuth}
+              disabled={biometricLoading}
+              className="relative w-20 h-20 rounded-full bg-cyan-950/80 border-2 border-cyan-400 flex items-center justify-center shadow-[0_0_30px_rgba(0,229,255,0.5)] active:scale-95 transition-transform group"
+            >
+              {biometricLoading ? (
+                <Loader2 className="w-9 h-9 animate-spin text-cyan-300" />
+              ) : (
+                <ScanFace className="w-9 h-9 text-cyan-400 group-hover:scale-110 transition-transform animate-pulse" />
+              )}
+            </button>
+          </div>
+
+          <h2 className="font-mono text-base font-black tracking-widest text-cyan-300 uppercase">
+            J.A.R.V.I.S. LOCKED
+          </h2>
+          <p className="text-[11px] font-mono text-slate-400 mt-1 mb-6">
+            DIRECTIVE 01 ENFORCED // FACE ID AUTHENTICATION
+          </p>
+
+          {error && (
+            <div className="mb-4 text-[11px] font-mono text-red-400 flex items-center justify-center space-x-1 animate-shake">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {/* Big Tap to Unlock Button */}
+          <button
+            onClick={handleBiometricAuth}
+            disabled={biometricLoading}
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 via-cyan-400 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-black font-mono font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_25px_rgba(0,229,255,0.5)] flex items-center justify-center space-x-2"
+          >
+            {biometricLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-black" />
+            ) : (
+              <>
+                <Fingerprint className="w-4 h-4 text-black" />
+                <span>TAP TO UNLOCK (FACE ID)</span>
+              </>
+            )}
+          </button>
+
+          {/* Fallback to Passcode */}
+          <div className="mt-5 pt-4 border-t border-slate-800/80">
+            <button
+              onClick={() => {
+                setUsePasscodeFallback(true);
+                setError(false);
+              }}
+              className="text-[11px] font-mono text-slate-400 hover:text-cyan-300 transition-colors flex items-center justify-center space-x-1 mx-auto"
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>UNLOCK WITH MASTER PASSCODE</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 5. Passcode Form (Initial or Fallback Mode)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-fadeIn">
       <div className="relative w-full max-w-sm bg-slate-950 border border-cyan-500/50 rounded-2xl p-6 shadow-[0_0_60px_rgba(0,229,255,0.25)] text-center">
@@ -365,7 +450,7 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
           DIRECTIVE 01 ENFORCED // VERIFY CREATOR IDENTITY
         </p>
 
-        {/* Instant Biometric Unlock (If Supported on Phone / Hardware) */}
+        {/* Instant Biometric Button If Supported */}
         {hasBiometricsSupport && (
           <div className="mb-5 pb-5 border-b border-slate-800">
             <button
@@ -431,6 +516,20 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
             )}
           </button>
         </form>
+
+        {isBiometricsEnrolled && (
+          <div className="mt-4 pt-3 border-t border-slate-800">
+            <button
+              onClick={() => {
+                setUsePasscodeFallback(false);
+                setError(false);
+              }}
+              className="text-[11px] font-mono text-cyan-400 hover:underline"
+            >
+              ← Back to Face ID Scan
+            </button>
+          </div>
+        )}
 
         <div className="mt-4 flex items-center justify-center space-x-1 text-[10px] font-mono text-slate-500">
           <Lock className="w-3 h-3 text-cyan-500/70" />

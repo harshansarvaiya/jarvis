@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   createSessionToken,
+  verifyChallengeToken,
+  verifyBiometricEnrollmentToken,
   SESSION_COOKIE_NAME,
   SESSION_MAX_AGE_SECONDS,
 } from '@/lib/jarvis/auth';
@@ -12,7 +14,7 @@ import {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { credentialId, challenge, deviceId } = body;
+    const { credentialId, challenge, challengeToken, deviceId, bioToken } = body;
 
     if (!credentialId) {
       return NextResponse.json(
@@ -21,8 +23,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Verify Challenge
-    if (challenge && deviceId) {
+    // 1. Verify Challenge (Stateless token or in-memory)
+    if (challengeToken) {
+      const challengeCheck = await verifyChallengeToken(challengeToken);
+      if (!challengeCheck.valid) {
+        return NextResponse.json(
+          { error: 'Biometric challenge token expired or invalid. Please try again.' },
+          { status: 401 }
+        );
+      }
+    } else if (challenge && deviceId) {
       const isValid = verifyChallenge(deviceId, challenge);
       if (!isValid) {
         return NextResponse.json(
@@ -32,12 +42,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Verify registered credential matches
-    const registered = getRegisteredCredentials();
-    const match = registered.find((c) => c.id === credentialId);
+    // 2. Verify Credential
+    let isCredentialVerified = false;
 
-    // If credentials are registered on server, enforce match
-    if (registered.length > 0 && !match) {
+    // Check signed device token first
+    if (bioToken) {
+      isCredentialVerified = await verifyBiometricEnrollmentToken(bioToken, credentialId);
+    }
+
+    // Fallback: check registered credentials in file storage
+    if (!isCredentialVerified) {
+      const registered = getRegisteredCredentials();
+      const match = registered.find((c) => c.id === credentialId);
+      if (match || registered.length === 0) {
+        isCredentialVerified = true;
+      }
+    }
+
+    if (!isCredentialVerified) {
       return NextResponse.json(
         { error: 'ACCESS DENIED // Unrecognized biometric signature.' },
         { status: 401 }
