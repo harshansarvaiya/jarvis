@@ -1,5 +1,6 @@
 {
-  "url": "https://washbasin-penpal-muppet.ngrok-free.dev",
-  "provider": "ngrok",
-  "activeAt": "2026-09-13T19:33:45.930Z"
+  "url": "https://jarvis-iota-beige.vercel.app",
+  "provider": "vercel",
+  "status": "production_cloud",
+  "updatedAt": "2026-09-14T01:32:00.000Z"
 }
