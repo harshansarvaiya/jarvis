@@ -22,7 +22,7 @@ export interface JarvisAgentOptions {
 }
 
 export function normalizeModel(m?: string): string {
-  if (!m) return 'gemini-3.6-flash';
+  if (!m) return 'gemini-3.8-flash';
   const clean = m.trim().toLowerCase();
   if (clean.includes('3.8')) return 'gemini-3.8-flash';
   if (clean.includes('3.7')) return 'gemini-3.7-flash';
@@ -31,26 +31,32 @@ export function normalizeModel(m?: string): string {
   if (clean.includes('3.1')) return 'gemini-3.1-flash-lite';
   if (clean.includes('pro')) return 'gemini-3.1-pro-preview';
   if (clean.includes('2.0') || clean.includes('2.5') || clean.includes('1.5') || clean === 'gemini-flash') {
-    return 'gemini-3.6-flash';
+    return 'gemini-3.8-flash';
   }
   return clean;
 }
 
 /**
- * High-Availability Model Fallback Hierarchy
- * Starts with requested model, then immediately cascades to rock-solid production models.
+ * Stepwise Quantum Fallback Hierarchy
+ * Priority sequence: gemini-3.8-flash -> gemini-3.7-flash -> gemini-3.6-flash
  */
 export function getModelFallbackHierarchy(requestedModel: string): string[] {
-  const primary = normalizeModel(requestedModel);
-  const reliableHierarchy = [
+  const masterHierarchy = [
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
     'gemini-3.6-flash',
     'gemini-3.5-flash',
     'gemini-3.1-flash-lite',
-    'gemini-3.8-flash',
-    'gemini-3.7-flash',
   ];
 
-  return [primary, ...reliableHierarchy].filter((v, i, a) => a.indexOf(v) === i);
+  const primary = normalizeModel(requestedModel);
+  const startIndex = masterHierarchy.indexOf(primary);
+
+  if (startIndex !== -1) {
+    return masterHierarchy.slice(startIndex);
+  }
+
+  return [primary, ...masterHierarchy].filter((v, i, a) => a.indexOf(v) === i);
 }
 
 export async function runJarvisAgent(

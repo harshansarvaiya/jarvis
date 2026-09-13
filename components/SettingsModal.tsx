@@ -109,9 +109,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {[
-                { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', desc: 'Scaled Production Core (Recommended)' },
-                { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', desc: 'Flagship 2026 Agent & Reasoning' },
-                { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', desc: 'Hybrid Thinking Core' },
+                { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', desc: 'Flagship 2026 Core (Primary)' },
+                { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', desc: 'Hybrid Thinking (Secondary)' },
+                { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', desc: 'Scaled Production (Safety Core)' },
                 { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', desc: 'High-Throughput Multimodal' },
                 { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash-Lite', desc: 'Ultra-low Latency Reflex' },
                 { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', desc: 'Deep Synthesis & Analysis' },
@@ -132,7 +132,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               ))}
             </div>
             <p className="text-[10px] text-slate-500 font-mono mt-1.5">
-              High-Availability Fallback: 3.6 &rarr; 3.5 &rarr; 3.1-Lite &rarr; 3.8 &rarr; 3.7 (Auto-switch during high demand)
+              Quantum Fallback Priority: 3.8 &rarr; 3.7 &rarr; then only 3.6 (Auto-recovers on demand spikes)
             </p>
           </div>
 
