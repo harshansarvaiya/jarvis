@@ -18,6 +18,7 @@ import {
   Brain,
   ShieldCheck,
   MessageSquare,
+  Trash2,
 } from 'lucide-react';
 import { ArcReactorOrb } from '@/components/ArcReactorOrb';
 import { DirectiveBadge } from '@/components/DirectiveBadge';
@@ -36,6 +37,14 @@ interface Message {
   timestamp: string;
 }
 
+const INITIAL_WELCOME_MESSAGE: Message = {
+  id: 'welcome-1',
+  role: 'assistant',
+  content:
+    'Good evening, Sir. J.A.R.V.I.S. Mark I is online and synchronized. All four Core Directives — Guardian Protocol, Benevolent Alignment, Evolutionary Adaptation, and Sovereign Loyalty — are actively governing our operations. I stand ready to execute your orders with absolute fidelity at any cost. How may I advance our objectives?',
+  timestamp: 'ONLINE',
+};
+
 export default function JarvisDashboard() {
   // Mount and Auth State
   const [isMounted, setIsMounted] = useState(false);
@@ -46,15 +55,8 @@ export default function JarvisDashboard() {
   const [desktopTab, setDesktopTab] = useState<'TASKS' | 'MEMORY'>('TASKS');
 
   // Messages & Conversational State
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome-1',
-      role: 'assistant',
-      content:
-        'Good evening, Sir. J.A.R.V.I.S. Mark I is online and synchronized. All four Core Directives — Guardian Protocol, Benevolent Alignment, Evolutionary Adaptation, and Sovereign Loyalty — are actively governing our operations. I stand ready to execute your orders with absolute fidelity at any cost. How may I advance our objectives?',
-      timestamp: 'ONLINE',
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([INITIAL_WELCOME_MESSAGE]);
+  const isHistoryHydrated = useRef(false);
   const [inputText, setInputText] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [orbStatus, setOrbStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
@@ -125,7 +127,50 @@ export default function JarvisDashboard() {
     setSelectedModel(savedModel);
     localStorage.setItem('jarvis_model', savedModel);
     if (savedTts !== null) setTtsEnabled(savedTts === 'true');
+
+    // Restore chat transmissions from localStorage
+    try {
+      const savedHistory = localStorage.getItem('jarvis_chat_history');
+      if (savedHistory) {
+        const parsed = JSON.parse(savedHistory);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse jarvis_chat_history', e);
+    } finally {
+      isHistoryHydrated.current = true;
+    }
   }, []);
+
+  // Persist chat transmissions across page refreshes
+  useEffect(() => {
+    if (!isHistoryHydrated.current) return;
+    try {
+      const sanitized = messages.slice(-50).map((m) => ({
+        ...m,
+        // Strip large image payloads (>100KB) to prevent localStorage quota exhaustion
+        image: m.image && m.image.length > 100000 ? undefined : m.image,
+      }));
+      localStorage.setItem('jarvis_chat_history', JSON.stringify(sanitized));
+    } catch (err) {
+      console.warn('Could not save chat history to localStorage', err);
+    }
+  }, [messages]);
+
+  // Smooth scroll to latest transmission
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Clear chat history handler
+  const handleClearChat = () => {
+    setMessages([INITIAL_WELCOME_MESSAGE]);
+    try {
+      localStorage.removeItem('jarvis_chat_history');
+    } catch {}
+  };
 
   // Auto-lock with Face ID when phone is locked or app is minimized
   useEffect(() => {
@@ -510,7 +555,20 @@ export default function JarvisDashboard() {
                   <Terminal className="w-3.5 h-3.5" />
                   <span>TRANSMISSIONS</span>
                 </div>
-                <span className="text-[10px] text-slate-400">{messages.length} LOGS</span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] text-slate-400">{messages.length} LOGS</span>
+                  {messages.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={handleClearChat}
+                      title="Purge chat history"
+                      className="text-[10px] text-slate-500 hover:text-red-400 transition-colors flex items-center space-x-1 px-1.5 py-0.5 rounded bg-slate-900/60 border border-slate-800 hover:border-red-500/30 font-mono"
+                    >
+                      <Trash2 className="w-2.5 h-2.5" />
+                      <span>PURGE</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Messages Area */}
