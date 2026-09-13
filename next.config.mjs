@@ -4,6 +4,12 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  allowedDevOrigins: [
+    'washbasin-penpal-muppet.ngrok-free.dev',
+    '*.ngrok-free.dev',
+    '*.ngrok-free.app',
+    '*.trycloudflare.com',
+  ],
   async headers() {
     return [
       {

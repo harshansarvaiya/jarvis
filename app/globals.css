@@ -68,3 +68,11 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #00e5ff;
 }
+
+/* Suppress Next.js development overlay toast on external devices */
+nextjs-portal,
+[data-nextjs-toast],
+div[data-nextjs-toast="true"] {
+  display: none !important;
+}
+
