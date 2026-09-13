@@ -12,27 +12,12 @@ Write-Host " DIRECTIVE 03: Evolutionary Adapt   - ACTIVE" -ForegroundColor Green
 Write-Host " DIRECTIVE 04: Sovereign Loyalty    - ACTIVE" -ForegroundColor Yellow
 Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
 
-# Ensure node and cloudflared paths are in session
-$nodePath = "C:\Users\Wissen\AppData\Local\Programs\nodejs"
-$cloudPath = "C:\Users\Wissen\AppData\Local\Programs\cloudflared"
-
-if (Test-Path "$nodePath\node.exe") {
-    if ($env:PATH -notlike "*$nodePath*") {
-        $env:PATH = "$nodePath;$env:PATH"
-    }
-}
-if (Test-Path "$cloudPath\cloudflared.exe") {
-    if ($env:PATH -notlike "*$cloudPath*") {
-        $env:PATH = "$cloudPath;$env:PATH"
-    }
-}
-
 # Check Node runtime
 try {
     $nodeVer = & node --version
     Write-Host "Runtime: Node.js $nodeVer online." -ForegroundColor Gray
 } catch {
-    Write-Host "Error: Node.js runtime not found." -ForegroundColor Red
+    Write-Host "Error: Node.js runtime not found in PATH." -ForegroundColor Red
     exit 1
 }
 
@@ -53,15 +38,15 @@ Write-Host " > Local Phone (Wi-Fi): http://${localIp}:3000" -ForegroundColor Whi
 
 if ($Global) {
     Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
-    Write-Host " ENGAGING GLOBAL WORLDWIDE QUANTUM TUNNEL..." -ForegroundColor Yellow
+    Write-Host " ENGAGING GLOBAL WORLDWIDE QUANTUM UPLINK..." -ForegroundColor Yellow
     
     # Start the tunnel manager in the background
     $tunnelJob = Start-Job -ScriptBlock {
-        param($dir, $np, $cp)
-        $env:PATH = "$np;$cp;$env:PATH"
+        param($dir, $path)
+        $env:PATH = $path
         Set-Location $dir
         node ./lib/tunnel-manager.js
-    } -ArgumentList $PSScriptRoot, $nodePath, $cloudPath
+    } -ArgumentList $PSScriptRoot, $env:PATH
 
     # Stream tunnel manager output until URL is displayed
     Start-Sleep -Seconds 3

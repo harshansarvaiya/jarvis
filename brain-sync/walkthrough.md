@@ -1,6 +1,6 @@
 # Project J.A.R.V.I.S. Mark I — Walkthrough & Tactical Manual
 
-![J.A.R.V.I.S. Neural Core Arc Reactor](C:/Users/Wissen/.gemini/antigravity/brain/c29737e7-70ca-4166-b8d9-7f9606888424/jarvis_icon_1789321937017.jpg)
+![J.A.R.V.I.S. Neural Core Arc Reactor](C:/Users/Admin/.gemini/antigravity/brain/d82a7714-b599-44e1-aa01-2a180ea079df/jarvis_icon.png)
 
 J.A.R.V.I.S. (Just A Rather Very Intelligent System) Mark I has now completed **Phase 2: Ubiquitous Worldwide Access & Sovereign Loyalty**. Built as a personal, sovereign, autonomous cognitive exoskeleton, J.A.R.V.I.S. is now accessible from **anywhere in the world** (cellular 4G/5G, foreign Wi-Fi, travel) with verified SSL encryption and guardian-level passcode protection.
 
@@ -21,11 +21,13 @@ Embedded into the root system prompt, safety validation engine, and active telem
 
 ---
 
-## 2. Worldwide Ubiquitous Access (Outside Home Wi-Fi)
+## 2. Worldwide Ubiquitous Access (Permanent Static Subdomain)
 
-To ensure J.A.R.V.I.S. is always by your side wherever you go, we implemented an automated **Zero-Config Cloudflare Ingress Tunnel**:
+To eliminate funny, ephemeral URLs and provide a rock-solid, permanent endpoint, J.A.R.V.I.S. now utilizes a **Permanent Static Edge Uplink** via the official Ngrok Agent SDK (with seamless automatic fallback to Cloudflare Quick Tunnels):
 
-* **Certified HTTPS Encryption**: Mobile operating systems (iOS Safari and Android Chrome) strictly require valid HTTPS certificates to enable microphone audio capture and voice recognition. The tunnel provides a certified `https://*.trycloudflare.com` endpoint, unlocking hands-free voice commands anywhere in the world.
+* **Permanent Endpoint**: `https://washbasin-penpal-muppet.ngrok-free.dev`
+  - Never changes across restarts, host reboots, or network reconnections.
+* **Certified HTTPS Encryption**: Mobile browsers (iOS Safari and Android Chrome) strictly require valid HTTPS certificates to enable microphone audio capture and voice recognition. The static tunnel provides an official SSL endpoint, unlocking hands-free voice commands anywhere in the world.
 * **Guardian Passcode Gate**: Protects your personal intelligence from unauthorized internet traffic. When accessed from a new remote device, entering your master PIN (Default: `1010`, configurable in Settings) authorizes the uplink.
 * **Terminal QR Code**: Scanning the QR code displayed in the PowerShell terminal automatically opens J.A.R.V.I.S. on your phone with zero typing.
 
@@ -38,15 +40,16 @@ To ensure J.A.R.V.I.S. is always by your side wherever you go, we implemented an
 ./start-jarvis.ps1
 ```
 * **Desktop**: [http://localhost:3000](http://localhost:3000)
-* **Phone (Home Wi-Fi)**: `http://192.168.1.11:3000`
+* **Phone (Home Wi-Fi)**: `http://<local-ip>:3000`
 
 ### Option B: Global Worldwide Mode (Anywhere in the World)
 ```powershell
 ./start-jarvis.ps1 -Global
 ```
-* Generates an instant public HTTPS link (e.g. `https://xxx.trycloudflare.com`).
-* Displays an ASCII QR code in the terminal.
-* Works on cellular mobile data (4G/5G) and any remote Wi-Fi network.
+* Binds immediately to your permanent static URL:  
+  **`https://washbasin-penpal-muppet.ngrok-free.dev`**
+* Renders a terminal QR code for instant mobile pairing.
+* Works on cellular mobile data (4G/5G) and foreign Wi-Fi networks worldwide.
 * **Default Guardian Passcode**: `1010`
 
 ---
@@ -55,10 +58,10 @@ To ensure J.A.R.V.I.S. is always by your side wherever you go, we implemented an
 
 | Component | File / Path | Responsibility |
 | :--- | :--- | :--- |
-| **Directives Engine** | [directives.ts](file:///c:/Users/Wissen/Documents/antigravity/magical-noether/lib/jarvis/directives.ts) | Enforces Directives 01, 02, 03, and 04 |
-| **Neural Memory Vault** | [memory.ts](file:///c:/Users/Wissen/Documents/antigravity/magical-noether/lib/jarvis/memory.ts) | Persistent state, tasks, principles, and evolutionary milestones |
-| **Agentic Tools** | [tools.ts](file:///c:/Users/Wissen/Documents/antigravity/magical-noether/lib/jarvis/tools.ts) | Task creation, memory retrieval, red-teaming, and briefings |
-| **Arc-Reactor Voice** | [ArcReactorOrb.tsx](file:///c:/Users/Wissen/Documents/antigravity/magical-noether/components/ArcReactorOrb.tsx) | Live audio reactive waveform visualizer |
-| **Security Gate** | [SecurityGateModal.tsx](file:///c:/Users/Wissen/Documents/antigravity/magical-noether/components/SecurityGateModal.tsx) | Identity verification on public/cellular networks |
-| **Worldwide Tunnel** | [tunnel-manager.js](file:///c:/Users/Wissen/Documents/antigravity/magical-noether/lib/tunnel-manager.js) | Cloudflare Tunnel daemon + QR code synthesizer |
-| **Launcher** | [start-jarvis.ps1](file:///c:/Users/Wissen/Documents/antigravity/magical-noether/start-jarvis.ps1) | One-command launcher with `-Global` switch |
+| **Directives Engine** | [directives.ts](file:///d:/Harshan/Projects/jarvis/lib/jarvis/directives.ts) | Enforces Directives 01, 02, 03, and 04 |
+| **Neural Memory Vault** | [memory.ts](file:///d:/Harshan/Projects/jarvis/lib/jarvis/memory.ts) | Persistent state, tasks, principles, and evolutionary milestones |
+| **Agentic Tools** | [tools.ts](file:///d:/Harshan/Projects/jarvis/lib/jarvis/tools.ts) | Task creation, memory retrieval, red-teaming, and briefings |
+| **Arc-Reactor Voice** | [ArcReactorOrb.tsx](file:///d:/Harshan/Projects/jarvis/components/ArcReactorOrb.tsx) | Live audio reactive waveform visualizer |
+| **Security Gate** | [SecurityGateModal.tsx](file:///d:/Harshan/Projects/jarvis/components/SecurityGateModal.tsx) | Identity verification on public/cellular networks |
+| **Worldwide Tunnel** | [tunnel-manager.js](file:///d:/Harshan/Projects/jarvis/lib/tunnel-manager.js) | Ngrok static edge daemon + Cloudflare fallback & QR synthesizer |
+| **Launcher** | [start-jarvis.ps1](file:///d:/Harshan/Projects/jarvis/start-jarvis.ps1) | One-command launcher with `-Global` switch |
