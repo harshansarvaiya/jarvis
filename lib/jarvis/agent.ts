@@ -22,9 +22,12 @@ export interface JarvisAgentOptions {
 }
 
 export function normalizeModel(m?: string): string {
-  if (!m) return 'gemini-2.0-flash';
+  if (!m) return 'gemini-3.8-flash';
   const clean = m.trim().toLowerCase();
-  if (clean.includes('2.5') || clean.includes('2.0') || clean === 'gemini-flash') {
+  if (clean.includes('3.8') || clean.includes('3.7') || clean.includes('3.5')) {
+    return 'gemini-3.8-flash';
+  }
+  if (clean.includes('2.0') || clean.includes('2.5') || clean === 'gemini-flash') {
     return 'gemini-2.0-flash';
   }
   if (clean.includes('pro')) {
@@ -125,7 +128,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     }
 
     const primaryModel = normalizeModel(model);
-    const candidateModels = [primaryModel, 'gemini-2.0-flash', 'gemini-1.5-flash']
+    const candidateModels = [primaryModel, 'gemini-3.8-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
       .filter((v, i, a) => a.indexOf(v) === i);
 
     let response: Response | null = null;
@@ -133,6 +136,17 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     let lastErrorText = '';
 
     for (const candidateModel of candidateModels) {
+      const is3x = candidateModel.includes('3.');
+      const generationConfig = is3x
+        ? {
+            thinking_level: 'medium',
+            maxOutputTokens: 4096,
+          }
+        : {
+            temperature: 0.4,
+            maxOutputTokens: 2048,
+          };
+
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${candidateModel}:generateContent?key=${apiKey}`;
       const res = await fetch(url, {
         method: 'POST',
@@ -141,10 +155,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           contents,
           systemInstruction,
           tools: geminiTools,
-          generationConfig: {
-            temperature: 0.4,
-            maxOutputTokens: 2048,
-          },
+          generationConfig,
         }),
       });
 

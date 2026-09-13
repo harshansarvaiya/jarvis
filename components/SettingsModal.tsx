@@ -102,10 +102,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <label className="block text-xs font-mono text-cyan-400 mb-1.5">
               NEURAL ENGINE MODEL
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {[
-                { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'Sub-second reflex & voice' },
-                { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', desc: 'Deep synthesis & reasoning' },
+                { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', desc: 'Flagship 2026 Agent & Reasoning' },
+                { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'High-speed sub-second reflex' },
+                { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', desc: 'Deep synthesis & analysis' },
               ].map((m) => (
                 <button
                   type="button"
