@@ -86,20 +86,25 @@ export default function JarvisDashboard() {
   // Client initialization and Guardian Gate verification
   useEffect(() => {
     setIsMounted(true);
-    const isLocalhost =
-      typeof window !== 'undefined' &&
-      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    const isAuth =
-      typeof window !== 'undefined' &&
-      localStorage.getItem('jarvis_guardian_auth') === 'authenticated';
 
-    if (isLocalhost || isAuth) {
-      setIsUnlocked(true);
-      fetchTasks();
-      fetchMemories();
-    } else {
-      setIsUnlocked(false);
-    }
+    const verifyAuth = async () => {
+      try {
+        const res = await fetch('/api/jarvis/auth/status');
+        const data = await res.json();
+        if (res.ok && data.authenticated) {
+          setIsUnlocked(true);
+          fetchTasks();
+          fetchMemories();
+        } else {
+          localStorage.removeItem('jarvis_guardian_auth');
+          setIsUnlocked(false);
+        }
+      } catch (err) {
+        setIsUnlocked(false);
+      }
+    };
+
+    verifyAuth();
 
     const savedKey = localStorage.getItem('jarvis_api_key') || '';
     const savedModel = localStorage.getItem('jarvis_model') || 'gemini-2.5-flash';

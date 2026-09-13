@@ -84,20 +84,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </p>
           </div>
 
-          {/* Master Security PIN (Guardian Protocol) */}
-          <div>
-            <label className="block text-xs font-mono text-amber-400 mb-1.5 flex items-center space-x-1.5">
-              <Lock className="w-3.5 h-3.5" />
-              <span>GUARDIAN PASSCODE (REMOTE PHONE ACCESS)</span>
-            </label>
-            <input
-              type="text"
-              value={masterPin}
-              onChange={(e) => setMasterPin(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-amber-200 focus:outline-none focus:border-amber-400"
-            />
-            <p className="text-[10px] text-slate-400 mt-1">
-              Requires this passcode when connecting from your phone across public networks.
+          {/* Master Security Key (Guardian Protocol) */}
+          <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-mono text-amber-400 flex items-center space-x-1.5">
+                <Lock className="w-3.5 h-3.5" />
+                <span>GUARDIAN MASTER SECRET (SERVER SENTRY)</span>
+              </label>
+            </div>
+            <p className="text-[10px] text-slate-400">
+              Validated on Vercel Edge. Configure <code className="text-amber-300 bg-black/40 px-1 py-0.5 rounded">JARVIS_MASTER_PIN</code> or <code className="text-amber-300 bg-black/40 px-1 py-0.5 rounded">JARVIS_MASTER_KEY</code> in Vercel Environment Variables for absolute protection.
             </p>
           </div>
 
@@ -176,6 +172,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* Action Footer */}
           <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await fetch('/api/jarvis/auth/logout', { method: 'POST' });
+                } catch {}
+                localStorage.removeItem('jarvis_guardian_auth');
+                localStorage.removeItem('jarvis_auth_token');
+                window.location.reload();
+              }}
+              className="px-3 py-2 rounded-lg bg-red-950/60 border border-red-500/40 text-red-400 hover:bg-red-900/60 font-mono text-xs flex items-center space-x-1.5 transition-colors"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>ENGAGE LOCKDOWN</span>
+            </button>
+
             {savedSuccess ? (
               <span className="text-xs font-mono text-emerald-400 flex items-center space-x-1">
                 <Check className="w-3.5 h-3.5" />
