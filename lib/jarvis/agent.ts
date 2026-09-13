@@ -22,46 +22,35 @@ export interface JarvisAgentOptions {
 }
 
 export function normalizeModel(m?: string): string {
-  if (!m) return 'gemini-3.8-flash';
+  if (!m) return 'gemini-3.6-flash';
   const clean = m.trim().toLowerCase();
   if (clean.includes('3.8')) return 'gemini-3.8-flash';
   if (clean.includes('3.7')) return 'gemini-3.7-flash';
   if (clean.includes('3.6')) return 'gemini-3.6-flash';
   if (clean.includes('3.5')) return 'gemini-3.5-flash';
-  if (clean.includes('2.0') || clean.includes('2.5') || clean === 'gemini-flash') {
-    return 'gemini-2.0-flash';
-  }
-  if (clean.includes('pro')) {
-    return 'gemini-1.5-pro';
-  }
-  if (clean.includes('1.5')) {
-    return 'gemini-1.5-flash';
+  if (clean.includes('3.1')) return 'gemini-3.1-flash-lite';
+  if (clean.includes('pro')) return 'gemini-3.1-pro-preview';
+  if (clean.includes('2.0') || clean.includes('2.5') || clean.includes('1.5') || clean === 'gemini-flash') {
+    return 'gemini-3.6-flash';
   }
   return clean;
 }
 
 /**
- * Sequential Stepwise Fallback Hierarchy
- * Strict rule: Never jump directly from 3.x to 2.x; always step one version down.
+ * High-Availability Model Fallback Hierarchy
+ * Starts with requested model, then immediately cascades to rock-solid production models.
  */
 export function getModelFallbackHierarchy(requestedModel: string): string[] {
-  const masterHierarchy = [
-    'gemini-3.8-flash',
-    'gemini-3.7-flash',
+  const primary = normalizeModel(requestedModel);
+  const reliableHierarchy = [
     'gemini-3.6-flash',
     'gemini-3.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
   ];
 
-  const primary = normalizeModel(requestedModel);
-  const startIndex = masterHierarchy.indexOf(primary);
-
-  if (startIndex !== -1) {
-    return masterHierarchy.slice(startIndex);
-  }
-
-  return [primary, ...masterHierarchy].filter((v, i, a) => a.indexOf(v) === i);
+  return [primary, ...reliableHierarchy].filter((v, i, a) => a.indexOf(v) === i);
 }
 
 export async function runJarvisAgent(
@@ -160,16 +149,10 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     let selectedModel = candidateModels[0] || 'gemini-3.8-flash';
 
     for (const candidateModel of candidateModels) {
-      const is3x = candidateModel.includes('3.');
-      const generationConfig = is3x
-        ? {
-            thinking_level: 'medium',
-            maxOutputTokens: 4096,
-          }
-        : {
-            temperature: 0.4,
-            maxOutputTokens: 2048,
-          };
+      const generationConfig = {
+        temperature: 0.4,
+        maxOutputTokens: 4096,
+      };
 
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${candidateModel}:generateContent?key=${apiKey}`;
       try {
@@ -194,12 +177,32 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         lastErrorText = await res.text();
         console.warn(`[Quantum Fallback] Model ${candidateModel} failed with HTTP ${res.status}:`, lastErrorText);
 
+        // Parse error response if possible
+        let errorData: any = null;
+        try {
+          errorData = JSON.parse(lastErrorText);
+        } catch {}
+
+        const isApiKeyError =
+          res.status === 401 ||
+          res.status === 403 ||
+          lastErrorText.includes('API_KEY_INVALID') ||
+          lastErrorText.includes('API key not valid') ||
+          errorData?.error?.message?.toLowerCase().includes('api key');
+
+        // Fatal API key authentication errors must stop immediately - do not attempt fallback
+        if (isApiKeyError) {
+          response = res;
+          activeApiUrl = url;
+          break;
+        }
+
         // Fall back one version down on 404 (not found), 400 (config mismatch), 429 (rate limit), or 503 (overload)
         if (res.status === 404 || res.status === 400 || res.status === 429 || res.status === 503) {
           continue;
         }
 
-        // Fatal errors like 401 Unauthorized API key should stop immediately
+        // Other non-retryable errors stop immediately
         response = res;
         activeApiUrl = url;
         break;
@@ -211,8 +214,29 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     }
 
     if (!response || !response.ok) {
+      let diagnosticMessage = '';
+      try {
+        const parsed = JSON.parse(lastErrorText);
+        if (parsed?.error?.message) {
+          diagnosticMessage = `: "${parsed.error.message}"`;
+        }
+      } catch {
+        if (lastErrorText && lastErrorText.length < 150) {
+          diagnosticMessage = `: ${lastErrorText}`;
+        }
+      }
+
+      const statusCode = response?.status || (lastErrorText.includes('API_KEY_INVALID') ? 400 : 500);
+
+      let guidance = 'Operating on localized heuristics in the interim.';
+      if (lastErrorText.includes('API_KEY_INVALID') || lastErrorText.includes('API key not valid')) {
+        guidance = 'Your Gemini API Key appears to be invalid, mistyped, or not enabled for the Generative Language API. Please generate a valid key at https://aistudio.google.com/app/apikey and update it in Settings or .env.local.';
+      } else if (response?.status === 403 || lastErrorText.includes('PERMISSION_DENIED')) {
+        guidance = 'Permission denied by Google Cloud. Ensure the Generative Language API is enabled and your key has no IP/referrer restrictions.';
+      }
+
       return {
-        reply: `Sir, our neural uplink encountered an API response error (${response?.status || 500}). Operating on localized heuristics in the interim.`,
+        reply: `Sir, our neural uplink encountered an API response error (${statusCode})${diagnosticMessage}.\n\n${guidance}`,
         toolCallsExecuted: [],
         error: lastErrorText,
       };

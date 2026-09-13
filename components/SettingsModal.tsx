@@ -109,12 +109,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {[
+                { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', desc: 'Scaled Production Core (Recommended)' },
                 { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', desc: 'Flagship 2026 Agent & Reasoning' },
                 { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', desc: 'Hybrid Thinking Core' },
-                { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', desc: 'Scaled Production Agent' },
                 { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', desc: 'High-Throughput Multimodal' },
-                { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'High-speed Sub-second Reflex' },
-                { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', desc: 'Deep Synthesis & Analysis' },
+                { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash-Lite', desc: 'Ultra-low Latency Reflex' },
+                { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', desc: 'Deep Synthesis & Analysis' },
               ].map((m) => (
                 <button
                   type="button"
@@ -132,7 +132,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               ))}
             </div>
             <p className="text-[10px] text-slate-500 font-mono mt-1.5">
-              Quantum Fallback Cascade: 3.8 &rarr; 3.7 &rarr; 3.6 &rarr; 3.5 &rarr; 2.0 &rarr; 1.5 (Graceful single-version degradation)
+              High-Availability Fallback: 3.6 &rarr; 3.5 &rarr; 3.1-Lite &rarr; 3.8 &rarr; 3.7 (Auto-switch during high demand)
             </p>
           </div>
 
