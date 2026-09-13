@@ -137,20 +137,42 @@ const INITIAL_STATE: JarvisState = {
   ],
 };
 
+function getStateFilePath(): string {
+  if (process.env.VERCEL) {
+    const tmpFile = path.join('/tmp', 'jarvis-state.json');
+    if (!fs.existsSync(tmpFile)) {
+      try {
+        if (fs.existsSync(STATE_FILE)) {
+          fs.copyFileSync(STATE_FILE, tmpFile);
+        } else {
+          fs.writeFileSync(tmpFile, JSON.stringify(INITIAL_STATE, null, 2), 'utf-8');
+        }
+      } catch (e) {
+        // Fallback to in-memory/static
+      }
+    }
+    return tmpFile;
+  }
+  return STATE_FILE;
+}
+
 function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (!process.env.VERCEL && !fs.existsSync(DATA_DIR)) {
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    } catch (e) {}
   }
 }
 
 export function loadJarvisState(): JarvisState {
   try {
     ensureDataDir();
-    if (!fs.existsSync(STATE_FILE)) {
+    const filePath = getStateFilePath();
+    if (!fs.existsSync(filePath)) {
       saveJarvisState(INITIAL_STATE);
       return INITIAL_STATE;
     }
-    const raw = fs.readFileSync(STATE_FILE, 'utf-8');
+    const raw = fs.readFileSync(filePath, 'utf-8');
     const parsed = JSON.parse(raw) as JarvisState;
     return parsed;
   } catch (error) {
@@ -163,7 +185,8 @@ export function saveJarvisState(state: JarvisState): void {
   try {
     ensureDataDir();
     state.lastActive = new Date().toISOString();
-    fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), 'utf-8');
+    const filePath = getStateFilePath();
+    fs.writeFileSync(filePath, JSON.stringify(state, null, 2), 'utf-8');
   } catch (error) {
     console.error('Failed to save Jarvis state:', error);
   }
