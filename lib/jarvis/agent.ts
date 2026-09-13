@@ -21,6 +21,21 @@ export interface JarvisAgentOptions {
   stream?: boolean;
 }
 
+export function normalizeModel(m?: string): string {
+  if (!m) return 'gemini-2.0-flash';
+  const clean = m.trim().toLowerCase();
+  if (clean.includes('2.5') || clean.includes('2.0') || clean === 'gemini-flash') {
+    return 'gemini-2.0-flash';
+  }
+  if (clean.includes('pro')) {
+    return 'gemini-1.5-pro';
+  }
+  if (clean.includes('1.5')) {
+    return 'gemini-1.5-flash';
+  }
+  return clean;
+}
+
 export async function runJarvisAgent(
   messages: ChatMessage[],
   options: JarvisAgentOptions = {}
@@ -31,7 +46,7 @@ export async function runJarvisAgent(
   error?: string;
 }> {
   const apiKey = options.apiKey || process.env.GEMINI_API_KEY || '';
-  const model = options.model || 'gemini-2.5-flash';
+  const model = normalizeModel(options.model || 'gemini-2.0-flash');
 
   const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
   if (!lastUserMessage) {
@@ -109,29 +124,52 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       contents.push({ role, parts });
     }
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const primaryModel = normalizeModel(model);
+    const candidateModels = [primaryModel, 'gemini-2.0-flash', 'gemini-1.5-flash']
+      .filter((v, i, a) => a.indexOf(v) === i);
 
-    let response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents,
-        systemInstruction,
-        tools: geminiTools,
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 2048,
-        },
-      }),
-    });
+    let response: Response | null = null;
+    let activeApiUrl = '';
+    let lastErrorText = '';
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('Gemini API Error:', errText);
+    for (const candidateModel of candidateModels) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${candidateModel}:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents,
+          systemInstruction,
+          tools: geminiTools,
+          generationConfig: {
+            temperature: 0.4,
+            maxOutputTokens: 2048,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        response = res;
+        activeApiUrl = url;
+        break;
+      }
+
+      lastErrorText = await res.text();
+      console.warn(`Gemini model ${candidateModel} returned ${res.status}:`, lastErrorText);
+
+      // If model not found (404), fall back to next model candidate
+      if (res.status !== 404) {
+        response = res;
+        activeApiUrl = url;
+        break;
+      }
+    }
+
+    if (!response || !response.ok) {
       return {
-        reply: `Sir, our neural uplink encountered an API response error (${response.status}). Operating on localized heuristics in the interim.`,
+        reply: `Sir, our neural uplink encountered an API response error (${response?.status || 500}). Operating on localized heuristics in the interim.`,
         toolCallsExecuted: [],
-        error: errText,
+        error: lastErrorText,
       };
     }
 
@@ -178,7 +216,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       });
 
       // Query Gemini again with tool output
-      response = await fetch(apiUrl, {
+      response = await fetch(activeApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

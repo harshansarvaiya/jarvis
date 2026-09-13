@@ -104,8 +104,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </label>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', desc: 'Sub-second reflex & voice' },
-                { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', desc: 'Deep synthesis & reasoning' },
+                { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'Sub-second reflex & voice' },
+                { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', desc: 'Deep synthesis & reasoning' },
               ].map((m) => (
                 <button
                   type="button"

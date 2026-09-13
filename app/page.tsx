@@ -66,7 +66,7 @@ export default function JarvisDashboard() {
 
   // Config State
   const [apiKey, setApiKey] = useState('');
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-2.0-flash');
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [timeStr, setTimeStr] = useState('');
 
@@ -118,10 +118,12 @@ export default function JarvisDashboard() {
     verifyAuth();
 
     const savedKey = localStorage.getItem('jarvis_api_key') || '';
-    const savedModel = localStorage.getItem('jarvis_model') || 'gemini-2.5-flash';
+    const rawModel = localStorage.getItem('jarvis_model') || 'gemini-2.0-flash';
+    const savedModel = rawModel.includes('2.5') ? 'gemini-2.0-flash' : rawModel;
     const savedTts = localStorage.getItem('jarvis_tts');
     setApiKey(savedKey);
     setSelectedModel(savedModel);
+    localStorage.setItem('jarvis_model', savedModel);
     if (savedTts !== null) setTtsEnabled(savedTts === 'true');
   }, []);
 

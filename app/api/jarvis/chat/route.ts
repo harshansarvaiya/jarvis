@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 
     const result = await runJarvisAgent(messages, {
       apiKey: apiKey || process.env.GEMINI_API_KEY,
-      model: model || 'gemini-2.5-flash',
+      model: model || 'gemini-2.0-flash',
     });
 
     return NextResponse.json(result);
