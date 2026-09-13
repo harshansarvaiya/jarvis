@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Key, Cpu, Volume2, ShieldCheck, Check } from 'lucide-react';
+import { X, Key, Cpu, Volume2, ShieldCheck, Check, Globe, Lock } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -25,24 +25,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onToggleTts,
 }) => {
   const [localKey, setLocalKey] = useState(apiKey);
+  const [masterPin, setMasterPin] = useState('1010');
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
     setLocalKey(apiKey);
-  }, [apiKey]);
+    const pin = localStorage.getItem('jarvis_master_pin') || '1010';
+    setMasterPin(pin);
+  }, [apiKey, isOpen]);
 
   if (!isOpen) return null;
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     onSaveApiKey(localKey.trim());
+    localStorage.setItem('jarvis_master_pin', masterPin.trim() || '1010');
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2000);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-      <div className="relative w-full max-w-lg bg-slate-950 border border-cyan-500/40 rounded-2xl p-6 shadow-[0_0_50px_rgba(0,229,255,0.2)]">
+      <div className="relative w-full max-w-lg bg-slate-950 border border-cyan-500/40 rounded-2xl p-6 shadow-[0_0_50px_rgba(0,229,255,0.2)] max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-cyan-500/20 mb-5">
           <div className="flex items-center space-x-2">
@@ -76,7 +80,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               />
             </div>
             <p className="text-[10px] text-slate-400 mt-1">
-              Encrypted locally in your browser storage. Required for live multimodal synthesis & real-time reasoning.
+              Encrypted locally in your browser. Powers real-time voice, vision, and tool actions.
+            </p>
+          </div>
+
+          {/* Master Security PIN (Guardian Protocol) */}
+          <div>
+            <label className="block text-xs font-mono text-amber-400 mb-1.5 flex items-center space-x-1.5">
+              <Lock className="w-3.5 h-3.5" />
+              <span>GUARDIAN PASSCODE (REMOTE PHONE ACCESS)</span>
+            </label>
+            <input
+              type="text"
+              value={masterPin}
+              onChange={(e) => setMasterPin(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-amber-200 focus:outline-none focus:border-amber-400"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">
+              Requires this passcode when connecting from your phone across public networks.
             </p>
           </div>
 
@@ -131,13 +152,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
           </div>
 
+          {/* Worldwide Access Telemetry Info */}
+          <div className="p-3 rounded-lg bg-cyan-950/20 border border-cyan-500/30 text-xs font-mono text-cyan-300">
+            <div className="flex items-center space-x-2 font-bold mb-1">
+              <Globe className="w-4 h-4 text-cyan-400" />
+              <span>WORLDWIDE UBIQUITOUS UPLINK</span>
+            </div>
+            <p className="text-[10px] text-slate-300 leading-relaxed">
+              Launch with <code className="text-cyan-400 bg-slate-900 px-1 py-0.5 rounded">./start-jarvis.ps1 -Global</code> to spin up an instant secure HTTPS tunnel for encrypted mobile voice anywhere in the world.
+            </p>
+          </div>
+
           {/* Core Directives Confirmation */}
           <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-500/30 text-xs font-mono text-emerald-300 flex items-start space-x-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold">DIRECTIVES 01, 02, 03 ENGAGED:</span>
+              <span className="font-bold">DIRECTIVES 01, 02, 03, 04 ENGAGED:</span>
               <p className="text-[10px] text-slate-300 mt-0.5">
-                Guardian Protocol active. Absolute protection of creator, privacy, digital sovereignty, and ethical alignment.
+                Guardian Protocol, Benevolent Alignment, Evolutionary Adaptation, and Sovereign Loyalty active.
               </p>
             </div>
           </div>

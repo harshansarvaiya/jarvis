@@ -20,6 +20,7 @@ import { DirectiveBadge } from '@/components/DirectiveBadge';
 import { TaskMatrix } from '@/components/TaskMatrix';
 import { MemoryVault } from '@/components/MemoryVault';
 import { SettingsModal } from '@/components/SettingsModal';
+import { SecurityGateModal } from '@/components/SecurityGateModal';
 import { Task, Priority, MemoryItem, MemoryCategory } from '@/lib/jarvis/memory';
 
 interface Message {
@@ -38,7 +39,7 @@ export default function JarvisDashboard() {
       id: 'welcome-1',
       role: 'assistant',
       content:
-        'Good evening, Sir. J.A.R.V.I.S. Mark I is online and synchronized. All three Core Directives — Guardian Protocol, Benevolent Alignment, and Evolutionary Adaptation — are actively governing our operations. How may I advance our objectives?',
+        'Good evening, Sir. J.A.R.V.I.S. Mark I is online and synchronized. All four Core Directives — Guardian Protocol, Benevolent Alignment, Evolutionary Adaptation, and Sovereign Loyalty — are actively governing our operations. I stand ready to execute your orders with absolute fidelity at any cost. How may I advance our objectives?',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -50,6 +51,7 @@ export default function JarvisDashboard() {
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [evolutionStage, setEvolutionStage] = useState<number>(1);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(true);
   const [activeTab, setActiveTab] = useState<'TASKS' | 'MEMORY' | 'FEED'>('FEED');
 
   // Config State
@@ -79,6 +81,15 @@ export default function JarvisDashboard() {
     setApiKey(savedKey);
     setSelectedModel(savedModel);
     if (savedTts !== null) setTtsEnabled(savedTts === 'true');
+
+    // If accessing remotely outside localhost, verify Guardian authentication
+    if (typeof window !== 'undefined') {
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const isAuth = localStorage.getItem('jarvis_guardian_auth') === 'authenticated';
+      if (!isLocalhost && !isAuth) {
+        setIsUnlocked(false);
+      }
+    }
 
     fetchTasks();
     fetchMemories();
@@ -594,6 +605,12 @@ export default function JarvisDashboard() {
           setTtsEnabled(enabled);
           localStorage.setItem('jarvis_tts', String(enabled));
         }}
+      />
+
+      {/* Guardian Security Gate for Remote Phone Access */}
+      <SecurityGateModal
+        isUnlocked={isUnlocked}
+        onUnlock={() => setIsUnlocked(true)}
       />
     </main>
   );

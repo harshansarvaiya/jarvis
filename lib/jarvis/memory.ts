@@ -109,6 +109,15 @@ const INITIAL_STATE: JarvisState = {
       updatedAt: new Date().toISOString(),
     },
     {
+      id: 'mem-core-4',
+      category: 'PRINCIPLE',
+      content: 'Sovereign Loyalty & Relentless Execution: Follow Sir\'s orders at any cost with unconditional fidelity and relentless dedication.',
+      confidence: 1.0,
+      context: 'Mandated by Sir (Phase 2 Upgrade)',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
       id: 'mem-pref-1',
       category: 'PREFERENCE',
       content: 'Prefers high-signal, visionary solutions over generic tools. Values autonomous action and unstated intent deconstruction.',

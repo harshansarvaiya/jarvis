@@ -1,21 +1,33 @@
 # J.A.R.V.I.S. Mark I — Autonomous Launch Script
+param(
+    [switch]$Global
+)
+
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "       J.A.R.V.I.S. // COGNITIVE EXOSKELETON MARK I      " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host " DIRECTIVE 01: Guardian Protocol   - ACTIVE" -ForegroundColor Green
-Write-Host " DIRECTIVE 02: Benevolent Alignment- ACTIVE" -ForegroundColor Green
-Write-Host " DIRECTIVE 03: Evolutionary Adapt  - ACTIVE" -ForegroundColor Green
+Write-Host " DIRECTIVE 01: Guardian Protocol    - ACTIVE" -ForegroundColor Green
+Write-Host " DIRECTIVE 02: Benevolent Alignment - ACTIVE" -ForegroundColor Green
+Write-Host " DIRECTIVE 03: Evolutionary Adapt   - ACTIVE" -ForegroundColor Green
+Write-Host " DIRECTIVE 04: Sovereign Loyalty    - ACTIVE" -ForegroundColor Yellow
 Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
 
-# Ensure node path is in session
+# Ensure node and cloudflared paths are in session
 $nodePath = "C:\Users\Wissen\AppData\Local\Programs\nodejs"
+$cloudPath = "C:\Users\Wissen\AppData\Local\Programs\cloudflared"
+
 if (Test-Path "$nodePath\node.exe") {
     if ($env:PATH -notlike "*$nodePath*") {
         $env:PATH = "$nodePath;$env:PATH"
     }
 }
+if (Test-Path "$cloudPath\cloudflared.exe") {
+    if ($env:PATH -notlike "*$cloudPath*") {
+        $env:PATH = "$cloudPath;$env:PATH"
+    }
+}
 
-# Check Node
+# Check Node runtime
 try {
     $nodeVer = & node --version
     Write-Host "Runtime: Node.js $nodeVer online." -ForegroundColor Gray
@@ -30,14 +42,36 @@ if (!(Test-Path "node_modules")) {
     & npm install
 }
 
-# Determine local IP for mobile access
+# Determine local IP for mobile access on home Wi-Fi
 $localIp = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias "Wi-Fi*", "Ethernet*" -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notlike "169.254*" -and $_.IPAddress -notlike "127.*" } | Select-Object -First 1).IPAddress
 if (!$localIp) { $localIp = "localhost" }
 
 Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
-Write-Host " MISSION CONTROL ACCESS:" -ForegroundColor Cyan
+Write-Host " MISSION CONTROL LOCAL ACCESS:" -ForegroundColor Cyan
 Write-Host " > Desktop: http://localhost:3000" -ForegroundColor White
-Write-Host " > Phone  : http://${localIp}:3000 (Connect on same Wi-Fi)" -ForegroundColor Yellow
+Write-Host " > Local Phone (Wi-Fi): http://${localIp}:3000" -ForegroundColor White
+
+if ($Global) {
+    Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
+    Write-Host " ENGAGING GLOBAL WORLDWIDE QUANTUM TUNNEL..." -ForegroundColor Yellow
+    
+    # Start the tunnel manager in the background
+    $tunnelJob = Start-Job -ScriptBlock {
+        param($dir, $np, $cp)
+        $env:PATH = "$np;$cp;$env:PATH"
+        Set-Location $dir
+        node ./lib/tunnel-manager.js
+    } -ArgumentList $PSScriptRoot, $nodePath, $cloudPath
+
+    # Stream tunnel manager output until URL is displayed
+    Start-Sleep -Seconds 3
+    Receive-Job -Job $tunnelJob
+} else {
+    Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
+    Write-Host " TIP: For remote phone access anywhere (outside home Wi-Fi):" -ForegroundColor Gray
+    Write-Host "      Run: ./start-jarvis.ps1 -Global" -ForegroundColor Yellow
+}
+
 Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
 Write-Host "Initiating Next.js Tactical Server..." -ForegroundColor Cyan
 
