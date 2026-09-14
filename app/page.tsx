@@ -583,7 +583,13 @@ export default function JarvisDashboard() {
           <div className="hidden sm:block text-right font-mono">
             <div className="text-xs text-cyan-300">{timeStr}</div>
             <div className="text-[9px] text-cyan-400 font-bold uppercase tracking-wider">
-              {selectedModel.startsWith('llama-')
+              {selectedModel.includes('120b')
+                ? 'GPT-OSS 120B (GROQ)'
+                : selectedModel.includes('20b')
+                ? 'GPT-OSS 20B (GROQ)'
+                : selectedModel.includes('compound')
+                ? 'COMPOUND (GROQ)'
+                : selectedModel.startsWith('llama-')
                 ? 'LLAMA 3.3 (GROQ)'
                 : selectedModel.startsWith('gpt-')
                 ? 'GPT-4O (GITHUB)'

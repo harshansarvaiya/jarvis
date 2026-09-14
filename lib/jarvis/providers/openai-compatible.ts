@@ -147,7 +147,7 @@ export async function runOpenAICompatibleAgent(
       }
 
       // Plain text response received
-      finalContent = message.content || '';
+      finalContent = message.content || message.reasoning || '';
       break;
     }
 

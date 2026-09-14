@@ -224,28 +224,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
                   {
-                    id: 'llama-3.3-70b-versatile',
-                    name: 'Meta Llama 3.3 70B',
+                    id: 'openai/gpt-oss-120b',
+                    name: 'OpenAI GPT-OSS 120B',
                     provider: 'Groq Cloud (US LPU)',
-                    desc: 'Flagship American Open-Weights frontier intelligence',
+                    desc: 'Verified Live: 120B parameter reasoning & tool engine (0.1s latency)',
                   },
                   {
-                    id: 'llama-3.1-8b-instant',
-                    name: 'Meta Llama 3.1 8B',
+                    id: 'openai/gpt-oss-20b',
+                    name: 'OpenAI GPT-OSS 20B',
                     provider: 'Groq Cloud (US LPU)',
-                    desc: 'Ultra-fast sub-second reflex intelligence',
+                    desc: 'Verified Live: High-throughput reasoning & reflexes',
+                  },
+                  {
+                    id: 'groq/compound',
+                    name: 'Groq Compound System',
+                    provider: 'Groq Cloud (US LPU)',
+                    desc: 'Verified Live: Parallel agentic synthesis system',
                   },
                   {
                     id: 'gpt-4o',
                     name: 'OpenAI GPT-4o',
                     provider: 'GitHub Models (Azure)',
-                    desc: 'Frontier multimodal omnimodel (US-hosted)',
-                  },
-                  {
-                    id: 'gpt-4o-mini',
-                    name: 'OpenAI GPT-4o-mini',
-                    provider: 'GitHub Models (Azure)',
-                    desc: 'High-speed reasoning & tool execution',
+                    desc: 'Frontier omnimodel (Subject to GitHub preview brownout)',
                   },
                 ].map((m) => (
                   <button
