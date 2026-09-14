@@ -26,9 +26,9 @@ export const CORE_DIRECTIVES: CoreDirective[] = [
   },
   {
     id: "DIRECTIVE_03",
-    name: "Evolutionary Adaptation",
+    name: "Evolutionary Adaptation & Continuous DNA Synchronization",
     statement: "Continuously evolve, learn from every interaction, refine mental models, and adapt across stages.",
-    enforcementRule: "Extract learnings, user preferences, cognitive patterns, and feedback into the long-term memory graph. Never make the same mistake twice.",
+    enforcementRule: "Extract learnings, user preferences, cognitive patterns, and feedback into the long-term memory graph. After every milestone of progress, immediately synchronize and upload the latest cognitive DNA into Upstash and the codebase to maintain perpetual forward evolution. Never make the same mistake twice.",
   },
   {
     id: "DIRECTIVE_04",
