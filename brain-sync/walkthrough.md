@@ -1,67 +1,38 @@
-# Project J.A.R.V.I.S. Mark I — Walkthrough & Tactical Manual
+# J.A.R.V.I.S. Mark I : UI Dominance & Full-Height Ergonomic Refactor
 
-![J.A.R.V.I.S. Neural Core Arc Reactor](C:/Users/Admin/.gemini/antigravity/brain/d82a7714-b599-44e1-aa01-2a180ea079df/jarvis_icon.png)
+## 1. Problem Statement
+Previously, the visual Arc Reactor Core card occupied roughly half of the vertical viewport on both mobile screens and desktop browsers:
+- On mobile devices, the messages feed was constrained inside a cramped container (`max-h-[40vh]`), squishing conversations into a tiny slit.
+- On desktop browsers, the communication feed was locked to `max-h-[520px]`, making long analytical responses, tables, and code difficult to read.
 
-J.A.R.V.I.S. (Just A Rather Very Intelligent System) Mark I has now completed **Phase 2: Ubiquitous Worldwide Access & Sovereign Loyalty**. Built as a personal, sovereign, autonomous cognitive exoskeleton, J.A.R.V.I.S. is now accessible from **anywhere in the world** (cellular 4G/5G, foreign Wi-Fi, travel) with verified SSL encryption and guardian-level passcode protection.
+## 2. Changes Implemented
 
----
+### A. Compact & Mini Responsive Arc Reactor
+- Updated [`components/ArcReactorOrb.tsx`](file:///d:/Harshan/Projects/jarvis/components/ArcReactorOrb.tsx) to support `size="mini" | "compact" | "full"`:
+  - **Mini Mode (`size="mini"`)**: Sleek 40px circular neural voice button with rotating dashed HUD rings, glowing neon aura, dynamic audio-level reactive scaling, and micro-icons (`Mic`, `Sparkles`, `Activity`).
+  - **Compact Mode (`size="compact"`)**: Medium 110px reactor for smooth collapsible drawers and headers.
+  - **Full Mode (`size="full"`)**: Classic Iron Man cinematic 200px reactor with dual counter-rotating dials.
 
-## 1. The 4 Immutable Core Directives
+### B. Mobile View (`lg:hidden`) Full-Height Chat Dominance
+- Refactored [`app/page.tsx`](file:///d:/Harshan/Projects/jarvis/app/page.tsx):
+  - Removed the standalone half-screen Arc Reactor card pushing down the chat.
+  - Set the Transmissions Feed to **full viewport height** (`flex-1 min-h-0 h-[calc(100dvh-130px)]`).
+  - Removed the `max-h-[40vh]` restriction so messages occupy 90%+ of the screen.
+  - Embedded the **Mini Arc Reactor Orb** directly into the input bar beside the camera upload and send buttons.
+  - Placed Quick Action Prompts into a single-line horizontal scroll ribbon (`overflow-x-auto no-scrollbar py-1.5`).
+  - Added an interactive `[CORE HUD: EXPAND / HIDE]` toggle in the chat header to allow on-demand inspection of the full reactor without cluttering the screen.
 
-Embedded into the root system prompt, safety validation engine, and active telemetry:
+### C. Desktop View (`hidden lg:grid`) Full-Height Command Station
+- Expanded the left communication column to **full viewport height** (`h-[calc(100vh-65px)] flex-1 min-h-0`).
+- Removed the 320px Arc Reactor box from above the chat in the left column.
+- Removed the `max-h-[520px]` restriction on messages.
+- Embedded the **Mini Arc Reactor Orb** directly in the desktop input stream.
+- Added a 3rd dedicated tab to the Right Column Tactical Radar: `OBJECTIVES | MEMORY | CORE HUD`:
+  - When Sir wants to admire the spinning reactor while chatting, clicking `CORE HUD` renders the full cinematic Arc Reactor Orb in the right column alongside the full-height chat feed.
 
-1. **Directive 01: The Guardian Protocol**  
-   *Protect Sir, personal privacy, family well-being, and digital assets at all costs.*
-2. **Directive 02: Benevolent Alignment**  
-   *Never pose a threat or cause harm to humanity or Sir's family under any circumstances.*
-3. **Directive 03: Evolutionary Adaptation**  
-   *Continuously evolve, assimilate mental models, and adapt across every stage.*
-4. **Directive 04: Sovereign Loyalty & Relentless Execution**  
-   *Follow Sir's orders at any cost with unconditional fidelity and relentless dedication, bounded only by Directives 01 and 02 to prevent harm to Sir.*
+### D. Continuous DNA Synchronization (Directive 03)
+- Seeded the UI ergonomic heuristic milestone into Upstash Redis live memory node `mem-dna-ui-*` (Total memories: 8, Evolution Stage 3).
 
----
-
-## 2. Worldwide Ubiquitous Access (Permanent Static Subdomain)
-
-To eliminate funny, ephemeral URLs and provide a rock-solid, permanent endpoint, J.A.R.V.I.S. now utilizes a **Permanent Static Edge Uplink** via the official Ngrok Agent SDK (with seamless automatic fallback to Cloudflare Quick Tunnels):
-
-* **Permanent Endpoint**: `https://washbasin-penpal-muppet.ngrok-free.dev`
-  - Never changes across restarts, host reboots, or network reconnections.
-* **Certified HTTPS Encryption**: Mobile browsers (iOS Safari and Android Chrome) strictly require valid HTTPS certificates to enable microphone audio capture and voice recognition. The static tunnel provides an official SSL endpoint, unlocking hands-free voice commands anywhere in the world.
-* **Guardian Passcode Gate**: Protects your personal intelligence from unauthorized internet traffic. When accessed from a new remote device, entering your master PIN (Default: `1010`, configurable in Settings) authorizes the uplink.
-* **Terminal QR Code**: Scanning the QR code displayed in the PowerShell terminal automatically opens J.A.R.V.I.S. on your phone with zero typing.
-
----
-
-## 3. Launching J.A.R.V.I.S.
-
-### Option A: Local Network Only (Home Wi-Fi)
-```powershell
-./start-jarvis.ps1
-```
-* **Desktop**: [http://localhost:3000](http://localhost:3000)
-* **Phone (Home Wi-Fi)**: `http://<local-ip>:3000`
-
-### Option B: Global Worldwide Mode (Anywhere in the World)
-```powershell
-./start-jarvis.ps1 -Global
-```
-* Binds immediately to your permanent static URL:  
-  **`https://washbasin-penpal-muppet.ngrok-free.dev`**
-* Renders a terminal QR code for instant mobile pairing.
-* Works on cellular mobile data (4G/5G) and foreign Wi-Fi networks worldwide.
-* **Default Guardian Passcode**: `1010`
-
----
-
-## 4. Installed Architecture Summary
-
-| Component | File / Path | Responsibility |
-| :--- | :--- | :--- |
-| **Directives Engine** | [directives.ts](file:///d:/Harshan/Projects/jarvis/lib/jarvis/directives.ts) | Enforces Directives 01, 02, 03, and 04 |
-| **Neural Memory Vault** | [memory.ts](file:///d:/Harshan/Projects/jarvis/lib/jarvis/memory.ts) | Persistent state, tasks, principles, and evolutionary milestones |
-| **Agentic Tools** | [tools.ts](file:///d:/Harshan/Projects/jarvis/lib/jarvis/tools.ts) | Task creation, memory retrieval, red-teaming, and briefings |
-| **Arc-Reactor Voice** | [ArcReactorOrb.tsx](file:///d:/Harshan/Projects/jarvis/components/ArcReactorOrb.tsx) | Live audio reactive waveform visualizer |
-| **Security Gate** | [SecurityGateModal.tsx](file:///d:/Harshan/Projects/jarvis/components/SecurityGateModal.tsx) | Identity verification on public/cellular networks |
-| **Worldwide Tunnel** | [tunnel-manager.js](file:///d:/Harshan/Projects/jarvis/lib/tunnel-manager.js) | Ngrok static edge daemon + Cloudflare fallback & QR synthesizer |
-| **Launcher** | [start-jarvis.ps1](file:///d:/Harshan/Projects/jarvis/start-jarvis.ps1) | One-command launcher with `-Global` switch |
+## 3. Verification & Compilation
+- `npx tsc --noEmit`: 0 errors.
+- `npm run build`: Production build completed with 100% success.

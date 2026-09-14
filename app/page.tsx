@@ -55,7 +55,16 @@ export default function JarvisDashboard() {
 
   // Tab State: Separate mobile tabs from desktop view
   const [mobileTab, setMobileTab] = useState<'COMMS' | 'TASKS' | 'MEMORY' | 'DIRECTIVES'>('COMMS');
-  const [desktopTab, setDesktopTab] = useState<'TASKS' | 'MEMORY'>('TASKS');
+  const [desktopTab, setDesktopTab] = useState<'TASKS' | 'MEMORY' | 'REACTOR'>('TASKS');
+  const [isReactorExpanded, setIsReactorExpanded] = useState(false);
+
+  // Quick Action Prompts for horizontal ribbons
+  const quickPrompts = [
+    { label: '⚡ Tactical Briefing', prompt: 'Give me our tactical briefing and pending priorities.' },
+    { label: '🛡️ Red-Team Test', prompt: 'Act as my adversarial sparring partner and stress-test my upcoming plan.' },
+    { label: '🎯 Create Objective', prompt: 'Add a new high-priority objective to our radar.' },
+    { label: '👁️ Scan Asset', prompt: 'I have attached a visual asset, analyze it and extract action items.' },
+  ];
 
   // Messages & Conversational State
   const [messages, setMessages] = useState<Message[]>([INITIAL_WELCOME_MESSAGE]);
@@ -623,43 +632,27 @@ export default function JarvisDashboard() {
       {/* ========================================================================= */}
       {/* MOBILE VIEW (lg:hidden) — Dedicated Screen Per Tab for an Uncluttered Look */}
       {/* ========================================================================= */}
-      <div className="flex-1 flex flex-col p-3 sm:p-4 lg:hidden max-w-lg mx-auto w-full">
+      <div className="flex-1 flex flex-col p-3 sm:p-4 lg:hidden max-w-lg mx-auto w-full min-h-0">
         {/* MOBILE TAB 1: COMMS (Direct Communication with J.A.R.V.I.S. Only) */}
         {mobileTab === 'COMMS' && (
-          <div className="flex-1 flex flex-col space-y-3">
-            {/* Compact Arc Reactor Core */}
-            <div className="border border-cyan-500/20 bg-hud-glass rounded-2xl p-3 shadow-xl relative flex flex-col items-center justify-center">
-              <ArcReactorOrb
-                status={orbStatus}
-                onToggleListen={toggleListening}
-                audioLevel={audioLevel}
-              />
-              {/* Quick Action Chips */}
-              <div className="mt-1 flex flex-wrap gap-1.5 justify-center">
-                {[
-                  { label: 'Tactical Briefing', prompt: 'Give me our tactical briefing and pending priorities.' },
-                  { label: 'Red-Team Test', prompt: 'Act as my adversarial sparring partner and stress-test my upcoming plan.' },
-                  { label: 'Create Objective', prompt: 'Add a new high-priority objective to our radar.' },
-                ].map((chip) => (
-                  <button
-                    key={chip.label}
-                    onClick={() => handleSendMessage(chip.prompt)}
-                    className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-slate-900/90 hover:bg-cyan-950 border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 transition-all"
-                  >
-                    {chip.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Communication Feed & Tool Stream */}
-            <div className="border border-cyan-500/20 bg-hud-glass rounded-2xl p-3 shadow-xl flex-1 flex flex-col min-h-[320px] overflow-hidden">
-              <div className="flex items-center justify-between pb-2 border-b border-cyan-500/20 mb-2 text-xs font-mono text-cyan-400">
+          <div className="flex-1 flex flex-col min-h-0 h-[calc(100dvh-130px)]">
+            {/* Communication Feed & Tool Stream - DOMINANT HERO */}
+            <div className="border border-cyan-500/20 bg-hud-glass rounded-2xl p-3 shadow-xl flex-1 flex flex-col min-h-0 overflow-hidden">
+              <div className="flex items-center justify-between pb-2 border-b border-cyan-500/20 mb-2 text-xs font-mono text-cyan-400 shrink-0">
                 <div className="flex items-center space-x-2">
-                  <Terminal className="w-3.5 h-3.5" />
-                  <span>TRANSMISSIONS</span>
+                  <Terminal className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="font-bold tracking-wider">TRANSMISSIONS</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 </div>
                 <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsReactorExpanded(!isReactorExpanded)}
+                    className="text-[10px] text-cyan-300 hover:text-cyan-100 flex items-center space-x-1 px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-500/40 font-mono transition-colors"
+                  >
+                    <Zap className="w-2.5 h-2.5 text-cyan-400" />
+                    <span>{isReactorExpanded ? 'HIDE CORE' : 'CORE HUD'}</span>
+                  </button>
                   <span className="text-[10px] text-slate-400">{messages.length} LOGS</span>
                   {messages.length > 1 && (
                     <button
@@ -675,8 +668,23 @@ export default function JarvisDashboard() {
                 </div>
               </div>
 
-              {/* Messages Area */}
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs sm:text-sm max-h-[40vh]">
+              {/* Optional Collapsible Arc Reactor Drawer */}
+              {isReactorExpanded && (
+                <div className="mb-2 p-3 rounded-xl bg-slate-950/80 border border-cyan-500/30 shadow-inner flex flex-col items-center justify-center shrink-0">
+                  <ArcReactorOrb
+                    status={orbStatus}
+                    onToggleListen={toggleListening}
+                    audioLevel={audioLevel}
+                    size="compact"
+                  />
+                  <div className="text-[10px] font-mono text-cyan-400/80 mt-1">
+                    {orbStatus === 'listening' ? 'RECORDING VOICE...' : orbStatus === 'thinking' ? 'PROCESSING...' : orbStatus === 'speaking' ? 'VOCALIZING...' : 'CORE ACTIVE'}
+                  </div>
+                </div>
+              )}
+
+              {/* Messages Area - EXPANDED FULL HEIGHT */}
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs sm:text-sm min-h-0">
                 {messages.map((msg) => (
                   <div
                     key={msg.id}
@@ -751,8 +759,21 @@ export default function JarvisDashboard() {
                 <div ref={chatBottomRef} />
               </div>
 
-              {/* Multimodal Input Bar */}
-              <div className="mt-2 flex items-center space-x-2 pt-2 border-t border-cyan-500/20">
+              {/* Quick Action Chips Ribbon (Single line horizontal scroll) */}
+              <div className="mt-2 pt-1.5 border-t border-cyan-500/10 flex items-center space-x-1.5 overflow-x-auto no-scrollbar shrink-0 text-nowrap">
+                {quickPrompts.map((chip) => (
+                  <button
+                    key={chip.label}
+                    onClick={() => handleSendMessage(chip.prompt)}
+                    className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-slate-900/90 hover:bg-cyan-950 border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 transition-all shrink-0"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Multimodal Input Bar with Mini Arc Reactor embedded */}
+              <div className="mt-2 flex items-center space-x-2 pt-2 border-t border-cyan-500/20 shrink-0">
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -763,7 +784,8 @@ export default function JarvisDashboard() {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-cyan-400 text-slate-400 hover:text-cyan-300 transition-colors shrink-0"
+                  title="Attach visual asset"
+                  className="p-2 sm:p-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-cyan-400 text-slate-400 hover:text-cyan-300 transition-colors shrink-0"
                 >
                   <Camera className="w-4 h-4" />
                 </button>
@@ -775,13 +797,20 @@ export default function JarvisDashboard() {
                     if (e.key === 'Enter') handleSendMessage();
                   }}
                   placeholder="Direct orders for J.A.R.V.I.S., Sir..."
-                  className="flex-1 bg-slate-900/90 border border-slate-700 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs font-sans text-slate-100 placeholder-slate-500 focus:outline-none transition-all"
+                  className="flex-1 min-w-0 bg-slate-900/90 border border-slate-700 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs font-sans text-slate-100 placeholder-slate-500 focus:outline-none transition-all"
+                />
+                {/* Mini Arc Reactor Voice Orb */}
+                <ArcReactorOrb
+                  status={orbStatus}
+                  onToggleListen={toggleListening}
+                  audioLevel={audioLevel}
+                  size="mini"
                 />
                 <button
                   type="button"
                   onClick={() => handleSendMessage()}
                   disabled={!inputText.trim() && !selectedImage}
-                  className="p-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-bold transition-all shrink-0"
+                  className="p-2 sm:p-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-bold transition-all shrink-0 shadow-[0_0_10px_rgba(0,229,255,0.4)]"
                 >
                   <Send className="w-4 h-4" />
                 </button>
@@ -838,54 +867,59 @@ export default function JarvisDashboard() {
       {/* ========================================================================= */}
       {/* DESKTOP VIEW (hidden lg:grid) — Dual Column Tactical Battle Station       */}
       {/* ========================================================================= */}
-      <div className="hidden lg:grid max-w-7xl w-full mx-auto p-5 grid-cols-12 gap-5 flex-1">
-        {/* Left Column: Arc Reactor Core & Active Communication Feed (7 cols) */}
-        <div className="col-span-7 flex flex-col space-y-4">
+      <div className="hidden lg:grid max-w-7xl w-full mx-auto p-5 grid-cols-12 gap-5 flex-1 min-h-0 h-[calc(100vh-65px)]">
+        {/* Left Column: Directives & Dominant Full-Height Communication Feed (7 cols) */}
+        <div className="col-span-7 flex flex-col space-y-3 min-h-0 h-full">
           <DirectiveBadge />
 
-          <div className="border border-cyan-500/20 bg-hud-glass rounded-2xl p-6 shadow-2xl relative overflow-hidden flex flex-col items-center justify-center">
-            <div className="absolute top-2 left-3 text-[10px] font-mono text-cyan-500/60 uppercase tracking-widest flex items-center space-x-1">
-              <Zap className="w-3 h-3 text-cyan-400" />
-              <span>NEURAL ARC REACTOR // VOICE UPLINK</span>
-            </div>
-
-            <ArcReactorOrb
-              status={orbStatus}
-              onToggleListen={toggleListening}
-              audioLevel={audioLevel}
-            />
-
-            <div className="mt-2 flex flex-wrap gap-1.5 justify-center">
-              {[
-                { label: 'Tactical Briefing', prompt: 'Give me our tactical briefing and pending priorities.' },
-                { label: 'Red-Team Stress Test', prompt: 'Act as my adversarial sparring partner and stress-test my upcoming plan.' },
-                { label: 'Scan Whiteboard/Doc', prompt: 'I have uploaded a visual asset, analyze and extract action items.' },
-                { label: 'Create Objective', prompt: 'Add a new high-priority objective to our radar.' },
-              ].map((chip) => (
-                <button
-                  key={chip.label}
-                  onClick={() => handleSendMessage(chip.prompt)}
-                  className="text-[11px] font-mono px-2.5 py-1 rounded-full bg-slate-900/80 hover:bg-cyan-950 border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 transition-all"
-                >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Conversational Feed */}
-          <div className="border border-cyan-500/20 bg-hud-glass rounded-2xl p-4 shadow-xl flex-1 flex flex-col min-h-[380px] max-h-[520px]">
-            <div className="flex items-center justify-between pb-2 border-b border-cyan-500/20 mb-3 text-xs font-mono text-cyan-400">
+          {/* Conversational Feed - FULL HEIGHT HERO */}
+          <div className="border border-cyan-500/20 bg-hud-glass rounded-2xl p-4 shadow-xl flex-1 flex flex-col min-h-0 overflow-hidden">
+            <div className="flex items-center justify-between pb-2 border-b border-cyan-500/20 mb-2 text-xs font-mono text-cyan-400 shrink-0">
               <div className="flex items-center space-x-2">
-                <Terminal className="w-4 h-4" />
-                <span>COMMUNICATION FEED & TOOL STREAM</span>
+                <Terminal className="w-4 h-4 text-cyan-400" />
+                <span className="font-bold tracking-wider">COMMUNICATION FEED & TOOL STREAM</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               </div>
-              <span className="text-[10px] text-slate-400">
-                {messages.length} TRANSMISSIONS
-              </span>
+              <div className="flex items-center space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsReactorExpanded(!isReactorExpanded)}
+                  className="text-[10px] text-cyan-300 hover:text-cyan-100 flex items-center space-x-1 px-2.5 py-1 rounded bg-cyan-950/60 border border-cyan-500/40 font-mono transition-colors"
+                >
+                  <Zap className="w-3 h-3 text-cyan-400" />
+                  <span>{isReactorExpanded ? 'COLLAPSE CORE' : 'EXPAND CORE HUD'}</span>
+                </button>
+                <span className="text-[10px] text-slate-400">
+                  {messages.length} TRANSMISSIONS
+                </span>
+                {messages.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={handleClearChat}
+                    title="Purge chat history"
+                    className="text-[10px] text-slate-500 hover:text-red-400 transition-colors flex items-center space-x-1 px-2 py-0.5 rounded bg-slate-900/60 border border-slate-800 hover:border-red-500/30 font-mono"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>PURGE</span>
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-sm">
+            {/* Optional Collapsible Arc Reactor Drawer on Left */}
+            {isReactorExpanded && (
+              <div className="mb-3 p-3 rounded-xl bg-slate-950/80 border border-cyan-500/30 shadow-inner flex flex-col items-center justify-center shrink-0">
+                <ArcReactorOrb
+                  status={orbStatus}
+                  onToggleListen={toggleListening}
+                  audioLevel={audioLevel}
+                  size="compact"
+                />
+              </div>
+            )}
+
+            {/* Messages Area - FULL HEIGHT SCROLL */}
+            <div className="flex-1 overflow-y-auto space-y-3 pr-2 text-sm min-h-0">
               {messages.map((msg) => (
                 <div
                   key={msg.id}
@@ -977,8 +1011,21 @@ export default function JarvisDashboard() {
               <div ref={chatBottomRef} />
             </div>
 
-            {/* Input Bar */}
-            <div className="mt-3 flex items-center space-x-2 pt-2 border-t border-cyan-500/20">
+            {/* Quick Action Chips Ribbon */}
+            <div className="mt-2 pt-2 border-t border-cyan-500/10 flex items-center space-x-2 overflow-x-auto no-scrollbar shrink-0 text-nowrap">
+              {quickPrompts.map((chip) => (
+                <button
+                  key={chip.label}
+                  onClick={() => handleSendMessage(chip.prompt)}
+                  className="text-[11px] font-mono px-3 py-1 rounded-full bg-slate-900/80 hover:bg-cyan-950 border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 transition-all shrink-0"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Multimodal Input Bar with Mini Arc Reactor embedded */}
+            <div className="mt-3 flex items-center space-x-2.5 pt-2 border-t border-cyan-500/20 shrink-0">
               <input
                 type="file"
                 ref={fileInputRef}
@@ -1002,7 +1049,14 @@ export default function JarvisDashboard() {
                   if (e.key === 'Enter') handleSendMessage();
                 }}
                 placeholder="Transmit command, thought, or inquiry, Sir..."
-                className="flex-1 bg-slate-900/90 border border-slate-700 focus:border-cyan-400 rounded-xl px-4 py-2.5 text-sm font-sans text-slate-100 placeholder-slate-500 focus:outline-none transition-all shadow-inner"
+                className="flex-1 min-w-0 bg-slate-900/90 border border-slate-700 focus:border-cyan-400 rounded-xl px-4 py-2.5 text-sm font-sans text-slate-100 placeholder-slate-500 focus:outline-none transition-all shadow-inner"
+              />
+              {/* Mini Arc Reactor Voice Orb */}
+              <ArcReactorOrb
+                status={orbStatus}
+                onToggleListen={toggleListening}
+                audioLevel={audioLevel}
+                size="mini"
               />
               <button
                 type="button"
@@ -1017,12 +1071,12 @@ export default function JarvisDashboard() {
         </div>
 
         {/* Right Column: Mission Control Tactical Radar (5 cols) */}
-        <div className="col-span-5 flex flex-col space-y-4">
-          <div className="flex border border-cyan-500/30 rounded-lg p-1 bg-slate-950 font-mono text-xs">
+        <div className="col-span-5 flex flex-col space-y-3 min-h-0 h-full">
+          <div className="flex border border-cyan-500/30 rounded-lg p-1 bg-slate-950 font-mono text-xs shrink-0">
             <button
               onClick={() => setDesktopTab('TASKS')}
               className={`flex-1 py-1.5 rounded transition-colors ${
-                desktopTab === 'TASKS' ? 'bg-cyan-500 text-black font-bold' : 'text-slate-400'
+                desktopTab === 'TASKS' ? 'bg-cyan-500 text-black font-bold' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               OBJECTIVES ({tasks.filter((t) => t.status !== 'COMPLETED').length})
@@ -1030,14 +1084,23 @@ export default function JarvisDashboard() {
             <button
               onClick={() => setDesktopTab('MEMORY')}
               className={`flex-1 py-1.5 rounded transition-colors ${
-                desktopTab === 'MEMORY' ? 'bg-cyan-500 text-black font-bold' : 'text-slate-400'
+                desktopTab === 'MEMORY' ? 'bg-cyan-500 text-black font-bold' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               MEMORY ({memories.length})
             </button>
+            <button
+              onClick={() => setDesktopTab('REACTOR')}
+              className={`flex-1 py-1.5 rounded transition-colors flex items-center justify-center space-x-1 ${
+                desktopTab === 'REACTOR' ? 'bg-cyan-500 text-black font-bold' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>CORE HUD</span>
+            </button>
           </div>
 
-          <div className={`flex-1 ${desktopTab === 'MEMORY' ? 'hidden' : 'block'}`}>
+          <div className={`flex-1 min-h-0 ${desktopTab === 'TASKS' ? 'block' : 'hidden'}`}>
             <TaskMatrix
               tasks={tasks}
               onToggleTask={handleToggleTask}
@@ -1046,12 +1109,39 @@ export default function JarvisDashboard() {
             />
           </div>
 
-          <div className={`flex-1 ${desktopTab === 'TASKS' ? 'hidden' : 'block'}`}>
+          <div className={`flex-1 min-h-0 ${desktopTab === 'MEMORY' ? 'block' : 'hidden'}`}>
             <MemoryVault
               memories={memories}
               evolutionStage={evolutionStage}
               onAddMemory={handleAddMemory}
             />
+          </div>
+
+          {/* Full Cinematic Arc Reactor in Right Column Tab */}
+          <div className={`flex-1 min-h-0 border border-cyan-500/20 bg-hud-glass rounded-2xl p-6 shadow-2xl flex flex-col items-center justify-center relative overflow-hidden ${desktopTab === 'REACTOR' ? 'flex' : 'hidden'}`}>
+            <div className="absolute top-3 left-4 text-[10px] font-mono text-cyan-500/60 uppercase tracking-widest flex items-center space-x-1.5">
+              <Zap className="w-3.5 h-3.5 text-cyan-400" />
+              <span>NEURAL ARC REACTOR // HIGH FIDELITY CORE</span>
+            </div>
+
+            <ArcReactorOrb
+              status={orbStatus}
+              onToggleListen={toggleListening}
+              audioLevel={audioLevel}
+              size="full"
+            />
+
+            <div className="mt-4 flex flex-wrap gap-2 justify-center max-w-sm">
+              {quickPrompts.map((chip) => (
+                <button
+                  key={chip.label}
+                  onClick={() => handleSendMessage(chip.prompt)}
+                  className="text-[11px] font-mono px-3 py-1 rounded-full bg-slate-900/90 hover:bg-cyan-950 border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 transition-all"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>

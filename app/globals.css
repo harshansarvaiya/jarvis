@@ -76,3 +76,13 @@ div[data-nextjs-toast="true"] {
   display: none !important;
 }
 
+/* Hide scrollbar utility for horizontal ribbons */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+
