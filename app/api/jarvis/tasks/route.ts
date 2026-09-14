@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTasks, addTask, updateTask, deleteTask } from '@/lib/jarvis/memory';
+import { getTasks, addTask, updateTask, deleteTask, recordTaskExecution } from '@/lib/jarvis/memory';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { title, description, priority, dueDate, tags } = body;
+    const { title, description, priority, dueDate, tags, executionAudit } = body;
 
     if (!title) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       status: 'PENDING',
       dueDate: dueDate || undefined,
       tags: tags || ['general'],
+      executionAudit: executionAudit || [],
     });
 
     return NextResponse.json({ task }, { status: 201 });
@@ -39,10 +40,21 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, ...updates } = body;
+    const { id, auditRecord, ...updates } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Task ID is required' }, { status: 400 });
+    }
+
+    if (auditRecord) {
+      const task = recordTaskExecution(id, auditRecord);
+      if (!task) {
+        return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+      }
+      if (Object.keys(updates).length > 0) {
+        updateTask(id, updates);
+      }
+      return NextResponse.json({ task });
     }
 
     const task = updateTask(id, updates);

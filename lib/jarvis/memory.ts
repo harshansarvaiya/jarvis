@@ -4,6 +4,19 @@ import path from 'path';
 export type Priority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
 
+export interface TaskExecutionRecord {
+  id: string;
+  timestamp: string;
+  type: 'SHELL_COMMAND' | 'MCP_TOOL' | 'API_ORCHESTRATION' | 'SYSTEM_MUTATION' | 'TELEMETRY';
+  name: string;
+  command?: string;
+  server?: string;
+  status: 'SUCCESS' | 'RUNNING' | 'FAILED';
+  durationMs?: number;
+  output?: string;
+  details?: Record<string, any>;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -14,6 +27,7 @@ export interface Task {
   tags: string[];
   createdAt: string;
   completedAt?: string;
+  executionAudit?: TaskExecutionRecord[];
 }
 
 export type MemoryCategory =
@@ -290,6 +304,32 @@ export function deleteTask(id: string): boolean {
     return true;
   }
   return false;
+}
+
+export function recordTaskExecution(
+  taskId: string,
+  record: Omit<TaskExecutionRecord, 'id' | 'timestamp'> & { id?: string; timestamp?: string }
+): Task | null {
+  const state = loadJarvisState();
+  const index = state.tasks.findIndex((t) => t.id === taskId);
+  if (index === -1) return null;
+
+  const newRecord: TaskExecutionRecord = {
+    id: record.id || `exec-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    timestamp: record.timestamp || new Date().toISOString(),
+    ...record,
+  };
+
+  const existingAudit = state.tasks[index].executionAudit || [];
+  state.tasks[index].executionAudit = [newRecord, ...existingAudit];
+
+  addLog(
+    state,
+    'ACTION',
+    `Task execution logged on "${state.tasks[index].title}": [${newRecord.type}] ${newRecord.name} (${newRecord.status})`
+  );
+  saveJarvisState(state);
+  return state.tasks[index];
 }
 
 // Memory & Evolution API

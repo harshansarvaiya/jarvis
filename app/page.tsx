@@ -531,6 +531,41 @@ export default function JarvisDashboard() {
     fetchTasks();
   };
 
+  const handleLogTaskExecution = async (taskId: string, record: any) => {
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id === taskId) {
+          const currentAudit = t.executionAudit || [];
+          return {
+            ...t,
+            executionAudit: [
+              {
+                id: `exec-${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                ...record,
+              },
+              ...currentAudit,
+            ],
+          };
+        }
+        return t;
+      })
+    );
+    await authFetch('/api/jarvis/tasks', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ id: taskId, auditRecord: record }),
+    });
+    fetchTasks();
+  };
+
+  const handleTransmitTaskToChat = (prompt: string) => {
+    handleSendMessage(prompt);
+    if (mobileTab !== 'COMMS') setMobileTab('COMMS');
+  };
+
   // Memory Actions
   const handleAddMemory = async (category: MemoryCategory, content: string) => {
     await authFetch('/api/jarvis/memory', {
@@ -827,6 +862,8 @@ export default function JarvisDashboard() {
               onToggleTask={handleToggleTask}
               onDeleteTask={handleDeleteTask}
               onAddTask={handleAddTask}
+              onTransmitToChat={handleTransmitTaskToChat}
+              onLogExecution={handleLogTaskExecution}
             />
           </div>
         )}
@@ -1106,6 +1143,8 @@ export default function JarvisDashboard() {
               onToggleTask={handleToggleTask}
               onDeleteTask={handleDeleteTask}
               onAddTask={handleAddTask}
+              onTransmitToChat={handleTransmitTaskToChat}
+              onLogExecution={handleLogTaskExecution}
             />
           </div>
 

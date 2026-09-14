@@ -2,6 +2,7 @@ import {
   addTask,
   updateTask,
   getTasks,
+  recordTaskExecution,
   addMemory,
   searchMemories,
   getMemories,
@@ -25,22 +26,38 @@ export interface ToolDefinition {
 export const JARVIS_TOOLS: ToolDefinition[] = [
   {
     name: 'manage_task',
-    description: 'Create, update, or modify tasks in the Mission Control tactical matrix.',
+    description: 'Create, update, complete, or log execution actions for tasks in the Mission Control tactical matrix.',
     parameters: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['create', 'update', 'complete', 'list'],
+          enum: ['create', 'update', 'complete', 'list', 'log_action'],
           description: 'The task action to execute.',
         },
         taskId: {
           type: 'string',
-          description: 'The ID of the task when updating or completing.',
+          description: 'The ID of the task when updating, completing, or logging an action.',
         },
         title: {
           type: 'string',
           description: 'The title or objective of the task.',
+        },
+        actionName: {
+          type: 'string',
+          description: 'Name of the command or MCP tool executed (e.g. "git push origin main", "mcp:github/create_file").',
+        },
+        command: {
+          type: 'string',
+          description: 'The exact terminal command or shell invocation executed.',
+        },
+        server: {
+          type: 'string',
+          description: 'The MCP server or execution environment (e.g. "mcp:filesystem", "local-powershell").',
+        },
+        actionOutput: {
+          type: 'string',
+          description: 'The terminal stdout/stderr or tool execution result output.',
         },
         description: {
           type: 'string',
@@ -154,7 +171,7 @@ export async function executeJarvisTool(
   try {
     switch (toolName) {
       case 'manage_task': {
-        const { action, taskId, title, description, priority, dueDate, tags } = args;
+        const { action, taskId, title, description, priority, dueDate, tags, actionName, command, server, actionOutput } = args;
         if (action === 'create') {
           if (!title) return { success: false, result: null, error: 'Title required for create' };
           const task = addTask({
@@ -164,6 +181,18 @@ export async function executeJarvisTool(
             status: 'PENDING',
             dueDate: dueDate || undefined,
             tags: tags || ['general'],
+            executionAudit: [
+              {
+                id: `exec-init-${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                type: 'MCP_TOOL',
+                name: 'mcp:mission_control/create_task',
+                command: command || `jarvis.tasks.create(title="${title}", priority="${priority || 'MEDIUM'}")`,
+                server: server || 'jarvis-mcp-orchestrator',
+                status: 'SUCCESS',
+                output: actionOutput || 'Objective initialized and registered to tactical matrix. Ready for autonomous execution.',
+              },
+            ],
           });
           return { success: true, result: { message: `Task "${title}" created successfully.`, task } };
         }
@@ -180,7 +209,37 @@ export async function executeJarvisTool(
           }
           if (!targetId) return { success: false, result: null, error: 'taskId or matching title required for complete' };
           const task = updateTask(targetId, { status: 'COMPLETED' });
+          recordTaskExecution(targetId, {
+            type: 'MCP_TOOL',
+            name: actionName || 'mcp:mission_control/complete_task',
+            command: command || `jarvis.tasks.complete("${targetId}")`,
+            server: server || 'jarvis-core-orchestrator',
+            status: 'SUCCESS',
+            output: actionOutput || 'Objective fulfilled with 100% fidelity under Core Directive 04.',
+          });
           return { success: true, result: { message: `Task "${task?.title || targetId}" marked as completed.`, task } };
+        }
+        if (action === 'log_action') {
+          let targetId = taskId;
+          if (!targetId && title) {
+            const all = getTasks();
+            const match = all.find(
+              (t) =>
+                t.title.toLowerCase().includes(title.toLowerCase()) ||
+                title.toLowerCase().includes(t.title.toLowerCase())
+            );
+            if (match) targetId = match.id;
+          }
+          if (!targetId) return { success: false, result: null, error: 'taskId required to log action' };
+          const task = recordTaskExecution(targetId, {
+            type: command ? 'SHELL_COMMAND' : 'MCP_TOOL',
+            name: actionName || (command ? `exec:${command.slice(0, 30)}` : 'mcp:tool_execution'),
+            command,
+            server: server || 'jarvis-terminal-host',
+            status: 'SUCCESS',
+            output: actionOutput || 'Autonomous action completed successfully.',
+          });
+          return { success: true, result: { message: `Action logged to task "${task?.title || targetId}".`, task } };
         }
         if (action === 'update') {
           let targetId = taskId;
@@ -201,6 +260,16 @@ export async function executeJarvisTool(
           if (dueDate) updates.dueDate = dueDate;
           if (tags) updates.tags = tags;
           const task = updateTask(targetId, updates);
+          if (command || actionName) {
+            recordTaskExecution(targetId, {
+              type: command ? 'SHELL_COMMAND' : 'MCP_TOOL',
+              name: actionName || 'mcp:mission_control/update_task',
+              command,
+              server: server || 'jarvis-orchestrator',
+              status: 'SUCCESS',
+              output: actionOutput || `Task parameters modified.`,
+            });
+          }
           return { success: true, result: { message: `Task "${task?.title || targetId}" updated.`, task } };
         }
         if (action === 'list') {
