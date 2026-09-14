@@ -68,6 +68,8 @@ export default function JarvisDashboard() {
 
   // Config State
   const [apiKey, setApiKey] = useState('');
+  const [groqApiKey, setGroqApiKey] = useState('');
+  const [githubToken, setGithubToken] = useState('');
   const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash');
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [timeStr, setTimeStr] = useState('');
@@ -157,10 +159,14 @@ export default function JarvisDashboard() {
     verifyAuth();
 
     const savedKey = localStorage.getItem('jarvis_api_key') || '';
+    const savedGroqKey = localStorage.getItem('jarvis_groq_api_key') || '';
+    const savedGithubToken = localStorage.getItem('jarvis_github_token') || '';
     const rawModel = localStorage.getItem('jarvis_model') || 'gemini-3.8-flash';
     const savedModel = rawModel.includes('2.5') ? 'gemini-3.8-flash' : rawModel;
     const savedTts = localStorage.getItem('jarvis_tts');
     setApiKey(savedKey);
+    setGroqApiKey(savedGroqKey);
+    setGithubToken(savedGithubToken);
     setSelectedModel(savedModel);
     localStorage.setItem('jarvis_model', savedModel);
     if (savedTts !== null) setTtsEnabled(savedTts === 'true');
@@ -402,6 +408,8 @@ export default function JarvisDashboard() {
         })),
         apiKey: apiKey || undefined,
         model: selectedModel,
+        groqApiKey: groqApiKey || undefined,
+        githubToken: githubToken || undefined,
       };
 
       const res = await authFetch('/api/jarvis/chat', {
@@ -574,8 +582,12 @@ export default function JarvisDashboard() {
         <div className="flex items-center space-x-3">
           <div className="hidden sm:block text-right font-mono">
             <div className="text-xs text-cyan-300">{timeStr}</div>
-            <div className="text-[9px] text-slate-400 uppercase tracking-wider">
-              {selectedModel.replace('gemini-', '')}
+            <div className="text-[9px] text-cyan-400 font-bold uppercase tracking-wider">
+              {selectedModel.startsWith('llama-')
+                ? 'LLAMA 3.3 (GROQ)'
+                : selectedModel.startsWith('gpt-')
+                ? 'GPT-4O (GITHUB)'
+                : selectedModel.replace('gemini-', 'GEMINI ')}
             </div>
           </div>
 
@@ -1009,6 +1021,16 @@ export default function JarvisDashboard() {
         onSaveApiKey={(key) => {
           setApiKey(key);
           localStorage.setItem('jarvis_api_key', key);
+        }}
+        groqApiKey={groqApiKey}
+        onSaveGroqApiKey={(key) => {
+          setGroqApiKey(key);
+          localStorage.setItem('jarvis_groq_api_key', key);
+        }}
+        githubToken={githubToken}
+        onSaveGithubToken={(key) => {
+          setGithubToken(key);
+          localStorage.setItem('jarvis_github_token', key);
         }}
         selectedModel={selectedModel}
         onSelectModel={(mod) => {

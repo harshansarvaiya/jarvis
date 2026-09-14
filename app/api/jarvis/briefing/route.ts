@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { executeJarvisTool } from '@/lib/jarvis/tools';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const result = await executeJarvisTool('generate_briefing', {});

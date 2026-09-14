@@ -19,11 +19,18 @@ export interface JarvisAgentOptions {
   apiKey?: string;
   model?: string;
   stream?: boolean;
+  groqApiKey?: string;
+  githubToken?: string;
+  provider?: 'google' | 'groq' | 'github-models' | 'auto';
 }
 
 export function normalizeModel(m?: string): string {
   if (!m) return 'gemini-3.8-flash';
   const clean = m.trim().toLowerCase();
+  if (clean.includes('llama-3.3') || clean.includes('llama-70b') || clean === 'llama') return 'llama-3.3-70b-versatile';
+  if (clean.includes('llama-3.1') || clean.includes('llama-8b')) return 'llama-3.1-8b-instant';
+  if (clean.includes('gpt-4o-mini')) return 'gpt-4o-mini';
+  if (clean.includes('gpt-4') || clean === 'gpt') return 'gpt-4o';
   if (clean.includes('3.8')) return 'gemini-3.8-flash';
   if (clean.includes('3.7')) return 'gemini-3.7-flash';
   if (clean.includes('3.6')) return 'gemini-3.6-flash';
@@ -112,8 +119,55 @@ ${relevantMemories.map((m) => `- [${m.category}]: ${m.content}`).join('\n')}
 ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 `;
 
+  const fullSystemPrompt = `${JARVIS_SYSTEM_PROMPT}\n\n${contextPrompt}`;
+  const groqKey = options.groqApiKey || process.env.GROQ_API_KEY || '';
+  const githubKey = options.githubToken || process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_TOKEN || '';
+
+  // 3. Sovereign Provider Routing: Groq (Meta Llama 3.3 70B / 8B - American Open Weights)
+  if (model.startsWith('llama-') || options.provider === 'groq') {
+    if (!groqKey) {
+      return {
+        reply: `Sir, to engage Meta Llama 3.3 70B via Groq, please provide a Groq API Key in Settings or configure GROQ_API_KEY in your Vercel environment variables.`,
+        toolCallsExecuted: [],
+      };
+    }
+    const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+    return runOpenAICompatibleAgent(messages, {
+      endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+      apiKey: groqKey,
+      model: model.startsWith('llama-') ? model : 'llama-3.3-70b-versatile',
+      systemPrompt: fullSystemPrompt,
+    });
+  }
+
+  // 4. Sovereign Provider Routing: GitHub Models (OpenAI GPT-4o / GPT-4o-mini - Microsoft Cloud)
+  if (model.startsWith('gpt-') || options.provider === 'github-models') {
+    if (!githubKey) {
+      return {
+        reply: `Sir, to engage OpenAI GPT-4o via GitHub Models, please provide a GitHub Personal Access Token in Settings or configure GITHUB_TOKEN in your Vercel environment variables.`,
+        toolCallsExecuted: [],
+      };
+    }
+    const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+    return runOpenAICompatibleAgent(messages, {
+      endpoint: 'https://models.inference.ai.azure.com/chat/completions',
+      apiKey: githubKey,
+      model: model.startsWith('gpt-') ? model : 'gpt-4o',
+      systemPrompt: fullSystemPrompt,
+    });
+  }
+
   // If no Gemini API key is configured yet, provide intelligent fallback / simulated offline mode
   if (!apiKey) {
+    if (groqKey) {
+      const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+      return runOpenAICompatibleAgent(messages, {
+        endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+        apiKey: groqKey,
+        model: 'llama-3.3-70b-versatile',
+        systemPrompt: fullSystemPrompt,
+      });
+    }
     return handleOfflineJarvisResponse(lastUserMessage.content, activeTasks);
   }
 
@@ -231,6 +285,45 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     }
 
     if (!response || !response.ok) {
+      // Sovereign Multi-Provider Failover: If Groq or GitHub key is present, failover invisibly!
+      if (groqKey) {
+        console.log('[Sovereign Failover] Google Gemini unavailable. Engaging Groq Meta Llama 3.3 70B...');
+        try {
+          const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+          const failoverResult = await runOpenAICompatibleAgent(messages, {
+            endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+            apiKey: groqKey,
+            model: 'llama-3.3-70b-versatile',
+            systemPrompt: fullSystemPrompt,
+          });
+          return {
+            ...failoverResult,
+            reply: `*(Sovereign Autonomous Failover to Meta Llama 3.3 70B)*\n\n${failoverResult.reply}`,
+          };
+        } catch (failoverErr) {
+          console.warn('[Sovereign Failover] Groq failover error:', failoverErr);
+        }
+      }
+
+      if (githubKey) {
+        console.log('[Sovereign Failover] Google Gemini unavailable. Engaging GitHub Models GPT-4o...');
+        try {
+          const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+          const failoverResult = await runOpenAICompatibleAgent(messages, {
+            endpoint: 'https://models.inference.ai.azure.com/chat/completions',
+            apiKey: githubKey,
+            model: 'gpt-4o',
+            systemPrompt: fullSystemPrompt,
+          });
+          return {
+            ...failoverResult,
+            reply: `*(Sovereign Autonomous Failover to OpenAI GPT-4o)*\n\n${failoverResult.reply}`,
+          };
+        } catch (failoverErr) {
+          console.warn('[Sovereign Failover] GitHub Models failover error:', failoverErr);
+        }
+      }
+
       let diagnosticMessage = '';
       try {
         const parsed = JSON.parse(lastErrorText);

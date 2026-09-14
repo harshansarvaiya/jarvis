@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTasks, addTask, updateTask, deleteTask } from '@/lib/jarvis/memory';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const tasks = getTasks();

@@ -4,7 +4,7 @@ import { runJarvisAgent } from '@/lib/jarvis/agent';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages, apiKey, model } = body;
+    const { messages, apiKey, model, groqApiKey, githubToken, provider } = body;
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -16,6 +16,9 @@ export async function POST(req: NextRequest) {
     const result = await runJarvisAgent(messages, {
       apiKey: apiKey || process.env.GEMINI_API_KEY,
       model: model || 'gemini-3.8-flash',
+      groqApiKey: groqApiKey || process.env.GROQ_API_KEY,
+      githubToken: githubToken || process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_TOKEN,
+      provider: provider || 'auto',
     });
 
     // Asynchronously record user message and assistant reply to universal shared history
