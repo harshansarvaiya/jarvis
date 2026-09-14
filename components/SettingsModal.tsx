@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Key, Cpu, Volume2, ShieldCheck, Check, Globe, Lock, Zap, Server, ExternalLink } from 'lucide-react';
+import { X, Key, Cpu, Volume2, ShieldCheck, Check, Globe, Lock, Zap, Server, ExternalLink, Compass } from 'lucide-react';
+
+export type OrchestrationMode = 'auto' | 'groq' | 'gemini' | 'manual';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -16,6 +18,8 @@ interface SettingsModalProps {
   onSaveGroqApiKey?: (key: string) => void;
   githubToken?: string;
   onSaveGithubToken?: (key: string) => void;
+  orchestrationMode?: OrchestrationMode;
+  onSelectOrchestrationMode?: (mode: OrchestrationMode) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -31,10 +35,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSaveGroqApiKey,
   githubToken = '',
   onSaveGithubToken,
+  orchestrationMode = 'auto',
+  onSelectOrchestrationMode,
 }) => {
   const [localKey, setLocalKey] = useState(apiKey);
   const [localGroqKey, setLocalGroqKey] = useState(groqApiKey);
   const [localGithubToken, setLocalGithubToken] = useState(githubToken);
+  const [localOrchMode, setLocalOrchMode] = useState<OrchestrationMode>(orchestrationMode);
   const [masterPin, setMasterPin] = useState('1010');
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -44,7 +51,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setMasterPin(pin);
     setLocalGroqKey(localStorage.getItem('jarvis_groq_api_key') || groqApiKey || '');
     setLocalGithubToken(localStorage.getItem('jarvis_github_token') || githubToken || '');
-  }, [apiKey, groqApiKey, githubToken, isOpen]);
+    const savedMode = (localStorage.getItem('jarvis_orchestration_mode') as OrchestrationMode) || orchestrationMode || 'auto';
+    setLocalOrchMode(savedMode);
+  }, [apiKey, groqApiKey, githubToken, orchestrationMode, isOpen]);
 
   if (!isOpen) return null;
 
@@ -61,6 +70,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } else {
       localStorage.setItem('jarvis_github_token', localGithubToken.trim());
     }
+    if (onSelectOrchestrationMode) {
+      onSelectOrchestrationMode(localOrchMode);
+    }
+    localStorage.setItem('jarvis_orchestration_mode', localOrchMode);
     localStorage.setItem('jarvis_master_pin', masterPin.trim() || '1010');
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2000);
@@ -87,6 +100,65 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSave} className="space-y-5">
+          {/* Section: Cognitive Orchestration Strategy */}
+          <div className="p-3.5 rounded-xl bg-slate-900/80 border border-cyan-500/40 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-1.5 font-mono text-xs font-bold text-cyan-300">
+                <Compass className="w-4 h-4 text-cyan-400" />
+                <span>COGNITIVE ORCHESTRATION & DISPATCH MODE</span>
+              </div>
+              <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                EPISODIC RECALL ACTIVE
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                {
+                  id: 'auto',
+                  name: 'Autonomous Orchestrator',
+                  desc: 'Auto-triage: Groq for reflex speed (100ms), Gemini for vision & strategy.',
+                  badge: 'Recommended',
+                },
+                {
+                  id: 'groq',
+                  name: 'Reflex Priority (Groq)',
+                  desc: 'Pins all operations to Groq US LPU for sub-second responses.',
+                  badge: 'Sub-second',
+                },
+                {
+                  id: 'gemini',
+                  name: 'Deep Synthesis (Gemini)',
+                  desc: 'Pins operations to Gemini 3.8 Flash for maximum context depth.',
+                  badge: 'Deep Reasoning',
+                },
+                {
+                  id: 'manual',
+                  name: 'Manual Model Lock',
+                  desc: 'Strictly use the single model pinned below.',
+                  badge: 'Strict Lock',
+                },
+              ].map((om) => (
+                <button
+                  type="button"
+                  key={om.id}
+                  onClick={() => setLocalOrchMode(om.id as OrchestrationMode)}
+                  className={`p-2 rounded-lg border text-left font-mono transition-all ${
+                    localOrchMode === om.id
+                      ? 'border-cyan-400 bg-cyan-950/70 text-cyan-200 shadow-[0_0_12px_rgba(0,229,255,0.25)]'
+                      : 'border-slate-800 bg-slate-950/50 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold">{om.name}</span>
+                    <span className="text-[9px] px-1 py-0.2 rounded bg-slate-800 text-cyan-300">{om.badge}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-1 leading-tight">{om.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Section: Sovereign Independent Providers */}
           <div className="p-3.5 rounded-xl bg-slate-900/70 border border-cyan-500/30 space-y-3">
             <div className="flex items-center justify-between">
@@ -104,7 +176,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="flex items-center justify-between mb-1">
                 <label className="text-[11px] font-mono text-slate-300 flex items-center space-x-1">
                   <Zap className="w-3 h-3 text-amber-400" />
-                  <span>GROQ CLOUD API KEY (META LLAMA 3.3 70B)</span>
+                  <span>GROQ CLOUD API KEY (OPENAI GPT-OSS 120B / 20B)</span>
                 </label>
                 <a
                   href="https://console.groq.com/keys"
@@ -124,7 +196,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
               />
               <p className="text-[10px] text-slate-400 mt-1">
-                Powers Meta Llama 3.3 70B on US custom LPU hardware with zero cost and ultra-fast generation.
+                Powers OpenAI GPT-OSS-120B on US custom LPU hardware with zero cost and ultra-fast generation (100–180ms).
               </p>
             </div>
 
@@ -153,7 +225,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400"
               />
               <p className="text-[10px] text-slate-400 mt-1">
-                Powers OpenAI GPT-4o & GPT-4o-mini on Microsoft Azure inference without paid OpenAI subscriptions.
+                Saved for GitHub Models inference once Microsoft finishes the scheduled preview retirement brownout.
               </p>
             </div>
           </div>
@@ -219,7 +291,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="mb-2">
               <div className="text-[10px] font-mono uppercase text-slate-400 font-bold mb-1.5 flex items-center space-x-1">
                 <Zap className="w-3 h-3 text-amber-400" />
-                <span>Sovereign Fleet (Meta Llama & OpenAI - Non-Google)</span>
+                <span>Sovereign Fleet (OpenAI & Groq Silicon - Non-Google)</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
@@ -301,7 +373,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             <p className="text-[10px] text-slate-400 font-mono mt-2 bg-slate-900/60 p-2 rounded border border-slate-800">
-              <strong className="text-cyan-300">Sovereign Failover Protocol:</strong> If Google Gemini reaches rate limits (HTTP 429) or goes offline, J.A.R.V.I.S. automatically routes through Groq Meta Llama 3.3 or GitHub Models without losing state.
+              <strong className="text-cyan-300">Episodic History & Sovereign Failover:</strong> J.A.R.V.I.S. automatically extracts relevant prior conversations from Upstash Redis to inform every answer. If Gemini hits rate limits (HTTP 429), J.A.R.V.I.S. shifts to Groq instantly.
             </p>
           </div>
 
@@ -311,7 +383,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <Volume2 className="w-4 h-4 text-cyan-400" />
               <div>
                 <div className="text-xs font-mono text-slate-200">VOCAL SYNTHESIS (VOICE OUT)</div>
-                <div className="text-[10px] text-slate-400">J.A.R.V.I.S. vocalizes replies aloud</div>
+                <div className="text-[10px] text-slate-400">Cinematic mode: vocalizes crisp 1-2 sentence overview aloud</div>
               </div>
             </div>
             <button

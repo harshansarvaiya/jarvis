@@ -35,6 +35,9 @@ interface Message {
   image?: string;
   toolCalls?: Array<{ name: string; args: any; result: any }>;
   timestamp: string;
+  vocalSummary?: string;
+  tacticalActions?: string[];
+  telemetry?: any;
 }
 
 const INITIAL_WELCOME_MESSAGE: Message = {
@@ -71,6 +74,7 @@ export default function JarvisDashboard() {
   const [groqApiKey, setGroqApiKey] = useState('');
   const [githubToken, setGithubToken] = useState('');
   const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash');
+  const [orchestrationMode, setOrchestrationMode] = useState<'auto' | 'groq' | 'gemini' | 'manual'>('auto');
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [timeStr, setTimeStr] = useState('');
 
@@ -163,11 +167,13 @@ export default function JarvisDashboard() {
     const savedGithubToken = localStorage.getItem('jarvis_github_token') || '';
     const rawModel = localStorage.getItem('jarvis_model') || 'gemini-3.8-flash';
     const savedModel = rawModel.includes('2.5') ? 'gemini-3.8-flash' : rawModel;
+    const savedOrchMode = (localStorage.getItem('jarvis_orchestration_mode') as any) || 'auto';
     const savedTts = localStorage.getItem('jarvis_tts');
     setApiKey(savedKey);
     setGroqApiKey(savedGroqKey);
     setGithubToken(savedGithubToken);
     setSelectedModel(savedModel);
+    setOrchestrationMode(savedOrchMode);
     localStorage.setItem('jarvis_model', savedModel);
     if (savedTts !== null) setTtsEnabled(savedTts === 'true');
 
@@ -410,6 +416,7 @@ export default function JarvisDashboard() {
         model: selectedModel,
         groqApiKey: groqApiKey || undefined,
         githubToken: githubToken || undefined,
+        orchestrationMode,
       };
 
       const res = await authFetch('/api/jarvis/chat', {
@@ -423,6 +430,9 @@ export default function JarvisDashboard() {
       const data = await res.json();
       const reply = data.reply || 'Acknowledged, Sir.';
       const toolCalls = data.toolCallsExecuted || [];
+      const vocalSummary = data.vocalSummary || reply;
+      const tacticalActions = data.tacticalActions || [];
+      const telemetry = data.telemetry;
 
       const assistantMsg: Message = {
         id: `msg-${Date.now() + 1}`,
@@ -430,10 +440,13 @@ export default function JarvisDashboard() {
         content: reply,
         toolCalls,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        vocalSummary,
+        tacticalActions,
+        telemetry,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
-      speakText(reply);
+      speakText(vocalSummary);
 
       if (toolCalls.length > 0) {
         fetchTasks();
@@ -691,6 +704,47 @@ export default function JarvisDashboard() {
                         </div>
                       )}
                       <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+
+                      {/* Tactical Next Actions (Proactive Chips) */}
+                      {msg.role === 'assistant' && msg.tacticalActions && msg.tacticalActions.length > 0 && (
+                        <div className="mt-2.5 pt-2 border-t border-slate-800 flex flex-wrap gap-1.5">
+                          {msg.tacticalActions.map((action, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleSendMessage(action)}
+                              className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-950/70 border border-cyan-500/30 hover:border-cyan-400 text-cyan-300 hover:text-white transition-colors"
+                            >
+                              ⚡ {action}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Orchestration Telemetry Badge */}
+                      {msg.role === 'assistant' && msg.telemetry && (
+                        <div className="mt-2 text-[9px] font-mono text-slate-500 flex flex-wrap items-center gap-1.5 border-t border-slate-800/60 pt-1">
+                          <span className="text-cyan-400 font-bold">
+                            {msg.telemetry.provider === 'groq' ? '⚡ GROQ LPU' : '🧠 GEMINI CORE'}
+                          </span>
+                          <span>•</span>
+                          <span>{msg.telemetry.latencyMs}ms</span>
+                          {msg.telemetry.recalledEpisodesCount && msg.telemetry.recalledEpisodesCount > 0 ? (
+                            <>
+                              <span>•</span>
+                              <span className="text-emerald-400">
+                                {msg.telemetry.recalledEpisodesCount} EPISODES RECALLED
+                              </span>
+                            </>
+                          ) : null}
+                          {msg.telemetry.failoverOccurred && (
+                            <>
+                              <span>•</span>
+                              <span className="text-amber-400">FAILOVER ACTIVE</span>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -874,6 +928,49 @@ export default function JarvisDashboard() {
                         ))}
                       </div>
                     )}
+
+                    {/* Tactical Next Actions (Proactive Chips) */}
+                    {msg.role === 'assistant' && msg.tacticalActions && msg.tacticalActions.length > 0 && (
+                      <div className="mt-3 pt-2 border-t border-slate-800 flex flex-wrap gap-1.5">
+                        {msg.tacticalActions.map((action, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleSendMessage(action)}
+                            className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-cyan-950/70 border border-cyan-500/30 hover:border-cyan-400 text-cyan-300 hover:text-white transition-colors"
+                          >
+                            ⚡ {action}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Orchestration Telemetry Badge */}
+                    {msg.role === 'assistant' && msg.telemetry && (
+                      <div className="mt-2.5 text-[10px] font-mono text-slate-500 flex flex-wrap items-center gap-2 border-t border-slate-800/60 pt-1">
+                        <span className="text-cyan-400 font-bold">
+                          {msg.telemetry.provider === 'groq' ? '⚡ GROQ LPU' : '🧠 GEMINI CORE'}
+                        </span>
+                        <span>•</span>
+                        <span>{msg.telemetry.latencyMs}ms</span>
+                        <span>•</span>
+                        <span className="text-slate-400">{msg.telemetry.archetype}</span>
+                        {msg.telemetry.recalledEpisodesCount && msg.telemetry.recalledEpisodesCount > 0 ? (
+                          <>
+                            <span>•</span>
+                            <span className="text-emerald-400">
+                              {msg.telemetry.recalledEpisodesCount} EPISODES RECALLED
+                            </span>
+                          </>
+                        ) : null}
+                        {msg.telemetry.failoverOccurred && (
+                          <>
+                            <span>•</span>
+                            <span className="text-amber-400">FAILOVER ACTIVE</span>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1042,6 +1139,11 @@ export default function JarvisDashboard() {
         onSelectModel={(mod) => {
           setSelectedModel(mod);
           localStorage.setItem('jarvis_model', mod);
+        }}
+        orchestrationMode={orchestrationMode}
+        onSelectOrchestrationMode={(mode) => {
+          setOrchestrationMode(mode);
+          localStorage.setItem('jarvis_orchestration_mode', mode);
         }}
         ttsEnabled={ttsEnabled}
         onToggleTts={(enabled) => {
