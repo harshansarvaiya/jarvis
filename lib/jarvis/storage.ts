@@ -28,6 +28,7 @@ export interface StorageProvider {
   getChatHistory(limit?: number): Promise<ChatMessageRecord[]>;
   saveChatHistory(messages: ChatMessageRecord[]): Promise<void>;
   appendChatMessage(message: ChatMessageRecord): Promise<void>;
+  appendChatMessages(messages: ChatMessageRecord[]): Promise<void>;
   clearChatHistory(): Promise<void>;
 }
 
@@ -82,7 +83,7 @@ class UpstashRedisProvider implements StorageProvider {
     }
   }
 
-  async getChatHistory(limit = 60): Promise<ChatMessageRecord[]> {
+  async getChatHistory(limit = 100): Promise<ChatMessageRecord[]> {
     try {
       const raw = await this.execute('get', 'jarvis:chat_history');
       if (!raw) return [];
@@ -97,9 +98,9 @@ class UpstashRedisProvider implements StorageProvider {
 
   async saveChatHistory(messages: ChatMessageRecord[]): Promise<void> {
     try {
-      const sanitized = messages.slice(-100).map((m) => ({
+      const sanitized = messages.slice(-200).map((m) => ({
         ...m,
-        image: m.image && m.image.length > 100000 ? undefined : m.image,
+        image: m.image && m.image.length > 80000 ? undefined : m.image,
       }));
       await this.execute('set', 'jarvis:chat_history', JSON.stringify(sanitized));
     } catch (err) {
@@ -108,15 +109,29 @@ class UpstashRedisProvider implements StorageProvider {
   }
 
   async appendChatMessage(message: ChatMessageRecord): Promise<void> {
+    await this.appendChatMessages([message]);
+  }
+
+  async appendChatMessages(newMessages: ChatMessageRecord[]): Promise<void> {
     try {
-      const current = await this.getChatHistory(100);
-      current.push({
-        ...message,
-        image: message.image && message.image.length > 100000 ? undefined : message.image,
-      });
+      const current = await this.getChatHistory(200);
+      const existingIds = new Set(current.map((m) => m.id).filter(Boolean));
+
+      for (const msg of newMessages) {
+        if (msg.id && existingIds.has(msg.id)) {
+          const idx = current.findIndex((m) => m.id === msg.id);
+          if (idx !== -1) current[idx] = { ...current[idx], ...msg };
+        } else {
+          current.push({
+            ...msg,
+            image: msg.image && msg.image.length > 80000 ? undefined : msg.image,
+          });
+          if (msg.id) existingIds.add(msg.id);
+        }
+      }
       await this.saveChatHistory(current);
     } catch (err) {
-      console.error('[Storage:Upstash] Failed to append chat message:', err);
+      console.error('[Storage:Upstash] Failed to append chat messages:', err);
     }
   }
 
@@ -201,9 +216,9 @@ class LocalDiskProvider implements StorageProvider {
     try {
       this.ensureDataDir();
       const file = this.getFilePath('chats');
-      const sanitized = messages.slice(-100).map((m) => ({
+      const sanitized = messages.slice(-200).map((m) => ({
         ...m,
-        image: m.image && m.image.length > 100000 ? undefined : m.image,
+        image: m.image && m.image.length > 80000 ? undefined : m.image,
       }));
       fs.writeFileSync(file, JSON.stringify(sanitized, null, 2), 'utf-8');
     } catch (err) {
@@ -212,15 +227,29 @@ class LocalDiskProvider implements StorageProvider {
   }
 
   async appendChatMessage(message: ChatMessageRecord): Promise<void> {
+    await this.appendChatMessages([message]);
+  }
+
+  async appendChatMessages(newMessages: ChatMessageRecord[]): Promise<void> {
     try {
-      const current = await this.getChatHistory(100);
-      current.push({
-        ...message,
-        image: message.image && message.image.length > 100000 ? undefined : message.image,
-      });
+      const current = await this.getChatHistory(200);
+      const existingIds = new Set(current.map((m) => m.id).filter(Boolean));
+
+      for (const msg of newMessages) {
+        if (msg.id && existingIds.has(msg.id)) {
+          const idx = current.findIndex((m) => m.id === msg.id);
+          if (idx !== -1) current[idx] = { ...current[idx], ...msg };
+        } else {
+          current.push({
+            ...msg,
+            image: msg.image && msg.image.length > 80000 ? undefined : msg.image,
+          });
+          if (msg.id) existingIds.add(msg.id);
+        }
+      }
       await this.saveChatHistory(current);
     } catch (err) {
-      console.error('[Storage:Local] Failed to append chat message:', err);
+      console.error('[Storage:Local] Failed to append chat messages:', err);
     }
   }
 
@@ -268,12 +297,16 @@ export async function saveUniversalState(state: JarvisState): Promise<void> {
   await getStorage().saveState(state);
 }
 
-export async function getUniversalChatHistory(limit = 60): Promise<ChatMessageRecord[]> {
+export async function getUniversalChatHistory(limit = 100): Promise<ChatMessageRecord[]> {
   return await getStorage().getChatHistory(limit);
 }
 
 export async function appendUniversalChatMessage(msg: ChatMessageRecord): Promise<void> {
   await getStorage().appendChatMessage(msg);
+}
+
+export async function appendUniversalChatMessages(msgs: ChatMessageRecord[]): Promise<void> {
+  await getStorage().appendChatMessages(msgs);
 }
 
 export async function clearUniversalChatHistory(): Promise<void> {

@@ -44,7 +44,7 @@ export async function runOpenAICompatibleAgent(
   toolCallsExecuted: Array<{ name: string; args: any; result: any }>;
   error?: string;
 }> {
-  const { endpoint, apiKey, model, systemPrompt, temperature = 0.4, maxTokens = 4096, extraHeaders = {} } = options;
+  const { endpoint, apiKey, model, systemPrompt, temperature = 0.4, maxTokens = 1536, extraHeaders = {} } = options;
 
   const toolCallsExecuted: Array<{ name: string; args: any; result: any }> = [];
 
@@ -66,7 +66,7 @@ export async function runOpenAICompatibleAgent(
     },
   ];
 
-  for (const m of messages.slice(-10)) {
+  for (const m of messages.slice(-30)) {
     const role = m.role === 'model' ? 'assistant' : (m.role as any);
     formattedMessages.push({
       role: role === 'assistant' ? 'assistant' : 'user',
@@ -87,23 +87,46 @@ export async function runOpenAICompatibleAgent(
     while (loopCount < 3) {
       loopCount++;
 
-      const res = await fetch(endpoint, {
+      const requestBody: any = {
+        model,
+        messages: formattedMessages,
+        temperature,
+        max_tokens: maxTokens,
+      };
+
+      if (formattedTools.length > 0 && !model.includes('compound-mini') && !model.includes('whisper')) {
+        requestBody.tools = formattedTools;
+        requestBody.tool_choice = 'auto';
+      }
+
+      let res = await fetch(endpoint, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          model,
-          messages: formattedMessages,
-          tools: formattedTools,
-          tool_choice: 'auto',
-          temperature,
-          max_tokens: maxTokens,
-        }),
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(6000),
       });
 
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
-        console.error(`[OpenAICompatible] HTTP ${res.status} from ${endpoint}:`, errText);
-        throw new Error(`Provider HTTP ${res.status}: ${errText.slice(0, 200)}`);
+        if (requestBody.tools && (errText.includes('tool calling') || errText.includes('tools'))) {
+          console.warn(`[OpenAICompatible] Model ${model} does not support tools. Retrying without tools...`);
+          delete requestBody.tools;
+          delete requestBody.tool_choice;
+          res = await fetch(endpoint, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestBody),
+            signal: AbortSignal.timeout(6000),
+          });
+          if (!res.ok) {
+            const retryErr = await res.text().catch(() => '');
+            console.error(`[OpenAICompatible] HTTP ${res.status} from ${endpoint}:`, retryErr);
+            throw new Error(`Provider HTTP ${res.status}: ${retryErr.slice(0, 200)}`);
+          }
+        } else {
+          console.error(`[OpenAICompatible] HTTP ${res.status} from ${endpoint}:`, errText);
+          throw new Error(`Provider HTTP ${res.status}: ${errText.slice(0, 200)}`);
+        }
       }
 
       const data = await res.json();
@@ -164,7 +187,7 @@ export async function runOpenAICompatibleAgent(
   } catch (err: any) {
     console.error('[OpenAICompatible] Agent execution exception:', err);
     return {
-      reply: `Sir, our secondary neural uplink encountered interference: ${err.message}. Local state and safeguards remain fully intact.`,
+      reply: '',
       toolCallsExecuted,
       error: err.message,
     };

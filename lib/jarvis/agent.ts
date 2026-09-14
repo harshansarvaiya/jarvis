@@ -67,12 +67,11 @@ export function normalizeModel(m?: string): string {
 export function getModelFallbackHierarchy(requestedModel: string): string[] {
   const masterHierarchy = [
     'gemini-3.8-flash',
-    'gemini-3.7-flash',
     'gemini-3.6-flash',
-    'gemini-3.5-flash',
-    'gemini-2.5-flash',
-    'gemini-flash-latest',
+    'gemini-flash-lite-latest',
+    'gemini-3-flash-preview',
     'gemini-3.1-flash-lite',
+    'gemini-3.7-flash',
   ];
 
   const primary = normalizeModel(requestedModel);
@@ -199,8 +198,9 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 
       const groqCandidates = [
         primaryModel,
+        'openai/gpt-oss-120b',
         'openai/gpt-oss-20b',
-        'llama-3.3-70b-versatile',
+        'groq/compound-mini',
       ].filter((v, i, a) => a.indexOf(v) === i);
 
       for (const groqModel of groqCandidates) {
@@ -210,9 +210,10 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             apiKey: groqKey,
             model: groqModel,
             systemPrompt: fullSystemPrompt,
+            maxTokens: 1024,
           });
 
-          if (!groqResult.error) {
+          if (groqResult && !groqResult.error && groqResult.reply) {
             const latencyMs = Date.now() - startTime;
             return {
               reply: groqResult.reply,
@@ -231,11 +232,8 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             };
           }
         } catch (err: any) {
-          if (err?.message?.includes('429')) {
-            console.warn(`[Groq TPM Cascade] Model ${groqModel} reached TPM limit. Cascading to next candidate.`);
-            continue;
-          }
-          break;
+          console.warn(`[Groq Cascade] Model ${groqModel} failed:`, err?.message);
+          continue;
         }
       }
     } catch (groqErr) {
@@ -345,10 +343,13 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       ],
     };
 
-    for (const msg of messages.slice(-8)) {
+    const recentMessages = messages.slice(-30);
+    for (let i = 0; i < recentMessages.length; i++) {
+      const msg = recentMessages[i];
       const role = msg.role === 'assistant' ? 'model' : msg.role;
-      const parts: any[] = [{ text: msg.content }];
-      if (msg.image && msg.image.includes(';base64,')) {
+      const parts: any[] = [{ text: msg.content || '' }];
+      const isRecent = i >= recentMessages.length - 2;
+      if (isRecent && msg.image && msg.image.includes(';base64,')) {
         const [meta, base64Data] = msg.image.split(';base64,');
         const mimeType = meta.replace('data:', '');
         parts.push({
@@ -367,8 +368,16 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     let activeApiUrl = '';
     let lastErrorText = '';
     let selectedModel = candidateModels[0] || 'gemini-3.8-flash';
+    let attemptsCount = 0;
+    const MAX_GEMINI_ATTEMPTS = 2;
 
     for (const candidateModel of candidateModels) {
+      if (attemptsCount >= MAX_GEMINI_ATTEMPTS) {
+        console.warn(`[Quantum Fallback] Reached max Gemini attempts (${MAX_GEMINI_ATTEMPTS}). Cascading to Groq US LPU.`);
+        break;
+      }
+      attemptsCount++;
+
       const generationConfig = {
         temperature: 0.4,
         maxOutputTokens: 4096,
@@ -385,7 +394,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             tools: geminiTools,
             generationConfig,
           }),
-          signal: AbortSignal.timeout(3500),
+          signal: AbortSignal.timeout(2500),
         });
 
         if (res.ok) {
@@ -396,7 +405,13 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         }
 
         lastErrorText = await res.text();
-        console.warn(`[Quantum Fallback] Model ${candidateModel} failed with HTTP ${res.status}:`, lastErrorText);
+        console.warn(`[Quantum Fallback] Model ${candidateModel} failed with HTTP ${res.status}:`, lastErrorText.slice(0, 150));
+
+        // If 429 Quota Exceeded: Do not burn time on other Gemini models. Immediately failover to Groq!
+        if (res.status === 429) {
+          console.warn(`[Quantum Fallback] Gemini API Quota Exceeded (429) on ${candidateModel}. Immediate Groq US LPU failover engaged.`);
+          break;
+        }
 
         let errorData: any = null;
         try {
@@ -416,7 +431,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           break;
         }
 
-        if (res.status === 404 || res.status === 400 || res.status === 429 || res.status === 503) {
+        if (res.status === 404 || res.status === 400 || res.status === 503) {
           continue;
         }
 
@@ -426,7 +441,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       } catch (fetchErr: any) {
         lastErrorText = fetchErr?.message || 'Network request failed';
         if (fetchErr.name === 'TimeoutError') {
-          console.warn(`[Quantum Fallback] Gemini endpoint timed out after 3500ms for ${candidateModel}. Shifting to next tier.`);
+          console.warn(`[Quantum Fallback] Gemini endpoint timed out after 2500ms for ${candidateModel}. Shifting to next tier.`);
         }
         continue;
       }
@@ -435,10 +450,10 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     // Sovereign Autonomous Failover if Gemini is throttled (429) or unavailable
     if (!response || !response.ok) {
       if (groqKey) {
-        console.log('[Orchestrator Failover] Gemini unavailable, shifting to Groq US LPU fleet...');
+        console.log('[Orchestrator Failover] Gemini unavailable, shifting instantly to Groq US LPU fleet...');
         try {
           const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
-          const failoverCandidates = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.3-70b-versatile'];
+          const failoverCandidates = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'groq/compound-mini'];
 
           for (const groqModel of failoverCandidates) {
             try {
@@ -447,9 +462,10 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
                 apiKey: groqKey,
                 model: groqModel,
                 systemPrompt: fullSystemPrompt,
+                maxTokens: 1024,
               });
 
-              if (!failoverResult.error) {
+              if (failoverResult && !failoverResult.error && failoverResult.reply) {
                 const latencyMs = Date.now() - startTime;
                 return {
                   reply: `*(Sovereign Autonomous Failover to ${groqModel} on Groq)*\n\n${failoverResult.reply}`,
@@ -457,7 +473,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
                   tacticalActions: generateTacticalNextActions(lastUserMessage.content, failoverResult.reply, failoverResult.toolCallsExecuted),
                   toolCallsExecuted: failoverResult.toolCallsExecuted,
                   telemetry: {
-                    engineUsed: `Groq US LPU (${groqModel})`,
+                    engineUsed: `Groq US LPU (${groqModel}) [Failover]`,
                     provider: 'groq',
                     model: groqModel,
                     latencyMs,
@@ -468,11 +484,8 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
                 };
               }
             } catch (failErr: any) {
-              if (failErr?.message?.includes('429')) {
-                console.warn(`[Groq Failover TPM Cascade] ${groqModel} hit 429, trying next tier...`);
-                continue;
-              }
-              break;
+              console.warn(`[Groq Failover] ${groqModel} failed:`, failErr?.message);
+              continue;
             }
           }
         } catch (failoverErr) {
@@ -486,13 +499,13 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           console.log('[Orchestrator Failover] Engaging GitHub Models Frontier Backup...');
           const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
           const ghResult = await runOpenAICompatibleAgent(messages, {
-            endpoint: 'https://models.inference.ai.azure.com/chat/completions',
+            endpoint: 'https://models.github.ai/inference/chat/completions',
             apiKey: githubKey,
             model: 'gpt-4o',
             systemPrompt: fullSystemPrompt,
           });
 
-          if (!ghResult.error) {
+          if (ghResult && !ghResult.error && ghResult.reply) {
             const latencyMs = Date.now() - startTime;
             return {
               reply: `*(Sovereign Autonomous Failover to GitHub Models GPT-4o)*\n\n${ghResult.reply}`,
@@ -515,16 +528,17 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         }
       }
 
-      const statusCode = response?.status || 500;
+      // Offline Guardian Fallback ensures Sir always receives a coherent response
+      const offline = await handleOfflineJarvisResponse(lastUserMessage.content, activeTasks);
       return {
-        reply: `Sir, our neural uplink encountered cognitive latency (${statusCode}). Local state and safeguards remain fully online.`,
-        vocalSummary: 'Neural uplink encountered cognitive latency, Sir.',
+        reply: offline.reply,
+        vocalSummary: extractCinematicVocalSummary(offline.reply),
         tacticalActions: ['Tactical Briefing', 'Review Radar Tasks'],
-        toolCallsExecuted: [],
+        toolCallsExecuted: offline.toolCallsExecuted,
         telemetry: {
-          engineUsed: 'Sentry Core',
+          engineUsed: 'Guardian Sentry Heuristics',
           provider: 'offline',
-          model: 'fallback',
+          model: 'offline-safeguard',
           latencyMs: Date.now() - startTime,
           archetype,
           failoverOccurred: true,

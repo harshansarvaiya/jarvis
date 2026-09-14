@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runJarvisAgent } from '@/lib/jarvis/agent';
+import { appendUniversalChatMessages, ChatMessageRecord } from '@/lib/jarvis/storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,53 +25,66 @@ export async function POST(req: NextRequest) {
       orchestrationMode: orchestrationMode || 'auto',
     });
 
-    // Asynchronously record user message and assistant reply to universal shared history
-    import('@/lib/jarvis/storage')
-      .then(async ({ appendUniversalChatMessage }) => {
-        const lastUser = [...messages].reverse().find((m: any) => m.role === 'user');
-        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Synchronously persist user message and assistant reply to universal shared history
+    const lastUser = [...messages].reverse().find((m: any) => m.role === 'user');
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const recordsToSave: ChatMessageRecord[] = [];
 
-        if (lastUser && lastUser.content) {
-          await appendUniversalChatMessage({
-            id: `msg-${Date.now()}-u`,
-            role: 'user',
-            content: lastUser.content,
-            image: lastUser.image,
-            timestamp: nowStr,
-          });
+    if (lastUser && lastUser.content) {
+      recordsToSave.push({
+        id: lastUser.id || `msg-${Date.now()}-u`,
+        role: 'user',
+        content: lastUser.content,
+        image: lastUser.image,
+        timestamp: lastUser.timestamp || nowStr,
+      });
 
-          // Directive 03: Autonomous Evolutionary Memory Assimilation
-          const lower = lastUser.content.toLowerCase();
-          const isExplicitPref =
-            lower.includes('i prefer ') ||
-            lower.includes('always ') ||
-            lower.includes('never ') ||
-            lower.includes('remember that ') ||
-            lower.includes("don't use ");
+      // Directive 03: Autonomous Evolutionary Memory Assimilation
+      const lower = lastUser.content.toLowerCase();
+      const isExplicitPref =
+        lower.includes('i prefer ') ||
+        lower.includes('always ') ||
+        lower.includes('never ') ||
+        lower.includes('remember that ') ||
+        lower.includes("don't use ");
 
-          if (isExplicitPref && lastUser.content.length < 180) {
-            import('@/lib/jarvis/memory')
-              .then(({ addMemory }) => {
-                addMemory('PREFERENCE', lastUser.content.trim(), 'Autonomous Directive 03 Assimilation', 0.9);
-              })
-              .catch(() => {});
-          }
+      if (isExplicitPref && lastUser.content.length < 180) {
+        try {
+          const { addMemory } = await import('@/lib/jarvis/memory');
+          addMemory('PREFERENCE', lastUser.content.trim(), 'Autonomous Directive 03 Assimilation', 0.9);
+        } catch (memErr) {
+          console.warn('[Chat] Preference assimilation warning:', memErr);
         }
+      }
+    }
 
-        if (result && result.reply) {
-          await appendUniversalChatMessage({
-            id: `msg-${Date.now() + 1}-a`,
-            role: 'assistant',
-            content: result.reply,
-            toolCalls: result.toolCallsExecuted,
-            timestamp: nowStr,
-            telemetry: result.telemetry,
-          });
-        }
-      })
-      .catch((err) => console.warn('[Chat] Background history sync warning:', err));
+    let assistantRecord: ChatMessageRecord | null = null;
+    if (result && result.reply) {
+      assistantRecord = {
+        id: `msg-${Date.now() + 1}-a`,
+        role: 'assistant',
+        content: result.reply,
+        toolCalls: result.toolCallsExecuted,
+        timestamp: nowStr,
+        vocalSummary: result.vocalSummary,
+        tacticalActions: result.tacticalActions,
+        telemetry: result.telemetry,
+      };
+      recordsToSave.push(assistantRecord);
+    }
 
-    return NextResponse.json(result);
+    if (recordsToSave.length > 0) {
+      try {
+        await appendUniversalChatMessages(recordsToSave);
+      } catch (historyErr) {
+        console.warn('[Chat] Universal history persistence warning:', historyErr);
+      }
+    }
+
+    return NextResponse.json({
+      ...result,
+      messageRecord: assistantRecord,
+    });
   } catch (error: any) {
     console.error('API /api/jarvis/chat error:', error);
     return NextResponse.json(

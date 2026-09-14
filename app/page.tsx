@@ -258,14 +258,43 @@ export default function JarvisDashboard() {
     }
   }, []);
 
+  // Helper to merge local and server messages without losing unsynced turns or creating duplicates
+  const mergeMessages = (existing: Message[], incoming: Message[]): Message[] => {
+    if (!Array.isArray(incoming) || incoming.length === 0) return existing;
+    if (!Array.isArray(existing) || existing.length === 0) return incoming;
+
+    const seenIds = new Set<string>();
+    const seenContentSignatures = new Set<string>();
+    const merged: Message[] = [];
+
+    const getSig = (m: Message) => `${m.role}::${m.timestamp || ''}::${(m.content || '').slice(0, 60)}`;
+
+    // 1. Process server history as canonical
+    for (const msg of incoming) {
+      if (msg.id) seenIds.add(msg.id);
+      seenContentSignatures.add(getSig(msg));
+      merged.push(msg);
+    }
+
+    // 2. Append any client messages that haven't reached server yet
+    for (const msg of existing) {
+      if (msg.id && seenIds.has(msg.id)) continue;
+      if (seenContentSignatures.has(getSig(msg))) continue;
+      if (msg.id === 'msg-welcome' && merged.length > 0) continue;
+      merged.push(msg);
+    }
+
+    return merged.slice(-150);
+  };
+
   // Persist chat transmissions across page refreshes
   useEffect(() => {
     if (!isHistoryHydrated.current) return;
     try {
-      const sanitized = messages.slice(-50).map((m) => ({
+      const sanitized = messages.slice(-100).map((m) => ({
         ...m,
-        // Strip large image payloads (>100KB) to prevent localStorage quota exhaustion
-        image: m.image && m.image.length > 100000 ? undefined : m.image,
+        // Strip large image payloads (>80KB) to prevent localStorage quota exhaustion
+        image: m.image && m.image.length > 80000 ? undefined : m.image,
       }));
       localStorage.setItem('jarvis_chat_history', JSON.stringify(sanitized));
     } catch (err) {
@@ -312,17 +341,20 @@ export default function JarvisDashboard() {
     };
   }, [isUnlocked]);
 
-  // Fetch shared cross-device chat history from cloud/server
+  // Fetch shared cross-device chat history from cloud/server (Non-destructive merge)
   const fetchChatHistory = async () => {
     try {
-      const res = await authFetch('/api/jarvis/chat/history');
+      const res = await authFetch('/api/jarvis/chat/history?limit=100');
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.messages) && data.messages.length > 0) {
-          setMessages(data.messages);
-          try {
-            localStorage.setItem('jarvis_chat_history', JSON.stringify(data.messages));
-          } catch {}
+          setMessages((prev) => {
+            const merged = mergeMessages(prev, data.messages);
+            try {
+              localStorage.setItem('jarvis_chat_history', JSON.stringify(merged.slice(-100)));
+            } catch {}
+            return merged;
+          });
         }
       }
     } catch (e) {
@@ -473,9 +505,11 @@ export default function JarvisDashboard() {
     try {
       const payload = {
         messages: [...messages, userMsg].map((m) => ({
+          id: m.id,
           role: m.role,
           content: m.content,
           image: m.image,
+          timestamp: m.timestamp,
         })),
         apiKey: apiKey || undefined,
         model: selectedModel,
@@ -492,7 +526,17 @@ export default function JarvisDashboard() {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch (jsonErr) {
+        throw new Error(`Cognitive uplink response unparseable (HTTP ${res.status})`);
+      }
+
+      if (!res.ok && !data.reply) {
+        throw new Error(data.error || `Cognitive uplink error (HTTP ${res.status})`);
+      }
+
       const reply = data.reply || 'Acknowledged, Sir.';
       const toolCalls = data.toolCallsExecuted || [];
       const vocalSummary = data.vocalSummary || reply;
@@ -500,11 +544,11 @@ export default function JarvisDashboard() {
       const telemetry = data.telemetry;
 
       const assistantMsg: Message = {
-        id: `msg-${Date.now() + 1}`,
+        id: data.messageRecord?.id || `msg-${Date.now() + 1}`,
         role: 'assistant',
         content: reply,
         toolCalls,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: data.messageRecord?.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         vocalSummary,
         tacticalActions,
         telemetry,
@@ -522,12 +566,13 @@ export default function JarvisDashboard() {
       setMessages((prev) => [
         ...prev,
         {
-          id: `msg-${Date.now() + 1}`,
+          id: `msg-err-${Date.now()}`,
           role: 'assistant',
-          content: `Sir, our communication relay encountered interference: ${e.message}`,
+          content: `Sir, cognitive relay encountered latency: ${e.message}. Local safeguards and state remain fully intact.`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
+    } finally {
       setOrbStatus('idle');
     }
   };
