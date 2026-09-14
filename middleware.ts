@@ -10,8 +10,8 @@ import { verifySessionToken, SESSION_COOKIE_NAME } from './lib/jarvis/auth';
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Only protect /api/jarvis/* endpoints
-  if (!pathname.startsWith('/api/jarvis')) {
+  // Only protect /api/jarvis/* and /api/mcp/* endpoints
+  if (!pathname.startsWith('/api/jarvis') && !pathname.startsWith('/api/mcp')) {
     return NextResponse.next();
   }
 
@@ -42,5 +42,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/jarvis/:path*'],
+  matcher: ['/api/jarvis/:path*', '/api/mcp/:path*'],
 };

@@ -12,6 +12,13 @@ import {
   MemoryCategory,
 } from './memory';
 import { validateActionAgainstDirectives } from './directives';
+import {
+  executeGitHubMCP,
+  executeFileSystemMCP,
+  executeCloudMCP,
+  executeNetworkMCP,
+  executeDatabaseMCP,
+} from './mcp';
 
 export interface ToolDefinition {
   name: string;
@@ -161,6 +168,140 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
           description: 'Whether to include detailed component trees and environment configurations.',
         },
       },
+      required: [],
+    },
+  },
+  {
+    name: 'mcp_github',
+    description: 'Execute GitHub actions (get_repo, list_commits, get_file, list_issues, create_issue, create_or_update_file) via Octokit.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['get_repo', 'list_commits', 'get_file', 'list_issues', 'create_issue', 'create_or_update_file'],
+          description: 'GitHub action to execute.',
+        },
+        path: { type: 'string', description: 'File path in repo (e.g. "package.json", "lib/jarvis/mcp.ts").' },
+        content: { type: 'string', description: 'Content when creating or updating a file.' },
+        message: { type: 'string', description: 'Commit message.' },
+        limit: { type: 'number', description: 'Number of items to retrieve.' },
+        title: { type: 'string', description: 'Issue title.' },
+        body: { type: 'string', description: 'Issue body.' },
+        branch: { type: 'string', description: 'Target branch (default: "main").' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'mcp_filesystem',
+    description: 'Inspect workspace files and directories (read_file, list_dir, write_file) in project workspace.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['read_file', 'list_dir', 'write_file'],
+          description: 'Filesystem action to execute.',
+        },
+        path: { type: 'string', description: 'Relative path in workspace (e.g. "data/jarvis-state.json", "lib").' },
+        content: { type: 'string', description: 'File content to write.' },
+      },
+      required: ['action', 'path'],
+    },
+  },
+  {
+    name: 'mcp_cloud',
+    description: 'Check Vercel Edge production deployment status, Ngrok static tunnel, or server telemetry.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['ping_vercel', 'check_tunnel', 'telemetry_overview'],
+          description: 'Cloud inspection action.',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'mcp_network',
+    description: 'Perform outbound HTTP request (GET, POST, HEAD) to inspect web APIs or external documentation.',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Full HTTP/HTTPS URL to query.' },
+        method: { type: 'string', enum: ['GET', 'POST', 'HEAD'], description: 'HTTP method.' },
+        headers: { type: 'object', description: 'Optional HTTP headers.' },
+        body: { type: 'string', description: 'Optional request body.' },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'mcp_database',
+    description: 'Execute diagnostic query on Upstash Redis cluster (ping, dbsize, list_keys, get_key).',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['ping', 'dbsize', 'list_keys', 'get_key'], description: 'Redis operation.' },
+        key: { type: 'string', description: 'Redis key when calling get_key.' },
+        pattern: { type: 'string', description: 'Key pattern when calling list_keys (e.g. "jarvis:*").' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'cloud_write_file',
+    description: 'Physically create or update a file directly in the GitHub repository (harshansarvaiya/jarvis) on branch main. Generates real Git commits in the cloud without needing local disk access. Works 24/7 autonomously.',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description: 'Relative path of the file in the repository (e.g. "data/autonomous_log.json", "lib/jarvis/new_module.ts").',
+        },
+        content: {
+          type: 'string',
+          description: 'The full text or code content to write to the file.',
+        },
+        commitMessage: {
+          type: 'string',
+          description: 'Descriptive Git commit message explaining the change.',
+        },
+        branch: {
+          type: 'string',
+          description: 'Target branch (default: "main").',
+        },
+      },
+      required: ['path', 'content'],
+    },
+  },
+  {
+    name: 'cloud_execute_command',
+    description: 'Dispatch and execute a shell command in the 24/7 GitHub Actions cloud runner (Ubuntu Linux VM). Zero local PC dependency. Runs type-checks, tests, builds, and diagnostic scripts in the cloud.',
+    parameters: {
+      type: 'object',
+      properties: {
+        command: {
+          type: 'string',
+          description: 'The shell command to execute in the 24/7 cloud runner (e.g. "npx tsc --noEmit", "npm test", "node -e \'console.log(process.version)\'").',
+        },
+        taskId: {
+          type: 'string',
+          description: 'Associated task ID to bind this cloud execution to for audit history.',
+        },
+      },
+      required: ['command'],
+    },
+  },
+  {
+    name: 'cloud_check_deployment',
+    description: 'Inspect 24/7 cloud health, Vercel Edge deployment status, and latest GitHub Actions cloud execution runs.',
+    parameters: {
+      type: 'object',
+      properties: {},
       required: [],
     },
   },
@@ -399,6 +540,71 @@ export async function executeJarvisTool(
               'D-04: Sovereign Loyalty & Relentless Execution',
             ],
           },
+        };
+      }
+
+      case 'mcp_github': {
+        const { action, ...params } = args;
+        const res = await executeGitHubMCP(action, params);
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'mcp_filesystem': {
+        const { action, ...params } = args;
+        const res = await executeFileSystemMCP(action, params);
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'mcp_cloud': {
+        const { action } = args;
+        const res = await executeCloudMCP(action);
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'mcp_network': {
+        const { url, method, headers, body } = args;
+        const res = await executeNetworkMCP(url, method, headers, body);
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'mcp_database': {
+        const { action, ...params } = args;
+        const res = await executeDatabaseMCP(action, params);
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'cloud_write_file': {
+        const { path: filePath, content, commitMessage, branch } = args;
+        const res = await executeGitHubMCP('create_or_update_file', {
+          path: filePath,
+          content,
+          message: commitMessage || `auto(jarvis): physical cloud write ${filePath}`,
+          branch: branch || 'main',
+        });
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'cloud_execute_command': {
+        const { command, taskId } = args;
+        const res = await executeGitHubMCP('dispatch_workflow_run', {
+          command,
+          taskId: taskId || `task-exec-${Date.now()}`,
+        });
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'cloud_check_deployment': {
+        const [cloudRes, runsRes] = await Promise.all([
+          executeCloudMCP('ping_vercel'),
+          executeGitHubMCP('get_workflow_runs'),
+        ]);
+        return {
+          success: cloudRes.success,
+          result: {
+            vercelEdge: cloudRes.output,
+            githubActionsRuns: runsRes.output,
+          },
+          error: cloudRes.error || runsRes.error,
         };
       }
 

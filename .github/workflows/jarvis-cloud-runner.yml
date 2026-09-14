@@ -1,0 +1,42 @@
+name: JARVIS Cloud Execution Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'The shell command or script to execute in the 24/7 cloud runner'
+        required: true
+        default: 'npx tsc --noEmit'
+      task_id:
+        description: 'Associated J.A.R.V.I.S. Task ID for execution audit tracking'
+        required: false
+        default: 'manual-dispatch'
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci || npm install --legacy-peer-deps
+
+      - name: Execute Autonomous Command
+        id: exec_step
+        run: |
+          echo "=========================================================="
+          echo "       J.A.R.V.I.S. 24/7 AUTONOMOUS CLOUD RUNNER         "
+          echo "Task ID: ${{ github.event.inputs.task_id }}"
+          echo "Command: ${{ github.event.inputs.command }}"
+          echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          echo "=========================================================="
+          eval "${{ github.event.inputs.command }}"

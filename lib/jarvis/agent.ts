@@ -193,34 +193,50 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
   if (shouldPreferGroq) {
     try {
       const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
-      const groqModel = requestedModel.startsWith('openai/') || requestedModel.startsWith('groq/')
+      const primaryModel = requestedModel.startsWith('openai/') || requestedModel.startsWith('groq/')
         ? requestedModel
         : 'openai/gpt-oss-120b';
 
-      const groqResult = await runOpenAICompatibleAgent(messages, {
-        endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-        apiKey: groqKey,
-        model: groqModel,
-        systemPrompt: fullSystemPrompt,
-      });
+      const groqCandidates = [
+        primaryModel,
+        'openai/gpt-oss-20b',
+        'llama-3.3-70b-versatile',
+      ].filter((v, i, a) => a.indexOf(v) === i);
 
-      if (!groqResult.error) {
-        const latencyMs = Date.now() - startTime;
-        return {
-          reply: groqResult.reply,
-          vocalSummary: extractCinematicVocalSummary(groqResult.reply),
-          tacticalActions: generateTacticalNextActions(lastUserMessage.content, groqResult.reply, groqResult.toolCallsExecuted),
-          toolCallsExecuted: groqResult.toolCallsExecuted,
-          telemetry: {
-            engineUsed: `Groq US LPU Core (${groqModel})`,
-            provider: 'groq',
+      for (const groqModel of groqCandidates) {
+        try {
+          const groqResult = await runOpenAICompatibleAgent(messages, {
+            endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+            apiKey: groqKey,
             model: groqModel,
-            latencyMs,
-            archetype,
-            failoverOccurred: false,
-            recalledEpisodesCount: recalledEpisodes.length,
-          },
-        };
+            systemPrompt: fullSystemPrompt,
+          });
+
+          if (!groqResult.error) {
+            const latencyMs = Date.now() - startTime;
+            return {
+              reply: groqResult.reply,
+              vocalSummary: extractCinematicVocalSummary(groqResult.reply),
+              tacticalActions: generateTacticalNextActions(lastUserMessage.content, groqResult.reply, groqResult.toolCallsExecuted),
+              toolCallsExecuted: groqResult.toolCallsExecuted,
+              telemetry: {
+                engineUsed: `Groq US LPU Core (${groqModel})`,
+                provider: 'groq',
+                model: groqModel,
+                latencyMs,
+                archetype,
+                failoverOccurred: groqModel !== primaryModel,
+                recalledEpisodesCount: recalledEpisodes.length,
+              },
+            };
+          }
+        } catch (err: any) {
+          if (err?.message?.includes('429')) {
+            console.warn(`[Groq TPM Cascade] Model ${groqModel} reached TPM limit. Cascading to next candidate.`);
+            continue;
+          }
+          break;
+        }
       }
     } catch (groqErr) {
       console.warn('[Orchestrator] Groq dispatch failed, seamlessly engaging Gemini failover...', groqErr);
@@ -419,33 +435,83 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     // Sovereign Autonomous Failover if Gemini is throttled (429) or unavailable
     if (!response || !response.ok) {
       if (groqKey) {
-        console.log('[Orchestrator Failover] Gemini unavailable, shifting to Groq OpenAI GPT-OSS-120B...');
+        console.log('[Orchestrator Failover] Gemini unavailable, shifting to Groq US LPU fleet...');
         try {
           const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
-          const failoverResult = await runOpenAICompatibleAgent(messages, {
-            endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-            apiKey: groqKey,
-            model: 'openai/gpt-oss-120b',
+          const failoverCandidates = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.3-70b-versatile'];
+
+          for (const groqModel of failoverCandidates) {
+            try {
+              const failoverResult = await runOpenAICompatibleAgent(messages, {
+                endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+                apiKey: groqKey,
+                model: groqModel,
+                systemPrompt: fullSystemPrompt,
+              });
+
+              if (!failoverResult.error) {
+                const latencyMs = Date.now() - startTime;
+                return {
+                  reply: `*(Sovereign Autonomous Failover to ${groqModel} on Groq)*\n\n${failoverResult.reply}`,
+                  vocalSummary: extractCinematicVocalSummary(failoverResult.reply),
+                  tacticalActions: generateTacticalNextActions(lastUserMessage.content, failoverResult.reply, failoverResult.toolCallsExecuted),
+                  toolCallsExecuted: failoverResult.toolCallsExecuted,
+                  telemetry: {
+                    engineUsed: `Groq US LPU (${groqModel})`,
+                    provider: 'groq',
+                    model: groqModel,
+                    latencyMs,
+                    archetype,
+                    failoverOccurred: true,
+                    recalledEpisodesCount: recalledEpisodes.length,
+                  },
+                };
+              }
+            } catch (failErr: any) {
+              if (failErr?.message?.includes('429')) {
+                console.warn(`[Groq Failover TPM Cascade] ${groqModel} hit 429, trying next tier...`);
+                continue;
+              }
+              break;
+            }
+          }
+        } catch (failoverErr) {
+          console.warn('[Orchestrator Failover] Groq fleet failover error:', failoverErr);
+        }
+      }
+
+      // Secondary Failover to GitHub Models (Azure Frontier Fleet)
+      if (githubKey) {
+        try {
+          console.log('[Orchestrator Failover] Engaging GitHub Models Frontier Backup...');
+          const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+          const ghResult = await runOpenAICompatibleAgent(messages, {
+            endpoint: 'https://models.inference.ai.azure.com/chat/completions',
+            apiKey: githubKey,
+            model: 'gpt-4o',
             systemPrompt: fullSystemPrompt,
           });
-          const latencyMs = Date.now() - startTime;
-          return {
-            reply: `*(Sovereign Autonomous Failover to OpenAI GPT-OSS-120B on Groq)*\n\n${failoverResult.reply}`,
-            vocalSummary: extractCinematicVocalSummary(failoverResult.reply),
-            tacticalActions: generateTacticalNextActions(lastUserMessage.content, failoverResult.reply, failoverResult.toolCallsExecuted),
-            toolCallsExecuted: failoverResult.toolCallsExecuted,
-            telemetry: {
-              engineUsed: 'Groq US LPU (Failover Core)',
-              provider: 'groq',
-              model: 'openai/gpt-oss-120b',
-              latencyMs,
-              archetype,
-              failoverOccurred: true,
-              recalledEpisodesCount: recalledEpisodes.length,
-            },
-          };
-        } catch (failoverErr) {
-          console.warn('[Orchestrator Failover] Groq failover error:', failoverErr);
+
+          if (!ghResult.error) {
+            const latencyMs = Date.now() - startTime;
+            return {
+              reply: `*(Sovereign Autonomous Failover to GitHub Models GPT-4o)*\n\n${ghResult.reply}`,
+              vocalSummary: extractCinematicVocalSummary(ghResult.reply),
+              tacticalActions: generateTacticalNextActions(lastUserMessage.content, ghResult.reply, ghResult.toolCallsExecuted),
+              toolCallsExecuted: ghResult.toolCallsExecuted,
+              telemetry: {
+                engineUsed: 'GitHub Models (Azure)',
+                provider: 'groq',
+                model: 'gpt-4o',
+                latencyMs,
+                archetype,
+                failoverOccurred: true,
+                recalledEpisodesCount: recalledEpisodes.length,
+              },
+            };
+          }
+        } catch (ghErr) {
+          console.warn('[Orchestrator Failover] GitHub Models failover error:', ghErr);
         }
       }
 
