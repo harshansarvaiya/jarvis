@@ -142,6 +142,7 @@ export default function JarvisDashboard() {
         const data = await res.json();
         if (res.ok && data.authenticated) {
           setIsUnlocked(true);
+          fetchChatHistory();
           fetchTasks();
           fetchMemories();
         } else {
@@ -201,14 +202,15 @@ export default function JarvisDashboard() {
   }, [messages]);
 
   // Clear chat history handler
-  const handleClearChat = () => {
+  const handleClearChat = async () => {
     setMessages([INITIAL_WELCOME_MESSAGE]);
     try {
       localStorage.removeItem('jarvis_chat_history');
+      await authFetch('/api/jarvis/chat/history', { method: 'DELETE' });
     } catch {}
   };
 
-  // Auto-lock with Face ID when phone is locked or app is minimized
+  // Auto-lock with Face ID when minimized, and auto-sync cross-device transmissions on return
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'hidden') {
@@ -219,6 +221,11 @@ export default function JarvisDashboard() {
         if (hasEnrolledBiometrics) {
           setIsUnlocked(false);
         }
+      } else if (document.visibilityState === 'visible' && isUnlocked) {
+        // Automatically sync latest transmissions and radar from cloud/other devices
+        fetchChatHistory();
+        fetchTasks();
+        fetchMemories();
       }
     };
 
@@ -226,7 +233,25 @@ export default function JarvisDashboard() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, []);
+  }, [isUnlocked]);
+
+  // Fetch shared cross-device chat history from cloud/server
+  const fetchChatHistory = async () => {
+    try {
+      const res = await authFetch('/api/jarvis/chat/history');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.messages) && data.messages.length > 0) {
+          setMessages(data.messages);
+          try {
+            localStorage.setItem('jarvis_chat_history', JSON.stringify(data.messages));
+          } catch {}
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to sync chat history from server:', e);
+    }
+  };
 
   // Auto-scroll chat
   useEffect(() => {
@@ -511,6 +536,7 @@ export default function JarvisDashboard() {
           isUnlocked={false}
           onUnlock={() => {
             setIsUnlocked(true);
+            fetchChatHistory();
             fetchTasks();
             fetchMemories();
           }}

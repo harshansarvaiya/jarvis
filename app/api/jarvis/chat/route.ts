@@ -18,6 +18,34 @@ export async function POST(req: NextRequest) {
       model: model || 'gemini-3.8-flash',
     });
 
+    // Asynchronously record user message and assistant reply to universal shared history
+    import('@/lib/jarvis/storage')
+      .then(async ({ appendUniversalChatMessage }) => {
+        const lastUser = [...messages].reverse().find((m: any) => m.role === 'user');
+        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        if (lastUser && lastUser.content) {
+          await appendUniversalChatMessage({
+            id: `msg-${Date.now()}-u`,
+            role: 'user',
+            content: lastUser.content,
+            image: lastUser.image,
+            timestamp: nowStr,
+          });
+        }
+
+        if (result && result.reply) {
+          await appendUniversalChatMessage({
+            id: `msg-${Date.now() + 1}-a`,
+            role: 'assistant',
+            content: result.reply,
+            toolCalls: result.toolCallsExecuted,
+            timestamp: nowStr,
+          });
+        }
+      })
+      .catch((err) => console.warn('[Chat] Background history sync warning:', err));
+
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('API /api/jarvis/chat error:', error);

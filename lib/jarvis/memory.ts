@@ -164,19 +164,45 @@ function ensureDataDir() {
   }
 }
 
+let cachedMemoryState: JarvisState | null = null;
+let hasAttemptedCloudHydration = false;
+
+// Background hydration from cloud if available
+async function hydrateFromCloudIfNeeded() {
+  if (hasAttemptedCloudHydration) return;
+  hasAttemptedCloudHydration = true;
+  try {
+    const { getUniversalState } = await import('./storage');
+    const cloudState = await getUniversalState();
+    if (cloudState && cloudState.version) {
+      cachedMemoryState = cloudState;
+    }
+  } catch (err) {
+    // Silent fallback to local
+  }
+}
+
 export function loadJarvisState(): JarvisState {
+  if (cachedMemoryState) {
+    return cachedMemoryState;
+  }
+
   try {
     ensureDataDir();
     const filePath = getStateFilePath();
     if (!fs.existsSync(filePath)) {
       saveJarvisState(INITIAL_STATE);
+      cachedMemoryState = INITIAL_STATE;
       return INITIAL_STATE;
     }
     const raw = fs.readFileSync(filePath, 'utf-8');
     const parsed = JSON.parse(raw) as JarvisState;
+    cachedMemoryState = parsed;
+    hydrateFromCloudIfNeeded();
     return parsed;
   } catch (error) {
     console.error('Failed to load Jarvis state, falling back to initial state:', error);
+    cachedMemoryState = INITIAL_STATE;
     return INITIAL_STATE;
   }
 }
@@ -185,11 +211,39 @@ export function saveJarvisState(state: JarvisState): void {
   try {
     ensureDataDir();
     state.lastActive = new Date().toISOString();
+    cachedMemoryState = state;
+
+    // 1. Local disk persistence
     const filePath = getStateFilePath();
     fs.writeFileSync(filePath, JSON.stringify(state, null, 2), 'utf-8');
+
+    // 2. Asynchronous cloud persistence (Upstash Redis)
+    import('./storage')
+      .then(({ saveUniversalState }) => saveUniversalState(state))
+      .catch((err) => console.error('[Memory] Cloud sync error:', err));
   } catch (error) {
     console.error('Failed to save Jarvis state:', error);
   }
+}
+
+export async function loadJarvisStateAsync(): Promise<JarvisState> {
+  try {
+    const { getUniversalState } = await import('./storage');
+    const cloudState = await getUniversalState();
+    if (cloudState && cloudState.version) {
+      cachedMemoryState = cloudState;
+      return cloudState;
+    }
+  } catch {}
+  return loadJarvisState();
+}
+
+export async function saveJarvisStateAsync(state: JarvisState): Promise<void> {
+  saveJarvisState(state);
+  try {
+    const { saveUniversalState } = await import('./storage');
+    await saveUniversalState(state);
+  } catch {}
 }
 
 // Tasks API
