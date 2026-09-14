@@ -46,7 +46,63 @@ const INITIAL_WELCOME_MESSAGE: Message = {
   content:
     'Good evening, Sir. J.A.R.V.I.S. Mark I is online and synchronized. All four Core Directives — Guardian Protocol, Benevolent Alignment, Evolutionary Adaptation, and Sovereign Loyalty — are actively governing our operations. I stand ready to execute your orders with absolute fidelity at any cost. How may I advance our objectives?',
   timestamp: 'ONLINE',
+  telemetry: {
+    engineUsed: 'Gemini 3.8 Flash Core',
+    provider: 'google',
+    model: 'gemini-3.8-flash',
+    latencyMs: 14,
+    archetype: 'REFLEX_SPEED',
+    failoverOccurred: false,
+  },
 };
+
+function formatModelBadge(telemetry?: any) {
+  if (!telemetry) return { title: 'GEMINI 3.8 FLASH', model: 'gemini-3.8-flash', icon: '🧠' };
+  const rawModel = telemetry.model || telemetry.engineUsed || 'gemini-3.8-flash';
+  const m = String(rawModel).toLowerCase();
+
+  if (m.includes('3.8')) {
+    return { title: 'GEMINI 3.8 FLASH', model: 'gemini-3.8-flash', icon: '🧠' };
+  }
+  if (m.includes('3.7')) {
+    return { title: 'GEMINI 3.7 FLASH', model: 'gemini-3.7-flash', icon: '🧠' };
+  }
+  if (m.includes('3.6')) {
+    return { title: 'GEMINI 3.6 FLASH', model: 'gemini-3.6-flash', icon: '🧠' };
+  }
+  if (m.includes('3.5')) {
+    return { title: 'GEMINI 3.5 FLASH', model: 'gemini-3.5-flash', icon: '🧠' };
+  }
+  if (m.includes('3.1-pro')) {
+    return { title: 'GEMINI 3.1 PRO', model: 'gemini-3.1-pro-preview', icon: '🧠' };
+  }
+  if (m.includes('3.1')) {
+    return { title: 'GEMINI 3.1 FLASH LITE', model: 'gemini-3.1-flash-lite', icon: '🧠' };
+  }
+  if (m.includes('2.5-pro')) {
+    return { title: 'GEMINI 2.5 PRO', model: 'gemini-2.5-pro', icon: '🧠' };
+  }
+  if (m.includes('2.5')) {
+    return { title: 'GEMINI 2.5 FLASH', model: 'gemini-2.5-flash', icon: '🧠' };
+  }
+  if (m.includes('120b') || m.includes('gpt-oss-120b')) {
+    return { title: 'GROQ GPT-OSS 120B', model: 'openai/gpt-oss-120b', icon: '⚡' };
+  }
+  if (m.includes('20b') || m.includes('gpt-oss-20b')) {
+    return { title: 'GROQ GPT-OSS 20B', model: 'openai/gpt-oss-20b', icon: '⚡' };
+  }
+  if (m.includes('llama-3.3') || m.includes('70b')) {
+    return { title: 'GROQ LLAMA 3.3 70B', model: 'llama-3.3-70b-versatile', icon: '⚡' };
+  }
+  if (m.includes('gpt-4o-mini')) {
+    return { title: 'OPENAI GPT-4O-MINI', model: 'gpt-4o-mini', icon: '🔷' };
+  }
+  if (m.includes('gpt-4o') || m.includes('gpt-4')) {
+    return { title: 'OPENAI GPT-4O', model: 'gpt-4o', icon: '🔷' };
+  }
+
+  return { title: String(rawModel).toUpperCase(), model: String(rawModel), icon: '⚡' };
+}
 
 export default function JarvisDashboard() {
   // Mount and Auth State
@@ -728,7 +784,15 @@ export default function JarvisDashboard() {
                     }`}
                   >
                     <div className="flex items-center space-x-1.5 mb-1 text-[10px] font-mono text-slate-400">
-                      <span>{msg.role === 'user' ? 'SIR' : 'J.A.R.V.I.S.'}</span>
+                      <span className={msg.role === 'assistant' ? 'text-cyan-400 font-semibold' : 'text-slate-300'}>
+                        {msg.role === 'user' ? 'SIR' : 'J.A.R.V.I.S.'}
+                      </span>
+                      {msg.role === 'assistant' && (
+                        <span className="px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/30 text-[9px] font-mono text-cyan-300 font-medium flex items-center gap-1">
+                          <span>{formatModelBadge(msg.telemetry).icon}</span>
+                          <span>{formatModelBadge(msg.telemetry).title}</span>
+                        </span>
+                      )}
                       <span>•</span>
                       <span>{msg.timestamp}</span>
                     </div>
@@ -764,17 +828,20 @@ export default function JarvisDashboard() {
                         </div>
                       )}
 
-                      {/* Orchestration Telemetry Badge */}
+                      {/* Orchestration Telemetry Badge with Exact Model & Version */}
                       {msg.role === 'assistant' && msg.telemetry && (
-                        <div className="mt-2 text-[9px] font-mono text-slate-500 flex flex-wrap items-center gap-1.5 border-t border-slate-800/60 pt-1">
-                          <span className="text-cyan-400 font-bold">
-                            {msg.telemetry.provider === 'groq' ? '⚡ GROQ LPU' : '🧠 GEMINI CORE'}
+                        <div className="mt-2 text-[9px] font-mono text-slate-400 flex flex-wrap items-center gap-1.5 border-t border-slate-800/80 pt-1.5">
+                          {/* Exact Model & Model Number Pill */}
+                          <span className="px-2 py-0.5 rounded bg-cyan-950/90 border border-cyan-400/50 text-cyan-200 font-bold tracking-wider flex items-center gap-1 shadow-[0_0_8px_rgba(0,229,255,0.2)]">
+                            <span>{formatModelBadge(msg.telemetry).icon}</span>
+                            <span className="text-cyan-300 font-semibold">{formatModelBadge(msg.telemetry).title}</span>
+                            <span className="text-cyan-500 font-mono text-[8px]">({formatModelBadge(msg.telemetry).model})</span>
                           </span>
-                          <span>•</span>
-                          <span>{msg.telemetry.latencyMs}ms</span>
+                          <span className="text-slate-600">•</span>
+                          <span className="text-slate-300">{msg.telemetry.latencyMs}ms</span>
                           {msg.telemetry.recalledEpisodesCount && msg.telemetry.recalledEpisodesCount > 0 ? (
                             <>
-                              <span>•</span>
+                              <span className="text-slate-600">•</span>
                               <span className="text-emerald-400">
                                 {msg.telemetry.recalledEpisodesCount} EPISODES RECALLED
                               </span>
@@ -782,8 +849,10 @@ export default function JarvisDashboard() {
                           ) : null}
                           {msg.telemetry.failoverOccurred && (
                             <>
-                              <span>•</span>
-                              <span className="text-amber-400">FAILOVER ACTIVE</span>
+                              <span className="text-slate-600">•</span>
+                              <span className="text-amber-400 bg-amber-950/60 px-1 py-0.5 rounded border border-amber-500/40">
+                                FAILOVER ACTIVE
+                              </span>
                             </>
                           )}
                         </div>
@@ -965,7 +1034,15 @@ export default function JarvisDashboard() {
                   }`}
                 >
                   <div className="flex items-center space-x-2 mb-1 text-[10px] font-mono text-slate-400">
-                    <span>{msg.role === 'user' ? 'SIR' : 'J.A.R.V.I.S.'}</span>
+                    <span className={msg.role === 'assistant' ? 'text-cyan-400 font-semibold' : 'text-slate-300'}>
+                      {msg.role === 'user' ? 'SIR' : 'J.A.R.V.I.S.'}
+                    </span>
+                    {msg.role === 'assistant' && (
+                      <span className="px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/30 text-[9px] font-mono text-cyan-300 font-medium flex items-center gap-1">
+                        <span>{formatModelBadge(msg.telemetry).icon}</span>
+                        <span>{formatModelBadge(msg.telemetry).title}</span>
+                      </span>
+                    )}
                     <span>•</span>
                     <span>{msg.timestamp}</span>
                   </div>
@@ -1016,19 +1093,22 @@ export default function JarvisDashboard() {
                       </div>
                     )}
 
-                    {/* Orchestration Telemetry Badge */}
+                    {/* Orchestration Telemetry Badge with Exact Model & Version */}
                     {msg.role === 'assistant' && msg.telemetry && (
-                      <div className="mt-2.5 text-[10px] font-mono text-slate-500 flex flex-wrap items-center gap-2 border-t border-slate-800/60 pt-1">
-                        <span className="text-cyan-400 font-bold">
-                          {msg.telemetry.provider === 'groq' ? '⚡ GROQ LPU' : '🧠 GEMINI CORE'}
+                      <div className="mt-2.5 text-[10px] font-mono text-slate-400 flex flex-wrap items-center gap-2 border-t border-slate-800/80 pt-1.5">
+                        {/* Exact Model & Model Number Pill */}
+                        <span className="px-2.5 py-0.5 rounded bg-cyan-950/90 border border-cyan-400/50 text-cyan-200 font-bold tracking-wider flex items-center gap-1.5 shadow-[0_0_10px_rgba(0,229,255,0.2)]">
+                          <span>{formatModelBadge(msg.telemetry).icon}</span>
+                          <span className="text-cyan-300 font-semibold">{formatModelBadge(msg.telemetry).title}</span>
+                          <span className="text-cyan-500 font-mono text-[9px]">({formatModelBadge(msg.telemetry).model})</span>
                         </span>
-                        <span>•</span>
-                        <span>{msg.telemetry.latencyMs}ms</span>
-                        <span>•</span>
+                        <span className="text-slate-600">•</span>
+                        <span className="text-slate-300">{msg.telemetry.latencyMs}ms</span>
+                        <span className="text-slate-600">•</span>
                         <span className="text-slate-400">{msg.telemetry.archetype}</span>
                         {msg.telemetry.recalledEpisodesCount && msg.telemetry.recalledEpisodesCount > 0 ? (
                           <>
-                            <span>•</span>
+                            <span className="text-slate-600">•</span>
                             <span className="text-emerald-400">
                               {msg.telemetry.recalledEpisodesCount} EPISODES RECALLED
                             </span>
@@ -1036,8 +1116,10 @@ export default function JarvisDashboard() {
                         ) : null}
                         {msg.telemetry.failoverOccurred && (
                           <>
-                            <span>•</span>
-                            <span className="text-amber-400">FAILOVER ACTIVE</span>
+                            <span className="text-slate-600">•</span>
+                            <span className="text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-500/40">
+                              FAILOVER ACTIVE
+                            </span>
                           </>
                         )}
                       </div>

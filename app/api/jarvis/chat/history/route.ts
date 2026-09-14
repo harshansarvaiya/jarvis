@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
       image: message.image,
       toolCalls: message.toolCalls,
       timestamp: message.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      telemetry: message.telemetry,
     };
 
     await appendUniversalChatMessage(record);

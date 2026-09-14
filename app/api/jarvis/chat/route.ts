@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
             content: result.reply,
             toolCalls: result.toolCallsExecuted,
             timestamp: nowStr,
+            telemetry: result.telemetry,
           });
         }
       })
