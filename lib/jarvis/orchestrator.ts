@@ -45,10 +45,22 @@ export function classifyOperationalIntent(
 
   const clean = userPrompt.toLowerCase().trim();
 
-  // 1. Deep Synthesis & Strategic Reasoning Triggers
+  // 1. System Telemetry & Operational Reflex Triggers
+  const reflexTriggers = [
+    'status', 'inspect', 'telemetry', 'infrastructure', 'health', 'ping',
+    'briefing', 'task', 'radar', 'memory', 'directive', 'protocol', 'storage'
+  ];
+  if (reflexTriggers.some((t) => clean.includes(t))) {
+    return {
+      archetype: 'REFLEX_SPEED',
+      reason: 'System Telemetry / Operational Reflex — Routing to Groq US LPU (Sub-Second 0.1s).',
+    };
+  }
+
+  // 2. Deep Synthesis & Strategic Reasoning Triggers
   const deepReasoningTriggers = [
     'red-team', 'adversarial', 'stress-test', 'sparring', 'deep analysis',
-    'architect', 'strategic plan', 'comprehensive review', 'tradeoff',
+    'architect a', 'strategic plan', 'comprehensive review', 'tradeoff analysis',
     'security audit', 'break down in detail', 'synthesize findings'
   ];
 
@@ -59,7 +71,7 @@ export function classifyOperationalIntent(
     };
   }
 
-  // 2. Reflex Speed Triggers (Sub-second responses for voice and quick operations)
+  // 3. Conversational Reflex / Action Execution
   return {
     archetype: 'REFLEX_SPEED',
     reason: 'Conversational Reflex / Action Execution — Routing to Groq US LPU (0.1s).',

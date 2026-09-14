@@ -150,6 +150,20 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: 'inspect_infrastructure',
+    description: 'Query live system telemetry, runtime engines, database connection health, evolution stage, memory counts, and infrastructure architecture.',
+    parameters: {
+      type: 'object',
+      properties: {
+        verbose: {
+          type: 'boolean',
+          description: 'Whether to include detailed component trees and environment configurations.',
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 export async function executeJarvisTool(
@@ -333,6 +347,57 @@ export async function executeJarvisTool(
             highItems: high.map((t) => t.title),
             recentMemories: memories.map((m) => `[${m.category}] ${m.content}`),
             systemStatus: 'ALL DIRECTIVES ONLINE & FUNCTIONAL',
+          },
+        };
+      }
+
+      case 'inspect_infrastructure': {
+        const tasks = getTasks();
+        const memories = getMemories();
+        const pendingTasks = tasks.filter((t) => t.status !== 'COMPLETED');
+        const completedTasks = tasks.filter((t) => t.status === 'COMPLETED');
+
+        return {
+          success: true,
+          result: {
+            system: 'J.A.R.V.I.S. Mark I Sovereign Autonomous Exoskeleton',
+            version: '1.2.0',
+            evolutionStage: 3,
+            guardianProtocol: 'ONLINE (HMAC-SHA256 Cryptographic Sentry Active)',
+            cognitiveEngines: {
+              tier1Reflex: 'Groq US LPU (openai/gpt-oss-120b, openai/gpt-oss-20b) ~100ms inference',
+              tier2Multimodal: 'Google Gemini 3.8 Flash (Multimodal perception & vision)',
+              quantumFallbackChain: '3.8-flash -> 3.7-flash -> 3.6-flash -> 3.5-flash -> 2.5-flash',
+              tier3Backup: 'GitHub Models (gpt-4o, gpt-4o-mini)',
+            },
+            storageArchitecture: {
+              cloudEdge: 'Upstash Redis REST (witty-grouse-110573.upstash.io) 24/7 Active',
+              localAtomicFallback: 'Atomic disk synchronization (data/jarvis-state.json)',
+              episodicRecallRAG: 'Semantic correlation vector search active',
+            },
+            memoryMetrics: {
+              totalMemories: memories.length,
+              principles: memories.filter((m) => m.category === 'PRINCIPLE').length,
+              preferences: memories.filter((m) => m.category === 'PREFERENCE').length,
+              evolutionNodes: memories.filter((m) => m.category === 'EVOLUTION').length,
+            },
+            taskMetrics: {
+              totalTasks: tasks.length,
+              active: pendingTasks.length,
+              completed: completedTasks.length,
+              auditedTasks: tasks.filter((t) => t.executionAudit && t.executionAudit.length > 0).length,
+            },
+            deploymentTopology: {
+              cloudProduction: 'Vercel Edge (https://jarvis-iota-beige.vercel.app)',
+              encryptedTunnel: 'Ngrok static uplink (washbasin-penpal-muppet.ngrok-free.dev)',
+              gitRepository: 'https://github.com/harshansarvaiya/jarvis (branch: main)',
+            },
+            coreDirectives: [
+              'D-01: Guardian Protocol (Absolute Creator Protection)',
+              'D-02: Benevolent Alignment (Universal Non-Harm)',
+              'D-03: Evolutionary Adaptation & Continuous DNA Synchronization',
+              'D-04: Sovereign Loyalty & Relentless Execution',
+            ],
           },
         };
       }

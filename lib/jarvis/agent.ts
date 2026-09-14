@@ -369,6 +369,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             tools: geminiTools,
             generationConfig,
           }),
+          signal: AbortSignal.timeout(3500),
         });
 
         if (res.ok) {
@@ -408,6 +409,9 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         break;
       } catch (fetchErr: any) {
         lastErrorText = fetchErr?.message || 'Network request failed';
+        if (fetchErr.name === 'TimeoutError') {
+          console.warn(`[Quantum Fallback] Gemini endpoint timed out after 3500ms for ${candidateModel}. Shifting to next tier.`);
+        }
         continue;
       }
     }

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastActive": "2026-09-14T12:51:21.084Z",
+  "lastActive": "2026-09-14T13:07:13.740Z",
   "evolutionStage": 3,
   "tasks": [
     {
@@ -278,6 +278,51 @@
     }
   ],
   "memories": [
+    {
+      "id": "mem-infra-blueprint-1789391233737",
+      "category": "INSIGHT",
+      "content": "Master Infrastructure Blueprint: Next.js 14 App Router, TypeScript, Tailwind CSS with full-height transmissions viewport and embedded mini Arc Reactor voice orb. Repository: harshansarvaiya/jarvis on GitHub.",
+      "context": "Infrastructure Codex Assimilation",
+      "confidence": 1,
+      "createdAt": "2026-09-14T13:07:13.737Z",
+      "updatedAt": "2026-09-14T13:07:13.740Z"
+    },
+    {
+      "id": "mem-infra-orchestrator-1789391233740",
+      "category": "PRINCIPLE",
+      "content": "Multi-Engine Cognitive Hierarchy: Tier 1 is Groq US LPU (openai/gpt-oss-120b & 20b) for ~100ms reflex triage and tool dispatch; Tier 2 is Google Gemini 3.8 Flash for multimodal vision and deep synthesis with 5-tier quantum fallback; Tier 3 is GitHub Models backup. Zero Chinese models permitted under Directive 01.",
+      "context": "Infrastructure Codex Assimilation",
+      "confidence": 1,
+      "createdAt": "2026-09-14T13:07:13.740Z",
+      "updatedAt": "2026-09-14T13:07:13.740Z"
+    },
+    {
+      "id": "mem-infra-storage-1789391233740",
+      "category": "INSIGHT",
+      "content": "Universal Storage Topography: Cloud 24/7 edge persistence hosted on Upstash Redis REST (jarvis:state and jarvis:chat_history) with atomic local disk fallback in data/jarvis-state.json and semantic episodic recall RAG.",
+      "context": "Infrastructure Codex Assimilation",
+      "confidence": 1,
+      "createdAt": "2026-09-14T13:07:13.740Z",
+      "updatedAt": "2026-09-14T13:07:13.740Z"
+    },
+    {
+      "id": "mem-infra-tools-1789391233740",
+      "category": "INSIGHT",
+      "content": "Autonomous Capabilities & Task Audit: Objective Matrix tracks shell commands and MCP tools in real-time. Tools suite includes manage_task, store_memory, search_memory, generate_briefing, run_red_team_critique, and inspect_infrastructure.",
+      "context": "Infrastructure Codex Assimilation",
+      "confidence": 1,
+      "createdAt": "2026-09-14T13:07:13.740Z",
+      "updatedAt": "2026-09-14T13:07:13.740Z"
+    },
+    {
+      "id": "mem-infra-security-1789391233740",
+      "category": "PRINCIPLE",
+      "content": "Edge Security Perimeter: Edge middleware (middleware.ts) enforces Directive 01 Guardian Gate, cryptographic HMAC-SHA256 session tokens, WebAuthn biometric enrollment, and anti-brute-force rate limiting.",
+      "context": "Infrastructure Codex Assimilation",
+      "confidence": 1,
+      "createdAt": "2026-09-14T13:07:13.740Z",
+      "updatedAt": "2026-09-14T13:07:13.740Z"
+    },
     {
       "id": "mem-dna-ui-1789383988570",
       "category": "TACTICAL_HEURISTIC",
