@@ -305,6 +305,42 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: 'notify_user',
+    description: 'Send an immediate or scheduled push notification / reminder to Sir’s device with priority and optional delay.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Header/title of the push notification (e.g. "Mission Milestone Reminder", "Deployment Complete").',
+        },
+        message: {
+          type: 'string',
+          description: 'The body message or reminder content.',
+        },
+        priority: {
+          type: 'string',
+          enum: ['CRITICAL', 'HIGH', 'NORMAL', 'LOW'],
+          description: 'Priority of the alert. CRITICAL/HIGH triggers distinct audio chime and persistent banner.',
+        },
+        delaySeconds: {
+          type: 'number',
+          description: 'Optional delay in seconds before triggering (e.g. 300 for 5 minutes, 3600 for 1 hour).',
+        },
+        category: {
+          type: 'string',
+          enum: ['REMINDER', 'SECURITY', 'TASK', 'DEPLOYMENT', 'GENERAL'],
+          description: 'Category of the notification.',
+        },
+        actionUrl: {
+          type: 'string',
+          description: 'Optional URL or route to open when Sir taps the notification.',
+        },
+      },
+      required: ['title', 'message'],
+    },
+  },
 ];
 
 export async function executeJarvisTool(
@@ -605,6 +641,48 @@ export async function executeJarvisTool(
             githubActionsRuns: runsRes.output,
           },
           error: cloudRes.error || runsRes.error,
+        };
+      }
+
+      case 'notify_user': {
+        const { title, message, priority = 'NORMAL', delaySeconds = 0, category = 'GENERAL', actionUrl = '/' } = args;
+        const notifId = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        const now = new Date();
+        const delaySec = Number(delaySeconds) || 0;
+        const triggerAt = delaySec > 0 ? new Date(now.getTime() + delaySec * 1000).toISOString() : now.toISOString();
+
+        const notificationRecord = {
+          id: notifId,
+          title: title || 'J.A.R.V.I.S. Alert',
+          message: message || 'Operational notification from J.A.R.V.I.S.',
+          priority,
+          category,
+          delaySeconds: delaySec,
+          triggerAt,
+          status: delaySec > 0 ? 'PENDING' : 'SENT',
+          actionUrl: actionUrl || '/',
+          timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+
+        // If scheduled with a delay, record on tactical radar
+        if (delaySec > 0) {
+          addTask(
+            `[NOTIFICATION REMINDER] ${title}`,
+            `Scheduled push alert: ${message}`,
+            priority === 'CRITICAL' ? 'CRITICAL' : priority === 'HIGH' ? 'HIGH' : 'MEDIUM',
+            triggerAt,
+            ['Notification', 'Reminder', category]
+          );
+        }
+
+        return {
+          success: true,
+          result: {
+            message: delaySec > 0
+              ? `Scheduled push notification armed for ${new Date(triggerAt).toLocaleTimeString()} (${delaySec}s delay).`
+              : `Push notification dispatched directly to Sir's device.`,
+            notification: notificationRecord,
+          },
         };
       }
 

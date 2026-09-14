@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Key, Cpu, Volume2, ShieldCheck, Check, Globe, Lock, Zap, Server, ExternalLink, Compass } from 'lucide-react';
+import { X, Key, Cpu, Volume2, ShieldCheck, Check, Globe, Lock, Zap, Server, ExternalLink, Compass, Bell, BellRing } from 'lucide-react';
+import { triggerDeviceNotification } from '@/lib/jarvis/notifications';
 
 export type OrchestrationMode = 'auto' | 'groq' | 'gemini' | 'manual';
 
@@ -44,6 +45,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [localOrchMode, setLocalOrchMode] = useState<OrchestrationMode>(orchestrationMode);
   const [masterPin, setMasterPin] = useState('1010');
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [notifPerm, setNotifPerm] = useState<string>('default');
 
   useEffect(() => {
     setLocalKey(apiKey);
@@ -53,6 +55,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setLocalGithubToken(localStorage.getItem('jarvis_github_token') || githubToken || '');
     const savedMode = (localStorage.getItem('jarvis_orchestration_mode') as OrchestrationMode) || orchestrationMode || 'auto';
     setLocalOrchMode(savedMode);
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotifPerm(Notification.permission);
+    }
   }, [apiKey, groqApiKey, githubToken, orchestrationMode, isOpen]);
 
   if (!isOpen) return null;
@@ -399,6 +404,63 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 }`}
               />
             </button>
+          </div>
+
+          {/* Push Notification Uplink */}
+          <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <BellRing className="w-4 h-4 text-cyan-400" />
+                <div>
+                  <div className="text-xs font-mono text-slate-200">TACTICAL PUSH NOTIFICATIONS</div>
+                  <div className="text-[10px] text-slate-400">Receive proactive alerts, task reminders, and milestone notices</div>
+                </div>
+              </div>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold ${
+                notifPerm === 'granted'
+                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
+                  : notifPerm === 'denied'
+                  ? 'bg-red-950 text-red-300 border border-red-500/40'
+                  : 'bg-amber-950 text-amber-300 border border-amber-500/40'
+              }`}>
+                {notifPerm === 'granted' ? 'ENABLED' : notifPerm === 'denied' ? 'BLOCKED' : 'PROMPT'}
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-2 pt-1">
+              {notifPerm !== 'granted' && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (typeof window !== 'undefined' && 'Notification' in window) {
+                      const perm = await Notification.requestPermission();
+                      setNotifPerm(perm);
+                    }
+                  }}
+                  className="px-2.5 py-1.5 rounded bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 font-mono text-xs flex items-center space-x-1.5 transition-colors"
+                >
+                  <Bell className="w-3.5 h-3.5" />
+                  <span>ARM PERMISSIONS</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={async () => {
+                  await triggerDeviceNotification({
+                    id: `test-${Date.now()}`,
+                    title: 'J.A.R.V.I.S. Uplink Test',
+                    message: 'Tactical push notification channel is active and verified, Sir.',
+                    priority: 'HIGH',
+                    timestamp: new Date().toLocaleTimeString(),
+                  });
+                }}
+                className="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-mono text-xs flex items-center space-x-1.5 transition-colors"
+              >
+                <Zap className="w-3.5 h-3.5 text-cyan-400" />
+                <span>TEST PUSH NOTIFICATION</span>
+              </button>
+            </div>
           </div>
 
           {/* Worldwide Access Telemetry Info */}

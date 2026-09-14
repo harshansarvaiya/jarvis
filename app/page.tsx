@@ -19,6 +19,8 @@ import {
   ShieldCheck,
   MessageSquare,
   Trash2,
+  Bell,
+  BellRing,
 } from 'lucide-react';
 import { ArcReactorOrb } from '@/components/ArcReactorOrb';
 import { DirectiveBadge } from '@/components/DirectiveBadge';
@@ -27,6 +29,7 @@ import { MemoryVault } from '@/components/MemoryVault';
 import { SettingsModal } from '@/components/SettingsModal';
 import { SecurityGateModal } from '@/components/SecurityGateModal';
 import { Task, Priority, MemoryItem, MemoryCategory } from '@/lib/jarvis/memory';
+import { triggerDeviceNotification, playJarvisNotificationChime } from '@/lib/jarvis/notifications';
 
 interface Message {
   id: string;
@@ -142,6 +145,7 @@ export default function JarvisDashboard() {
   const [orchestrationMode, setOrchestrationMode] = useState<'auto' | 'groq' | 'gemini' | 'manual'>('auto');
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [timeStr, setTimeStr] = useState('');
+  const [notifPermission, setNotifPermission] = useState<string>('default');
 
   // Refs
   const chatBottomRef = useRef<HTMLDivElement>(null);
@@ -172,9 +176,41 @@ export default function JarvisDashboard() {
     });
   };
 
+  // Toggle or Arm Web Push Notification Permissions
+  const handleToggleNotificationPermission = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      alert('Your browser does not support Web Push Notifications.');
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    setNotifPermission(perm);
+    if (perm === 'granted') {
+      await triggerDeviceNotification({
+        id: `perm-${Date.now()}`,
+        title: 'J.A.R.V.I.S. Uplink Armed',
+        message: 'Push notifications are online and active across all operational directives, Sir.',
+        priority: 'HIGH',
+        timestamp: new Date().toLocaleTimeString(),
+      });
+    }
+  };
+
   // Client initialization and Guardian Gate verification
   useEffect(() => {
     setIsMounted(true);
+
+    // Register Service Worker for background push notifications
+    if (typeof window !== 'undefined') {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker
+          .register('/sw.js')
+          .then((reg) => console.log('[J.A.R.V.I.S. PWA] Service Worker registered:', reg.scope))
+          .catch((err) => console.warn('[J.A.R.V.I.S. PWA] Service Worker registration failed:', err));
+      }
+      if ('Notification' in window) {
+        setNotifPermission(Notification.permission);
+      }
+    }
 
     // Restore cached tasks and memories immediately for instant zero-latency radar
     try {
@@ -560,6 +596,13 @@ export default function JarvisDashboard() {
       if (toolCalls.length > 0) {
         fetchTasks();
         fetchMemories();
+
+        // Direct device push notification execution for notify_user tool calls
+        for (const tc of toolCalls) {
+          if (tc.name === 'notify_user' && tc.result?.notification) {
+            triggerDeviceNotification(tc.result.notification);
+          }
+        }
       }
     } catch (e: any) {
       console.error('Chat error:', e);
@@ -754,6 +797,23 @@ export default function JarvisDashboard() {
                 : selectedModel.replace('gemini-', 'GEMINI ')}
             </div>
           </div>
+
+          <button
+            onClick={handleToggleNotificationPermission}
+            title={notifPermission === 'granted' ? 'Push Notifications Active (Armed)' : 'Arm Push Notifications'}
+            aria-label="Arm Push Notifications"
+            className={`p-2 rounded-lg border transition-colors shadow-sm ${
+              notifPermission === 'granted'
+                ? 'bg-cyan-950/80 border-cyan-500/40 text-cyan-300 hover:text-cyan-100 hover:border-cyan-400'
+                : 'bg-slate-900 border-amber-500/40 text-amber-400 hover:text-amber-200 animate-pulse'
+            }`}
+          >
+            {notifPermission === 'granted' ? (
+              <BellRing className="w-4 h-4" />
+            ) : (
+              <Bell className="w-4 h-4" />
+            )}
+          </button>
 
           <button
             onClick={() => setIsSettingsOpen(true)}
