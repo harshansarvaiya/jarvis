@@ -168,20 +168,40 @@ export async function executeJarvisTool(
           return { success: true, result: { message: `Task "${title}" created successfully.`, task } };
         }
         if (action === 'complete') {
-          if (!taskId) return { success: false, result: null, error: 'taskId required for complete' };
-          const task = updateTask(taskId, { status: 'COMPLETED' });
-          return { success: true, result: { message: `Task ${taskId} marked as completed.`, task } };
+          let targetId = taskId;
+          if (!targetId && title) {
+            const all = getTasks();
+            const match = all.find(
+              (t) =>
+                t.title.toLowerCase().includes(title.toLowerCase()) ||
+                title.toLowerCase().includes(t.title.toLowerCase())
+            );
+            if (match) targetId = match.id;
+          }
+          if (!targetId) return { success: false, result: null, error: 'taskId or matching title required for complete' };
+          const task = updateTask(targetId, { status: 'COMPLETED' });
+          return { success: true, result: { message: `Task "${task?.title || targetId}" marked as completed.`, task } };
         }
         if (action === 'update') {
-          if (!taskId) return { success: false, result: null, error: 'taskId required for update' };
+          let targetId = taskId;
+          if (!targetId && title) {
+            const all = getTasks();
+            const match = all.find(
+              (t) =>
+                t.title.toLowerCase().includes(title.toLowerCase()) ||
+                title.toLowerCase().includes(t.title.toLowerCase())
+            );
+            if (match) targetId = match.id;
+          }
+          if (!targetId) return { success: false, result: null, error: 'taskId or matching title required for update' };
           const updates: Partial<Task> = {};
-          if (title) updates.title = title;
+          if (args.newTitle) updates.title = args.newTitle;
           if (description) updates.description = description;
           if (priority) updates.priority = priority as Priority;
           if (dueDate) updates.dueDate = dueDate;
           if (tags) updates.tags = tags;
-          const task = updateTask(taskId, updates);
-          return { success: true, result: { message: `Task ${taskId} updated.`, task } };
+          const task = updateTask(targetId, updates);
+          return { success: true, result: { message: `Task "${task?.title || targetId}" updated.`, task } };
         }
         if (action === 'list') {
           const tasks = getTasks();

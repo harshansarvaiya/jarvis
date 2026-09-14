@@ -74,17 +74,21 @@ export const TaskMatrix: React.FC<TaskMatrixProps> = ({
 
       {/* Filter Tabs */}
       <div className="flex space-x-2 my-3 text-xs font-mono">
-        {(['ACTIVE', 'ALL', 'COMPLETED'] as const).map((tab) => (
+        {[
+          { key: 'ACTIVE', label: `ACTIVE (${tasks.filter((t) => t.status !== 'COMPLETED').length})` },
+          { key: 'ALL', label: `ALL (${tasks.length})` },
+          { key: 'COMPLETED', label: `COMPLETED (${tasks.filter((t) => t.status === 'COMPLETED').length})` },
+        ].map((tab) => (
           <button
-            key={tab}
-            onClick={() => setFilter(tab)}
+            key={tab.key}
+            onClick={() => setFilter(tab.key as any)}
             className={`px-2.5 py-1 rounded transition-colors ${
-              filter === tab
+              filter === tab.key
                 ? 'bg-cyan-500 text-black font-semibold shadow-[0_0_10px_rgba(0,229,255,0.4)]'
                 : 'text-slate-400 hover:text-slate-200 bg-slate-900/50 border border-slate-800'
             }`}
           >
-            {tab}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -173,6 +177,11 @@ export const TaskMatrix: React.FC<TaskMatrixProps> = ({
                     >
                       {task.title}
                     </span>
+                    {isCompleted && (
+                      <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1 py-0.2 rounded shrink-0">
+                        DONE
+                      </span>
+                    )}
                   </div>
 
                   {task.description && (

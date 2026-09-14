@@ -28,17 +28,21 @@ export function normalizeModel(m?: string): string {
   if (clean.includes('3.7')) return 'gemini-3.7-flash';
   if (clean.includes('3.6')) return 'gemini-3.6-flash';
   if (clean.includes('3.5')) return 'gemini-3.5-flash';
+  if (clean.includes('3.1-pro') || (clean.includes('3.1') && clean.includes('pro'))) return 'gemini-3.1-pro-preview';
   if (clean.includes('3.1')) return 'gemini-3.1-flash-lite';
-  if (clean.includes('pro')) return 'gemini-3.1-pro-preview';
-  if (clean.includes('2.0') || clean.includes('2.5') || clean.includes('1.5') || clean === 'gemini-flash') {
-    return 'gemini-3.8-flash';
+  if (clean.includes('2.5-pro') || (clean.includes('2.5') && clean.includes('pro'))) return 'gemini-2.5-pro';
+  if (clean.includes('2.5')) return 'gemini-2.5-flash';
+  if (clean.includes('flash-latest')) return 'gemini-flash-latest';
+  if (clean.includes('pro-latest')) return 'gemini-pro-latest';
+  if (clean.includes('2.0') || clean.includes('1.5') || clean === 'gemini-flash') {
+    return 'gemini-2.5-flash';
   }
   return clean;
 }
 
 /**
  * Stepwise Quantum Fallback Hierarchy
- * Priority sequence: gemini-3.8-flash -> gemini-3.7-flash -> gemini-3.6-flash
+ * Priority sequence: gemini-3.8-flash -> 3.7 -> 3.6 -> 3.5 -> 2.5 -> flash-latest
  */
 export function getModelFallbackHierarchy(requestedModel: string): string[] {
   const masterHierarchy = [
@@ -46,6 +50,8 @@ export function getModelFallbackHierarchy(requestedModel: string): string[] {
     'gemini-3.7-flash',
     'gemini-3.6-flash',
     'gemini-3.5-flash',
+    'gemini-2.5-flash',
+    'gemini-flash-latest',
     'gemini-3.1-flash-lite',
   ];
 
@@ -86,13 +92,18 @@ export async function runJarvisAgent(
   }
 
   // 2. Synthesize Active State Context
-  const activeTasks = getTasks().filter((t) => t.status !== 'COMPLETED').slice(0, 5);
+  const allTasks = getTasks();
+  const activeTasks = allTasks.filter((t) => t.status !== 'COMPLETED').slice(0, 8);
+  const completedTasks = allTasks.filter((t) => t.status === 'COMPLETED').slice(0, 5);
   const relevantMemories = getMemories().slice(0, 8);
 
   const contextPrompt = `
 [CURRENT TEMPORAL CONTEXT]: ${new Date().toISOString()} (Local time: ${new Date().toLocaleString()})
 [ACTIVE TASKS ON RADAR]:
-${activeTasks.map((t) => `- [${t.priority}] ${t.title} (Status: ${t.status})`).join('\n') || 'No active pending tasks.'}
+${activeTasks.map((t) => `- [${t.priority}] ${t.title} (ID: ${t.id}, Status: ${t.status}${t.dueDate ? `, Due: ${t.dueDate}` : ''})`).join('\n') || 'No active pending tasks.'}
+
+[RECENT COMPLETED TASKS & ACHIEVEMENTS]:
+${completedTasks.map((t) => `- [COMPLETED] ${t.title} (ID: ${t.id}${t.completedAt ? `, Completed: ${t.completedAt}` : ''})`).join('\n') || 'No recently completed tasks recorded.'}
 
 [ASSIMILATED MEMORY & PREFERENCES]:
 ${relevantMemories.map((m) => `- [${m.category}]: ${m.content}`).join('\n')}
@@ -291,16 +302,10 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       });
 
       // Query Gemini again with tool output
-      const is3x = selectedModel.includes('3.');
-      const toolGenerationConfig = is3x
-        ? {
-            thinking_level: 'medium',
-            maxOutputTokens: 4096,
-          }
-        : {
-            temperature: 0.4,
-            maxOutputTokens: 2048,
-          };
+      const toolGenerationConfig = {
+        temperature: 0.4,
+        maxOutputTokens: 4096,
+      };
 
       response = await fetch(activeApiUrl, {
         method: 'POST',
@@ -313,14 +318,39 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         }),
       });
 
-      if (!response.ok) break;
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => '');
+        console.warn(`[Tool Response Turn] Request failed with HTTP ${response.status}:`, errBody);
+        break;
+      }
       data = await response.json();
       candidate = data.candidates?.[0];
       functionCalls = candidate?.content?.parts?.filter((p: any) => p.functionCall);
     }
 
-    const textPart = candidate?.content?.parts?.find((p: any) => p.text);
-    const finalReply = textPart?.text || 'Directives processed, Sir.';
+    // Find conversational text part (filtering out raw thought artifacts if any)
+    const textPart =
+      candidate?.content?.parts?.find((p: any) => p.text && !p.thought) ||
+      candidate?.content?.parts?.find((p: any) => p.text);
+
+    let finalReply = textPart?.text;
+    if (!finalReply) {
+      if (toolCallsExecuted.length > 0) {
+        const summaries = toolCallsExecuted.map((tc) => {
+          if (tc.result?.message) return tc.result.message;
+          if (tc.name === 'manage_task') {
+            if (tc.args?.action === 'create') return `Task "${tc.args?.title}" registered in tactical matrix.`;
+            if (tc.args?.action === 'complete') return `Task ${tc.args?.taskId || ''} marked completed.`;
+            if (tc.args?.action === 'list') return `Tactical objectives synchronized.`;
+          }
+          if (tc.name === 'store_memory') return `Memory imprinted under [${tc.args?.category || 'INSIGHT'}].`;
+          return `${tc.name} executed successfully.`;
+        });
+        finalReply = `Sir, I have executed your instructions directly:\n\n${summaries.map((s) => `- ${s}`).join('\n')}\n\nAll directives remain fully online.`;
+      } else {
+        finalReply = 'Directives acknowledged and synchronized, Sir.';
+      }
+    }
 
     return {
       reply: finalReply,

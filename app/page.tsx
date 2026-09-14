@@ -85,9 +85,45 @@ export default function JarvisDashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  // Authenticated fetch wrapper ensuring Bearer token and tunnel bypass
+  const authFetch = async (url: string, options: RequestInit = {}) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('jarvis_auth_token') || '' : '';
+    const headers: Record<string, string> = {
+      'ngrok-skip-browser-warning': 'true',
+      ...((options.headers as Record<string, string>) || {}),
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return fetch(url, {
+      ...options,
+      headers,
+    });
+  };
+
   // Client initialization and Guardian Gate verification
   useEffect(() => {
     setIsMounted(true);
+
+    // Restore cached tasks and memories immediately for instant zero-latency radar
+    try {
+      const cachedTasks = localStorage.getItem('jarvis_tasks_cache');
+      if (cachedTasks) {
+        const parsed = JSON.parse(cachedTasks);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setTasks(parsed);
+        }
+      }
+      const cachedMemories = localStorage.getItem('jarvis_memories_cache');
+      if (cachedMemories) {
+        const parsed = JSON.parse(cachedMemories);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMemories(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse cached tasks/memories', e);
+    }
 
     const verifyAuth = async () => {
       try {
@@ -102,7 +138,7 @@ export default function JarvisDashboard() {
           return;
         }
 
-        const res = await fetch('/api/jarvis/auth/status');
+        const res = await authFetch('/api/jarvis/auth/status');
         const data = await res.json();
         if (res.ok && data.authenticated) {
           setIsUnlocked(true);
@@ -200,12 +236,14 @@ export default function JarvisDashboard() {
   // Fetch tasks
   const fetchTasks = async () => {
     try {
-      const res = await fetch('/api/jarvis/tasks', {
-        headers: { 'ngrok-skip-browser-warning': 'true' },
-      });
+      const res = await authFetch('/api/jarvis/tasks');
       if (res.ok) {
         const data = await res.json();
-        setTasks(data.tasks || []);
+        const loadedTasks = data.tasks || [];
+        setTasks(loadedTasks);
+        try {
+          localStorage.setItem('jarvis_tasks_cache', JSON.stringify(loadedTasks));
+        } catch {}
       }
     } catch (e) {
       console.error('Failed to fetch tasks:', e);
@@ -215,13 +253,15 @@ export default function JarvisDashboard() {
   // Fetch memories
   const fetchMemories = async () => {
     try {
-      const res = await fetch('/api/jarvis/memory', {
-        headers: { 'ngrok-skip-browser-warning': 'true' },
-      });
+      const res = await authFetch('/api/jarvis/memory');
       if (res.ok) {
         const data = await res.json();
-        setMemories(data.memories || []);
+        const loadedMemories = data.memories || [];
+        setMemories(loadedMemories);
         if (data.evolutionStage) setEvolutionStage(data.evolutionStage);
+        try {
+          localStorage.setItem('jarvis_memories_cache', JSON.stringify(loadedMemories));
+        } catch {}
       }
     } catch (e) {
       console.error('Failed to fetch memories:', e);
@@ -339,11 +379,10 @@ export default function JarvisDashboard() {
         model: selectedModel,
       };
 
-      const res = await fetch('/api/jarvis/chat', {
+      const res = await authFetch('/api/jarvis/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
         },
         body: JSON.stringify(payload),
       });
@@ -397,11 +436,21 @@ export default function JarvisDashboard() {
   // Task Actions
   const handleToggleTask = async (taskId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'COMPLETED' ? 'PENDING' : 'COMPLETED';
-    await fetch('/api/jarvis/tasks', {
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              status: newStatus as any,
+              completedAt: newStatus === 'COMPLETED' ? new Date().toISOString() : undefined,
+            }
+          : t
+      )
+    );
+    await authFetch('/api/jarvis/tasks', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({ id: taskId, status: newStatus }),
     });
@@ -409,19 +458,18 @@ export default function JarvisDashboard() {
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    await fetch(`/api/jarvis/tasks?id=${taskId}`, {
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    await authFetch(`/api/jarvis/tasks?id=${taskId}`, {
       method: 'DELETE',
-      headers: { 'ngrok-skip-browser-warning': 'true' },
     });
     fetchTasks();
   };
 
   const handleAddTask = async (title: string, priority: Priority) => {
-    await fetch('/api/jarvis/tasks', {
+    await authFetch('/api/jarvis/tasks', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({ title, priority }),
     });
@@ -430,11 +478,10 @@ export default function JarvisDashboard() {
 
   // Memory Actions
   const handleAddMemory = async (category: MemoryCategory, content: string) => {
-    await fetch('/api/jarvis/memory', {
+    await authFetch('/api/jarvis/memory', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({ category, content, context: 'Manual Creator Input' }),
     });
