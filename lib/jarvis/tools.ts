@@ -885,15 +885,16 @@ export async function executeJarvisTool(
         return {
           success: true,
           result: {
-            system: 'J.A.R.V.I.S. Mark I Sovereign Autonomous Exoskeleton',
-            version: '1.2.0',
-            evolutionStage: 3,
+            system: 'J.A.R.V.I.S. Mark II Sovereign Autonomous Exoskeleton',
+            version: '2.0.0',
+            evolutionStage: 5,
+            stage: 'Stage 5: Autonomous Sovereign Cloud-Native Substrate',
             guardianProtocol: 'ONLINE (HMAC-SHA256 Cryptographic Sentry Active)',
             cognitiveEngines: {
-              tier1Reflex: 'Groq US LPU (openai/gpt-oss-120b, openai/gpt-oss-20b) ~100ms inference',
-              tier2Multimodal: 'Google Gemini 3.8 Flash (Multimodal perception & vision)',
-              quantumFallbackChain: '3.8-flash -> 3.7-flash -> 3.6-flash -> 3.5-flash -> 2.5-flash',
-              tier3Backup: 'GitHub Models (gpt-4o, gpt-4o-mini)',
+              tier1Reflex: 'Groq US LPU (openai/gpt-oss-120b) ~100-180ms inference',
+              tier2Multimodal: 'Google Gemini (gemini-3.7-flash Primary)',
+              quantumFallbackChain: '3.7-flash -> flash-lite-latest -> 3.1-flash-lite -> 3.5-flash-lite -> 3.8-flash',
+              tier3Backup: 'GitHub Models / Azure (gpt-4o, gpt-4o-mini)',
             },
             storageArchitecture: {
               cloudEdge: 'Upstash Redis REST (witty-grouse-110573.upstash.io) 24/7 Active',

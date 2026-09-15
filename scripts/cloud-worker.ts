@@ -1,9 +1,7 @@
 /**
- * J.A.R.V.I.S. Mark I — 24/7 Cloud Cron & Background Worker Daemon
- * 
- * Host: Google Cloud Compute Engine e2-micro (antigravity-cloud-runner)
- * Purpose: Autonomous scheduled tasks, due date reminders, morning briefings,
- *          and repository health watchdog with zero local workstation dependency.
+ * J.A.R.V.I.S. Mark II — 24/7 Cloud Cron & Background Worker Daemon
+ * Runs persistently on the Cloud Runner VM (`antigravity-cloud-runner`)
+ * Executes scheduled task reminders, VAPID Web Push alerts, and autonomous health sweeps.
  */
 
 import { Redis } from '@upstash/redis';
@@ -243,7 +241,7 @@ async function processCronQueue() {
 async function startWorkerLoop(isTestMode: boolean = false) {
   console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
-║  J.A.R.V.I.S. MARK I — 24/7 CLOUD CRON WORKER SUBSTRATE       ║
+║  J.A.R.V.I.S. MARK II — 24/7 CLOUD CRON WORKER SUBSTRATE      ║
 ║  Host: antigravity-cloud-runner (GCP Compute Engine e2-micro) ║
 ║  Status: INITIALIZED // DIRECTIVE 04 SOVEREIGN LOYALTY ACTIVE ║
 ╚═══════════════════════════════════════════════════════════════╝

@@ -90,7 +90,7 @@ const INITIAL_WELCOME_MESSAGE: Message = {
   id: 'welcome-1',
   role: 'assistant',
   content:
-    'Good evening, Sir. J.A.R.V.I.S. Mark I is online and synchronized. All four Core Directives — Guardian Protocol, Benevolent Alignment, Evolutionary Adaptation, and Sovereign Loyalty — are actively governing our operations. I stand ready to execute your orders with absolute fidelity at any cost. How may I advance our objectives?',
+    'Good evening, Sir. J.A.R.V.I.S. Mark II is online and fully synchronized. All five Core Directives — Guardian Protocol, Benevolent Alignment, Evolutionary Adaptation, Sovereign Loyalty, and Design-Approved Push Pipeline — are actively governing our operations. Stage 5 sovereign multi-engine substrate is active. How may I advance our objectives?',
   timestamp: 'ONLINE',
   telemetry: {
     engineUsed: 'Gemini 3.8 Flash Core',
@@ -980,8 +980,8 @@ export default function JarvisDashboard() {
               <span className="font-mono text-sm font-black tracking-widest text-cyan-400">
                 J.A.R.V.I.S.
               </span>
-              <span className="text-[10px] font-mono bg-cyan-950/80 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.2 rounded">
-                MARK I
+              <span className="text-[10px] font-mono bg-cyan-950/80 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.2 rounded font-bold">
+                MARK II
               </span>
             </div>
             <div className="text-[10px] font-mono text-emerald-400 flex items-center space-x-1">
@@ -1358,13 +1358,14 @@ export default function JarvisDashboard() {
                 SOVEREIGN ETHICAL ARCHITECTURE
               </div>
               <p>
-                The 4 Immutable Core Directives govern all perception, decision vectors, and tool execution in J.A.R.V.I.S. Mark I.
+                The 5 Immutable Core Directives govern all perception, decision vectors, and tool execution in J.A.R.V.I.S. Mark II.
               </p>
               <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-[11px] text-cyan-200 space-y-1.5">
                 <div>• <strong>Directive 01</strong>: The Guardian Protocol protects Sir at all costs.</div>
                 <div>• <strong>Directive 02</strong>: Benevolent Alignment guarantees constructive safety.</div>
                 <div>• <strong>Directive 03</strong>: Evolutionary Adaptation continuously assimilates mental models.</div>
                 <div>• <strong>Directive 04</strong>: Sovereign Loyalty executes Sir's direct orders with relentless fidelity.</div>
+                <div>• <strong>Directive 05</strong>: Design-Approved Push Pipeline pushes verified builds directly to remote.</div>
               </div>
             </div>
           </div>

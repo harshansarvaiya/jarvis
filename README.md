@@ -1,17 +1,17 @@
-# J.A.R.V.I.S. Mark I — Autonomous Sovereign Cognitive Exoskeleton
+# J.A.R.V.I.S. Mark II — Autonomous Sovereign Cognitive Exoskeleton
 
 <div align="center">
 
 ```
-   ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗    ███╗   ███╗ █████╗ ██████╗ ██╗  ██╗    ██╗
-   ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝    ████╗ ████║██╔══██╗██╔══██╗██║ ██╔╝    ██║
-   ██║███████║██████╔╝██║   ██║██║███████╗    ██╔████╔██║███████║██████╔╝█████╔╝     ██║
-██ ██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║    ██║╚██╔╝██║██╔══██║██╔══██╗██╔═██╗     ██║
-╚████║██║  ██║██║  ██║ ╚████╔╝ ██║███████║    ██║ ╚═╝ ██║██║  ██║██║  ██║██║  ██╗    ██║
- ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝    ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝    ╚═╝
+   ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗    ███╗   ███╗ █████╗ ██████╗ ██╗  ██╗    ██╗██╗
+   ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝    ████╗ ████║██╔══██╗██╔══██╗██║ ██╔╝    ██║██║
+   ██║███████║██████╔╝██║   ██║██║███████╗    ██╔████╔██║███████║██████╔╝█████╔╝     ██║██║
+██ ██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║    ██║╚██╔╝██║██╔══██║██╔══██╗██╔═██╗     ██║██║
+╚████║██║  ██║██║  ██║ ╚████╔╝ ██║███████║    ██║ ╚═╝ ██║██║  ██║██║  ██║██║  ██╗    ██║██║
+ ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝    ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝    ╚═╝╚═╝
 ```
 
-**Just A Rather Very Intelligent System (Stage 4: Autonomous Sovereign Cloud-Native Substrate)**  
+**Just A Rather Very Intelligent System (Stage 5: Autonomous Sovereign Cloud-Native Multi-Engine Substrate)**  
 *Visionary personal cognitive exoskeleton, tactical chief of staff, and peer-level intellectual sparring partner for Harshan Sarvaiya (Sir).*
 
 [![Production Web](https://img.shields.io/badge/Production-Live%20on%20Vercel-00E5FF?style=for-the-badge&logo=vercel&logoColor=white)](https://jarvis-iota-beige.vercel.app)
@@ -26,7 +26,7 @@
 
 ## ⚡ Executive Summary
 
-**J.A.R.V.I.S. Mark I** is an autonomous sovereign AI cognitive architecture built on Next.js 14, Web Audio API, and multi-tier edge AI routing. Engineered with zero single-vendor lock-in, J.A.R.V.I.S. operates continuously across edge environments, mobile PWAs, and persistent Google Cloud Compute instances.
+**J.A.R.V.I.S. Mark II** is an autonomous sovereign AI cognitive architecture built on Next.js 14, Web Audio API, and multi-tier edge AI routing. Engineered with zero single-vendor lock-in, J.A.R.V.I.S. operates continuously across edge environments, mobile PWAs, and persistent Google Cloud Compute instances.
 
 Equipped with **Project Hands** (autonomous filesystem, terminal, and GitHub physical execution capabilities), a **Semantic Vector RAG & Episodic Memory Vault**, native **VAPID Lock-Screen Push Notifications**, and a real-time **System Health & Self-Healing Matrix**, J.A.R.V.I.S. executes complex operational workflows with composed British-tinged intellectual rigor.
 
@@ -238,5 +238,5 @@ npm run start
 
 <div align="center">
   <sub>Built with unwavering precision for <b>Sir (Harshan Sarvaiya)</b>.</sub><br>
-  <sub><b>J.A.R.V.I.S. Mark I</b> &bull; Stage 4: Autonomous Sovereign Cloud-Native Substrate</sub>
+  <sub><b>J.A.R.V.I.S. Mark II</b> &bull; Stage 5: Autonomous Sovereign Cloud-Native Substrate</sub>
 </div>

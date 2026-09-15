@@ -69,9 +69,9 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const STATE_FILE = path.join(DATA_DIR, 'jarvis-state.json');
 
 const INITIAL_STATE: JarvisState = {
-  version: '1.0.0',
+  version: '2.0.0',
   lastActive: new Date().toISOString(),
-  evolutionStage: 1,
+  evolutionStage: 5,
   tasks: [
     {
       id: 'task-init-1',

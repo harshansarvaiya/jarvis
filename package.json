@@ -1,7 +1,7 @@
 {
-  "name": "jarvis-mark-1",
-  "version": "1.0.0",
-  "description": "J.A.R.V.I.S. Personal Autonomous Cognitive Exoskeleton & Copilot",
+  "name": "jarvis-mark-2",
+  "version": "2.0.0",
+  "description": "J.A.R.V.I.S. Mark II — Personal Sovereign Autonomous Cognitive Exoskeleton",
   "private": true,
   "scripts": {
     "dev": "next dev",
