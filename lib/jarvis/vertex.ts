@@ -91,11 +91,20 @@ export function mapToVertexModel(requestedModel: string): { model: string; locat
   const normalized = requestedModel.toLowerCase();
 
   // Gemini 3.x Series (Global Multi-Region Endpoint)
-  if (normalized.includes('3.8') || normalized.includes('3.8-flash')) {
+  if (normalized.includes('3.8')) {
     return { model: 'gemini-3.8-flash', location: 'global' };
   }
-  if (normalized.includes('3.7') || normalized.includes('3.7-flash')) {
+  if (normalized.includes('3.7')) {
     return { model: 'gemini-3.7-flash', location: 'global' };
+  }
+  if (normalized.includes('3.6')) {
+    return { model: 'gemini-3.6-flash', location: 'global' };
+  }
+  if (normalized.includes('3.1-pro')) {
+    return { model: 'gemini-3.1-pro-preview', location: 'global' };
+  }
+  if (normalized.includes('3.1')) {
+    return { model: 'gemini-3.1-flash-lite', location: 'global' };
   }
 
   // Deep Strategic Synthesis (us-central1)

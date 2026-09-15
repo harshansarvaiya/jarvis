@@ -754,6 +754,12 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
               ? 'Vertex AI Gemini 3.8 Flash (GCP Credits)'
               : selectedVertexModel.includes('3.7')
               ? 'Vertex AI Gemini 3.7 Flash (GCP Credits)'
+              : selectedVertexModel.includes('3.6')
+              ? 'Vertex AI Gemini 3.6 Flash (GCP Credits)'
+              : selectedVertexModel.includes('3.1-pro')
+              ? 'Vertex AI Gemini 3.1 Pro (GCP Credits)'
+              : selectedVertexModel.includes('3.1')
+              ? 'Vertex AI Gemini 3.1 Flash Lite (GCP Credits)'
               : selectedVertexModel.includes('pro')
               ? 'Vertex AI Gemini 2.5 Pro (GCP Credits)'
               : 'Vertex AI Gemini 2.5 Flash (GCP Credits)')
