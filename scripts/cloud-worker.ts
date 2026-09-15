@@ -93,6 +93,20 @@ async function dispatchPush(title: string, body: string, actionUrl: string = '/'
       }
     }
     console.log(`[Cloud Worker] 📲 Push dispatched to ${sentCount}/${keys.length} devices: "${title}"`);
+
+    // Dual-channel: Dispatch proactive alert to Sir's Telegram
+    try {
+      const { telegramGateway } = await import('../lib/jarvis/telegram');
+      const authChatId = await telegramGateway.getAuthorizedChatId();
+      if (authChatId) {
+        await telegramGateway.sendMessage(
+          authChatId,
+          `🔔 *[J.A.R.V.I.S. PROACTIVE ALERT]*\n\n*${title}*\n${body}`,
+          { parseMode: 'Markdown' }
+        );
+        console.log(`[Cloud Worker] 📱 Telegram proactive alert sent to chat ID: ${authChatId}`);
+      }
+    } catch {}
   } catch (err: any) {
     console.error('[Cloud Worker] Push dispatch error:', err.message);
   }
