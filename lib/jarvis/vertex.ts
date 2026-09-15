@@ -137,12 +137,22 @@ export async function callVertexAIGenerate(options: VertexGenerateOptions): Prom
   const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
   const endpoint = `https://${host}/v1/projects/${projectId}/locations/${location}/publishers/google/models/${vertexModel}:generateContent`;
 
+  const defaultGenConfig: any = {
+    temperature: 0.3,
+    maxOutputTokens: 4096,
+  };
+
+  // Enable Google's native internal thinking layer for Gemini 3.8 and Pro (Pillar 1)
+  if (vertexModel.includes('3.8') || vertexModel.includes('pro')) {
+    defaultGenConfig.thinkingConfig = {
+      includeThoughts: true,
+      thinkingBudget: 1024,
+    };
+  }
+
   const bodyPayload: any = {
     contents: options.contents,
-    generationConfig: options.generationConfig || {
-      temperature: 0.3,
-      maxOutputTokens: 4096,
-    },
+    generationConfig: options.generationConfig || defaultGenConfig,
   };
 
   if (options.systemInstruction) {

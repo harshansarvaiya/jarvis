@@ -251,15 +251,106 @@ async function processSubagentQueue() {
       return;
     }
 
-    console.log(`[Cloud Worker] 🤖 Autonomous Subagent worker executing: "${subagentTask.title}"`);
+    console.log(`[Cloud Worker] 🤖 Autonomous Subagent started: "${subagentTask.title}"`);
+    const prompt = subagentTask.prompt || subagentTask.instructions || subagentTask.title;
 
-    await dispatchPush(
-      '🤖 J.A.R.V.I.S. Subagent Execution Complete',
-      `Subagent task "${subagentTask.title}" finished autonomously on 24/7 Cloud Runner. Intelligence stored in Mission Control.`,
-      '/'
-    );
+    try {
+      const { runJarvisAgent } = await import('../lib/jarvis/agent');
+      const { addMemory } = await import('../lib/jarvis/memory');
+
+      const result = await runJarvisAgent([
+        {
+          role: 'user',
+          content: `[AUTONOMOUS SUBAGENT DIRECTIVE]: ${prompt}. Perform deep empirical research, execute tools as necessary, and compile an executive intelligence report with verified facts, pricing, and entity details.`,
+        },
+      ], {
+        model: 'gemini-3.8-flash',
+      });
+
+      console.log(`[Cloud Worker] 🤖 Subagent "${subagentTask.title}" completed in ${result.telemetry.latencyMs}ms.`);
+
+      // Store in Redis subagent reports
+      await redis.lpush('jarvis:subagent_reports', JSON.stringify({
+        id: subagentTask.id || Date.now().toString(),
+        title: subagentTask.title,
+        prompt,
+        report: result.reply,
+        vocalSummary: result.vocalSummary,
+        toolCalls: result.toolCallsExecuted,
+        timestamp: new Date().toISOString(),
+      }));
+
+      // Assimilate into persistent memory
+      addMemory(
+        'TACTICAL' as any,
+        `Subagent Report [${subagentTask.title}]: ${result.vocalSummary || result.reply.slice(0, 250)}`,
+        'Autonomous Cloud Subagent Execution'
+      );
+
+      // Push notification to Sir's devices
+      await dispatchPush(
+        `🤖 Subagent Done: ${subagentTask.title}`,
+        result.vocalSummary || result.reply.slice(0, 180),
+        '/'
+      );
+    } catch (agentErr: any) {
+      console.error(`[Cloud Worker] Subagent execution failed:`, agentErr.message);
+      await dispatchPush(
+        `⚠️ Subagent Alert: ${subagentTask.title}`,
+        `Execution encountered an issue: ${agentErr.message.slice(0, 100)}`,
+        '/'
+      );
+    }
   } catch (err: any) {
     console.warn('[Cloud Worker] Subagent queue processing warning:', err.message);
+  }
+}
+
+// 6C. Routine F: Autonomous Cloud Command Bridge Processor (Pillar 4)
+async function processCommandQueue() {
+  if (!redis) return;
+  try {
+    const cmdStr = (await redis.lpop('jarvis:command_queue')) as string | null;
+    if (!cmdStr) return;
+
+    let cmdJob: any = null;
+    try {
+      cmdJob = JSON.parse(cmdStr);
+    } catch {
+      return;
+    }
+
+    console.log(`[Cloud Worker] 💻 Executing cloud command on VM: "${cmdJob.command}"`);
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execPromise = promisify(exec);
+
+    try {
+      const { stdout, stderr } = await execPromise(cmdJob.command, {
+        timeout: 20000,
+        cwd: process.cwd(),
+      });
+
+      if (cmdJob.id) {
+        await redis.set(`jarvis:command_results:${cmdJob.id}`, JSON.stringify({
+          stdout: (stdout || '').slice(0, 4000),
+          stderr: (stderr || '').slice(0, 1000),
+          exitCode: 0,
+          timestamp: new Date().toISOString(),
+        }), { ex: 300 });
+      }
+    } catch (cmdErr: any) {
+      if (cmdJob.id) {
+        await redis.set(`jarvis:command_results:${cmdJob.id}`, JSON.stringify({
+          stdout: (cmdErr.stdout || '').slice(0, 1000),
+          stderr: (cmdErr.stderr || cmdErr.message).slice(0, 2000),
+          exitCode: cmdErr.code || 1,
+          timestamp: new Date().toISOString(),
+        }), { ex: 300 });
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Cloud Worker] Command queue warning:', err.message);
   }
 }
 
@@ -294,9 +385,10 @@ async function startWorkerLoop(isTestMode: boolean = false) {
   setInterval(async () => {
     tickCount++;
     try {
-      // Every 30 seconds: Reminders, subagent tasks, and cron queue
+      // Every 30 seconds: Reminders, subagent tasks, cron queue, and cloud commands
       await checkScheduledReminders();
       await processSubagentQueue();
+      await processCommandQueue();
       await processCronQueue();
 
       // Every 10 minutes (20 ticks): Morning briefing check

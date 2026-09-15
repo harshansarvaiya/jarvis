@@ -68,6 +68,8 @@ export async function POST(req: NextRequest) {
         timestamp: nowStr,
         vocalSummary: result.vocalSummary,
         tacticalActions: result.tacticalActions,
+        motiveAnalysis: result.motiveAnalysis,
+        internalThoughts: result.internalThoughts,
         telemetry: result.telemetry,
       };
       recordsToSave.push(assistantRecord);

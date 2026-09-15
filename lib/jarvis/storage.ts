@@ -19,6 +19,8 @@ export interface ChatMessageRecord {
   timestamp: string;
   vocalSummary?: string;
   tacticalActions?: string[];
+  motiveAnalysis?: string;
+  internalThoughts?: string;
   telemetry?: any;
 }
 

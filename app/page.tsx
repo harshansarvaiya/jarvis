@@ -83,6 +83,8 @@ interface Message {
   timestamp: string;
   vocalSummary?: string;
   tacticalActions?: string[];
+  motiveAnalysis?: string;
+  internalThoughts?: string;
   telemetry?: any;
 }
 
@@ -760,6 +762,8 @@ export default function JarvisDashboard() {
         timestamp: formatLocalTimestamp(data.messageRecord?.timestamp || new Date().toISOString()),
         vocalSummary,
         tacticalActions,
+        motiveAnalysis: data.motiveAnalysis,
+        internalThoughts: data.internalThoughts,
         telemetry,
       };
 
@@ -1148,6 +1152,19 @@ export default function JarvisDashboard() {
                             <span className="text-slate-500">{formatLocalTimestamp(msg.timestamp)}</span>
                           </div>
 
+                          {/* Cognitive Reasoning Process (Pillar 1) */}
+                          {msg.internalThoughts && (
+                            <details className="mb-2.5 rounded-lg border border-cyan-500/20 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-300 transition-all group">
+                              <summary className="cursor-pointer font-mono font-medium text-cyan-400 select-none hover:text-cyan-200 flex items-center space-x-1.5 text-[10px]">
+                                <span>🧠 COGNITIVE REASONING PROCESS</span>
+                                <span className="text-slate-500 text-[9px] group-open:hidden">(Click to expand)</span>
+                              </summary>
+                              <div className="mt-2 whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-cyan-200/80 border-t border-cyan-500/10 pt-2 max-h-56 overflow-y-auto">
+                                {msg.internalThoughts}
+                              </div>
+                            </details>
+                          )}
+
                           {/* Markdown Rendered Content */}
                           <div className="leading-relaxed text-slate-200">
                             <MarkdownRenderer content={msg.content} />
@@ -1490,6 +1507,19 @@ export default function JarvisDashboard() {
                           </div>
                           <span className="text-slate-500">{formatLocalTimestamp(msg.timestamp)}</span>
                         </div>
+
+                        {/* Cognitive Reasoning Process (Pillar 1) */}
+                        {msg.internalThoughts && (
+                          <details className="mb-2.5 rounded-lg border border-cyan-500/20 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-300 transition-all group">
+                            <summary className="cursor-pointer font-mono font-medium text-cyan-400 select-none hover:text-cyan-200 flex items-center space-x-1.5 text-[10px]">
+                              <span>🧠 COGNITIVE REASONING PROCESS</span>
+                              <span className="text-slate-500 text-[9px] group-open:hidden">(Click to expand)</span>
+                            </summary>
+                            <div className="mt-2 whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-cyan-200/80 border-t border-cyan-500/10 pt-2 max-h-48 overflow-y-auto">
+                              {msg.internalThoughts}
+                            </div>
+                          </details>
+                        )}
 
                         {/* Markdown Rendered Content */}
                         <div className="leading-relaxed text-slate-200">

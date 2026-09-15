@@ -103,6 +103,7 @@ export async function runJarvisAgent(
   tacticalActions: string[];
   toolCallsExecuted: Array<{ name: string; args: any; result: any }>;
   motiveAnalysis?: string;
+  internalThoughts?: string;
   telemetry: OrchestrationTelemetry;
   error?: string;
 }> {
@@ -416,7 +417,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             temperature: 0.3,
             maxOutputTokens: 4096,
           },
-          signal: AbortSignal.timeout(20000),
+          signal: AbortSignal.timeout(45000),
         });
 
         if (vRes.ok) {
@@ -640,10 +641,21 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           result: toolResult.result || toolResult.error,
         });
 
+        // Pillar 2 Grounding: Autonomous Empirical Reflection & Retry
+        let toolResponsePayload: any = toolResult;
+        const isSearchResults = Array.isArray(toolResult?.result?.results);
+        const isEmptySearch = isSearchResults && toolResult.result.results.length === 0;
+        if (toolResult.error || isEmptySearch) {
+          toolResponsePayload = {
+            ...toolResult,
+            reflectionGuidance: `[AUTONOMOUS EMPIRICAL REFLECTION]: The tool execution for "${call.name}" returned zero results or an error. Do not repeat the exact same request. Reformulate search terms, try a broader keyword, or explore an alternative data source to deliver concrete intelligence.`,
+          };
+        }
+
         toolResponseParts.push({
           functionResponse: {
             name: call.name,
-            response: toolResult,
+            response: toolResponsePayload,
           },
         });
       }
@@ -671,7 +683,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             systemInstruction,
             tools: geminiTools,
             generationConfig: toolGenerationConfig,
-            signal: AbortSignal.timeout(20000),
+            signal: AbortSignal.timeout(45000),
           });
         } else {
           response = await fetch(activeApiUrl, {
@@ -725,6 +737,12 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       }
     }
 
+    // Pillar 1: Extract Internal Cognition / Chain-of-Thought
+    const thoughtParts = candidate?.content?.parts?.filter((p: any) => p.thought);
+    const internalThoughts = thoughtParts && thoughtParts.length > 0
+      ? thoughtParts.map((p: any) => p.text).join('\n\n')
+      : undefined;
+
     const textPart =
       candidate?.content?.parts?.find((p: any) => p.text && !p.thought) ||
       candidate?.content?.parts?.find((p: any) => p.text);
@@ -742,12 +760,24 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       }
     }
 
+    // Pillar 5: Continuous Heuristic & Preference Assimilation
+    try {
+      const userText = lastUserMessage.content.toLowerCase();
+      if (/prefer|always|never|my rule|i want|remember that|from now on|i need you to/i.test(userText)) {
+        addMemory('PREFERENCE', `Sir's Explicit Preference: "${lastUserMessage.content.slice(0, 300)}"`, 'Directive 03 Evolutionary Adaptation');
+      }
+    } catch (prefErr) {
+      console.warn('[Agent] Preference assimilation warning:', prefErr);
+    }
+
     const latencyMs = Date.now() - startTime;
     return {
       reply: finalReply,
       vocalSummary: extractCinematicVocalSummary(finalReply),
       tacticalActions: generateTacticalNextActions(lastUserMessage.content, finalReply, toolCallsExecuted),
       toolCallsExecuted,
+      motiveAnalysis: motivePass.unstatedMotive,
+      internalThoughts,
       telemetry: {
         engineUsed: isVertexEngine
           ? (selectedVertexModel.includes('3.8')
