@@ -28,6 +28,7 @@ import { TaskMatrix } from '@/components/TaskMatrix';
 import { MemoryVault } from '@/components/MemoryVault';
 import { SettingsModal } from '@/components/SettingsModal';
 import { SecurityGateModal } from '@/components/SecurityGateModal';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { Task, Priority, MemoryItem, MemoryCategory } from '@/lib/jarvis/memory';
 import { triggerDeviceNotification, playJarvisNotificationChime } from '@/lib/jarvis/notifications';
 
@@ -944,7 +945,9 @@ export default function JarvisDashboard() {
                           <img src={msg.image} alt="Visual Uplink" className="max-h-48 w-full object-cover" />
                         </div>
                       )}
-                      <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                      <div className="leading-relaxed">
+                        <MarkdownRenderer content={msg.content} />
+                      </div>
 
                       {/* Tactical Next Actions (Proactive Chips) */}
                       {msg.role === 'assistant' && msg.tacticalActions && msg.tacticalActions.length > 0 && (
@@ -1194,7 +1197,9 @@ export default function JarvisDashboard() {
                         <img src={msg.image} alt="Visual Uplink" className="max-h-60 w-full object-cover" />
                       </div>
                     )}
-                    <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                    <div className="leading-relaxed">
+                      <MarkdownRenderer content={msg.content} />
+                    </div>
 
                     {msg.toolCalls && msg.toolCalls.length > 0 && (
                       <div className="mt-3 pt-2 border-t border-cyan-500/20 text-[11px] font-mono space-y-1">
