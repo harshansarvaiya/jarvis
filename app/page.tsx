@@ -25,6 +25,7 @@ import {
   X,
   File,
   Check,
+  ChevronDown,
 } from 'lucide-react';
 import { ArcReactorOrb } from '@/components/ArcReactorOrb';
 import { DirectiveBadge } from '@/components/DirectiveBadge';
@@ -194,8 +195,14 @@ export default function JarvisDashboard() {
   const [timeStr, setTimeStr] = useState('');
   const [notifPermission, setNotifPermission] = useState<string>('default');
 
-  // Refs
-  const chatBottomRef = useRef<HTMLDivElement>(null);
+  // Refs & Scroll State
+  const mobileChatBottomRef = useRef<HTMLDivElement>(null);
+  const desktopChatBottomRef = useRef<HTMLDivElement>(null);
+  const mobileChatContainerRef = useRef<HTMLDivElement>(null);
+  const desktopChatContainerRef = useRef<HTMLDivElement>(null);
+  const isUserScrolledUp = useRef(false);
+  const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mobileFileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -370,7 +377,47 @@ export default function JarvisDashboard() {
       merged.push(msg);
     }
 
-    return merged.slice(-150);
+    const result = merged.slice(-150);
+
+    // If result matches existing state exactly, return existing reference to prevent re-render triggers
+    if (
+      result.length === existing.length &&
+      result[result.length - 1]?.id === existing[existing.length - 1]?.id &&
+      result[result.length - 1]?.content === existing[existing.length - 1]?.content
+    ) {
+      return existing;
+    }
+
+    return result;
+  };
+
+  // Scroll management helpers
+  const handleContainerScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    // Consider user scrolled up if more than 100px away from bottom
+    const scrolledUp = distanceFromBottom > 100;
+    isUserScrolledUp.current = scrolledUp;
+    setShowScrollBottomBtn(scrolledUp);
+  };
+
+  const scrollToBottom = (force = false, smooth = true) => {
+    if (force || !isUserScrolledUp.current) {
+      const behavior = smooth ? 'smooth' : 'auto';
+      mobileChatBottomRef.current?.scrollIntoView({ behavior });
+      desktopChatBottomRef.current?.scrollIntoView({ behavior });
+      if (force) {
+        isUserScrolledUp.current = false;
+        setShowScrollBottomBtn(false);
+      }
+    }
+  };
+
+  const handleJumpToBottom = () => {
+    isUserScrolledUp.current = false;
+    setShowScrollBottomBtn(false);
+    mobileChatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    desktopChatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   // Persist chat transmissions across page refreshes
@@ -388,9 +435,11 @@ export default function JarvisDashboard() {
     }
   }, [messages]);
 
-  // Smooth scroll to latest transmission
+  // Smooth scroll to latest transmission ONLY if user is already at the bottom
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!isUserScrolledUp.current) {
+      scrollToBottom(false, true);
+    }
   }, [messages]);
 
   // Clear chat history handler
@@ -454,6 +503,7 @@ export default function JarvisDashboard() {
         if (Array.isArray(data.messages) && data.messages.length > 0) {
           setMessages((prev) => {
             const merged = mergeMessages(prev, data.messages);
+            if (merged === prev) return prev;
             try {
               localStorage.setItem('jarvis_chat_history', JSON.stringify(merged.slice(-100)));
             } catch {}
@@ -465,11 +515,6 @@ export default function JarvisDashboard() {
       console.warn('Failed to sync chat history from server:', e);
     }
   };
-
-  // Auto-scroll chat
-  useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, orbStatus, mobileTab]);
 
   // Fetch tasks
   const fetchTasks = async () => {
@@ -619,6 +664,11 @@ export default function JarvisDashboard() {
     setSelectedImage(null);
     setAttachedDoc(null);
     setOrbStatus('thinking');
+
+    // Force scroll down when sending new transmission
+    isUserScrolledUp.current = false;
+    setShowScrollBottomBtn(false);
+    setTimeout(() => scrollToBottom(true, true), 30);
 
     // Reset textarea auto-height
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -1006,7 +1056,11 @@ export default function JarvisDashboard() {
               )}
 
               {/* Messages Area - WHATSAPP STYLE CHAT STREAM */}
-              <div className="flex-1 overflow-y-auto space-y-3 p-1 text-xs sm:text-sm min-h-0">
+              <div
+                ref={mobileChatContainerRef}
+                onScroll={handleContainerScroll}
+                className="relative flex-1 overflow-y-auto space-y-3 p-1 text-xs sm:text-sm min-h-0"
+              >
                 {messages.map((msg) => (
                   <div key={msg.id} className="w-full">
                     {msg.role === 'user' ? (
@@ -1118,7 +1172,17 @@ export default function JarvisDashboard() {
                     )}
                   </div>
                 ))}
-                <div ref={chatBottomRef} />
+                {showScrollBottomBtn && (
+                  <button
+                    type="button"
+                    onClick={handleJumpToBottom}
+                    className="sticky bottom-2 ml-auto mr-1 z-20 flex items-center gap-1 px-2.5 py-1 rounded-full bg-cyan-950/90 border border-cyan-500/50 text-cyan-300 text-[10px] font-mono shadow-lg shadow-cyan-950/50 backdrop-blur hover:bg-cyan-900 transition-all"
+                  >
+                    <ChevronDown className="w-3 h-3 animate-bounce" />
+                    <span>Latest</span>
+                  </button>
+                )}
+                <div ref={mobileChatBottomRef} />
               </div>
 
               {/* Quick Action Chips Ribbon */}
@@ -1326,7 +1390,11 @@ export default function JarvisDashboard() {
             )}
 
             {/* Messages Area - WHATSAPP STYLE CHAT STREAM */}
-            <div className="flex-1 overflow-y-auto space-y-3.5 pr-2 text-sm min-h-0">
+            <div
+              ref={desktopChatContainerRef}
+              onScroll={handleContainerScroll}
+              className="relative flex-1 overflow-y-auto space-y-3.5 pr-2 text-sm min-h-0"
+            >
               {messages.map((msg) => (
                 <div key={msg.id} className="w-full">
                   {msg.role === 'user' ? (
@@ -1441,7 +1509,17 @@ export default function JarvisDashboard() {
                   )}
                 </div>
               ))}
-              <div ref={chatBottomRef} />
+              {showScrollBottomBtn && (
+                <button
+                  type="button"
+                  onClick={handleJumpToBottom}
+                  className="sticky bottom-2 ml-auto mr-2 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-cyan-950/90 border border-cyan-500/50 text-cyan-300 text-xs font-mono shadow-lg shadow-cyan-950/50 backdrop-blur hover:bg-cyan-900 transition-all"
+                >
+                  <ChevronDown className="w-3.5 h-3.5 animate-bounce" />
+                  <span>Latest Transmissions</span>
+                </button>
+              )}
+              <div ref={desktopChatBottomRef} />
             </div>
 
             {/* Quick Action Chips Ribbon */}
