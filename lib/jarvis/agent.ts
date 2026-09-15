@@ -3,6 +3,7 @@ import { getTasks, getMemories, addMemory, recordEvolution } from './memory';
 import { JARVIS_TOOLS, executeJarvisTool } from './tools';
 import { findCorrelatedEpisodes, formatRecalledEpisodesPrompt } from './recall';
 import { queryKnowledgeBase, formatKnowledgePromptContext } from './rag';
+import { isVertexAIAvailable, callVertexAIGenerate, mapToVertexModel } from './vertex';
 import {
   classifyOperationalIntent,
   deconstructOperationalMotive,
@@ -302,7 +303,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
   // =========================================================================
   // ROUTE C: GOOGLE GEMINI CORE (Multimodal & Deep Strategic Synthesis)
   // =========================================================================
-  if (!apiKey) {
+  if (!apiKey && !isVertexAIAvailable()) {
     // If no Gemini key, but Groq key is available, execute on Groq
     if (groqKey) {
       const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
@@ -398,7 +399,43 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     let attemptsCount = 0;
     const MAX_GEMINI_ATTEMPTS = 6; // Must cover full hierarchy depth (6 models)
 
-    for (const candidateModel of candidateModels) {
+    let isVertexEngine = false;
+    let selectedVertexModel = '';
+
+    // Tier 1 Primary: Google Cloud Vertex AI (Draws 100% from ₹33,435+ GCP Credits)
+    if (isVertexAIAvailable()) {
+      const vertexCandidate = mapToVertexModel(requestedModel);
+      try {
+        console.log(`[Vertex AI] Invoking enterprise endpoint for model: ${vertexCandidate}...`);
+        const vRes = await callVertexAIGenerate({
+          model: vertexCandidate,
+          contents,
+          systemInstruction,
+          tools: geminiTools,
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 4096,
+          },
+          signal: AbortSignal.timeout(20000),
+        });
+
+        if (vRes.ok) {
+          response = vRes;
+          isVertexEngine = true;
+          selectedVertexModel = vertexCandidate;
+          selectedModel = vertexCandidate;
+          console.log(`[Vertex AI] Success with ${vertexCandidate} (GCP Credits active)`);
+        } else {
+          const errText = await vRes.text();
+          console.warn(`[Vertex AI] Call failed (${vRes.status}):`, errText.slice(0, 150));
+        }
+      } catch (vErr: any) {
+        console.warn('[Vertex AI] Execution error, cascading to standard AI Studio / Groq:', vErr?.message);
+      }
+    }
+
+    if (!response || !response.ok) {
+      for (const candidateModel of candidateModels) {
       if (attemptsCount >= MAX_GEMINI_ATTEMPTS) {
         console.warn(`[Quantum Fallback] Reached max Gemini attempts (${MAX_GEMINI_ATTEMPTS}). Cascading to Groq US LPU.`);
         break;
@@ -477,6 +514,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         continue;
       }
     }
+  }
 
     // Sovereign Autonomous Failover if Gemini is throttled (429) or unavailable
     if (!response || !response.ok) {
@@ -626,17 +664,28 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       };
 
       try {
-        response = await fetch(activeApiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        if (isVertexEngine) {
+          response = await callVertexAIGenerate({
+            model: selectedVertexModel,
             contents,
             systemInstruction,
             tools: geminiTools,
             generationConfig: toolGenerationConfig,
-          }),
-          signal: AbortSignal.timeout(8000),
-        });
+            signal: AbortSignal.timeout(20000),
+          });
+        } else {
+          response = await fetch(activeApiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents,
+              systemInstruction,
+              tools: geminiTools,
+              generationConfig: toolGenerationConfig,
+            }),
+            signal: AbortSignal.timeout(8000),
+          });
+        }
 
         if (!response.ok) {
           // If active Gemini model throttles during tool synthesis, try secondary models in hierarchy
@@ -700,9 +749,11 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       tacticalActions: generateTacticalNextActions(lastUserMessage.content, finalReply, toolCallsExecuted),
       toolCallsExecuted,
       telemetry: {
-        engineUsed: selectedModel.includes('3.8') ? 'Gemini 3.8 Flash Core' : `Gemini ${selectedModel}`,
-        provider: 'google',
-        model: selectedModel,
+        engineUsed: isVertexEngine
+          ? (selectedVertexModel.includes('pro') ? 'Vertex AI Gemini 2.5 Pro (GCP Credits)' : 'Vertex AI Gemini 2.5 Flash (GCP Credits)')
+          : (selectedModel.includes('3.8') ? 'Gemini 3.8 Flash Core' : `Gemini ${selectedModel}`),
+        provider: isVertexEngine ? 'vertex-ai' : 'google',
+        model: isVertexEngine ? selectedVertexModel : selectedModel,
         latencyMs,
         archetype,
         failoverOccurred: false,

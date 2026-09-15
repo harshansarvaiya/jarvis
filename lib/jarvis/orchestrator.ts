@@ -13,7 +13,7 @@ export type OperationalArchetype = 'MULTIMODAL_PERCEPTION' | 'REFLEX_SPEED' | 'D
 
 export interface OrchestrationTelemetry {
   engineUsed: string;
-  provider: 'groq' | 'google' | 'github-models' | 'offline';
+  provider: 'groq' | 'google' | 'vertex-ai' | 'github-models' | 'offline';
   model: string;
   latencyMs: number;
   archetype: OperationalArchetype;
