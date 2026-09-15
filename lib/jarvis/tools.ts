@@ -332,6 +332,7 @@ async function spawnSubagentTask(title: string, instructions: string, priority: 
     title: `[Subagent Worker] ${title}`,
     description: instructions,
     priority: (priority as any) || 'HIGH',
+    status: 'PENDING',
     dueDate: new Date(Date.now() + 3600000).toISOString(),
     tags: ['subagent', 'cloud-runner', 'background-execution'],
   });
