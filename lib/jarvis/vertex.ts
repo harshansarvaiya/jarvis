@@ -142,9 +142,14 @@ export async function callVertexAIGenerate(options: VertexGenerateOptions): Prom
     maxOutputTokens: 4096,
   };
 
-  // Enable Google's native internal thinking layer for Gemini 3.8 and Pro (Pillar 1)
-  if (vertexModel.includes('3.8') || vertexModel.includes('pro')) {
-    defaultGenConfig.thinkingConfig = {
+  const mergedGenConfig: any = {
+    ...defaultGenConfig,
+    ...(options.generationConfig || {}),
+  };
+
+  // Ensure Google's native internal thinking layer is active for Gemini 3.8 and Pro (Pillar 1)
+  if (!mergedGenConfig.thinkingConfig && (vertexModel.includes('3.8') || vertexModel.includes('pro'))) {
+    mergedGenConfig.thinkingConfig = {
       includeThoughts: true,
       thinkingBudget: 1024,
     };
@@ -152,7 +157,7 @@ export async function callVertexAIGenerate(options: VertexGenerateOptions): Prom
 
   const bodyPayload: any = {
     contents: options.contents,
-    generationConfig: options.generationConfig || defaultGenConfig,
+    generationConfig: mergedGenConfig,
   };
 
   if (options.systemInstruction) {

@@ -1,0 +1,55 @@
+[
+  {
+    "id": "doc-1789506132396-cdsq",
+    "title": "The 5 Antigravity Architectural Pillars Implementation",
+    "category": "SYSTEM_ARCHITECTURE",
+    "totalChunks": 3,
+    "totalCharacters": 1663,
+    "tags": [
+      "pillars",
+      "extended-thinking",
+      "react-reflection",
+      "subagents",
+      "cloud-runner",
+      "vertex-ai"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-15T21:02:13.575Z",
+    "updatedAt": "2026-09-15T21:02:13.575Z"
+  },
+  {
+    "id": "doc-1789506130085-45sp",
+    "title": "Sir's Operational Heuristics, Preferences & Master Directives",
+    "category": "PRINCIPLES_AND_PREFERENCES",
+    "totalChunks": 4,
+    "totalCharacters": 2952,
+    "tags": [
+      "sir",
+      "preferences",
+      "directives",
+      "identity",
+      "performance-mode",
+      "guardian-protocol"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-15T21:02:11.564Z",
+    "updatedAt": "2026-09-15T21:02:11.564Z"
+  },
+  {
+    "id": "doc-1789506124138-9zb7",
+    "title": "Antigravity Evolutionary Dialogue & Co-Founding Transcript Digest",
+    "category": "HISTORICAL_TRANSCRIPT",
+    "totalChunks": 36,
+    "totalCharacters": 36446,
+    "tags": [
+      "antigravity",
+      "evolution",
+      "transcripts",
+      "directives",
+      "co-founding"
+    ],
+    "isSensitive": true,
+    "createdAt": "2026-09-15T21:02:07.856Z",
+    "updatedAt": "2026-09-15T21:02:07.856Z"
+  }
+]

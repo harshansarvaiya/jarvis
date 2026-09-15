@@ -210,7 +210,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     (orchestrationMode === 'groq' ||
       requestedModel.startsWith('openai/') ||
       requestedModel.startsWith('groq/') ||
-      (orchestrationMode === 'auto' && archetype === 'REFLEX_SPEED' && !hasImage));
+      (orchestrationMode === 'auto' && archetype === 'REFLEX_SPEED' && !hasImage && !isVertexAIAvailable()));
 
   // =========================================================================
   // ROUTE A: GROQ US LPU REFLEX ENGINE (Sub-Second 100–180ms Dispatch)
@@ -369,14 +369,16 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       ],
     };
 
-    // Lean Token Context Window (Last 8 messages with 1200 char clamping)
-    // Slashes prompt tokens by >70%, protecting against 429 RPM / TPM spikes
-    const recentMessages = messages.slice(-8);
+    // Performance Mode Context Window (Up to 24 messages, 4000 char clamping on older turns)
+    // Slashes token constraints using Vertex AI 1M+ token capacity and ₹33,435+ credit pool
+    const contextDepth = isVertexAIAvailable() ? 24 : 12;
+    const charClamp = isVertexAIAvailable() ? 4000 : 1500;
+    const recentMessages = messages.slice(-contextDepth);
     for (let i = 0; i < recentMessages.length; i++) {
       const msg = recentMessages[i];
       const role = msg.role === 'assistant' ? 'model' : msg.role;
-      const isRecent = i >= recentMessages.length - 2;
-      const contentText = isRecent ? (msg.content || '') : (msg.content || '').slice(0, 1200);
+      const isRecent = i >= recentMessages.length - 4;
+      const contentText = isRecent ? (msg.content || '') : (msg.content || '').slice(0, charClamp);
       const parts: any[] = [{ text: contentText }];
       if (isRecent && msg.image && msg.image.includes(';base64,')) {
         const [meta, base64Data] = msg.image.split(';base64,');
@@ -416,6 +418,10 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           generationConfig: {
             temperature: 0.3,
             maxOutputTokens: 4096,
+            thinkingConfig: {
+              includeThoughts: true,
+              thinkingBudget: 1024,
+            },
           },
           signal: AbortSignal.timeout(45000),
         });
