@@ -360,12 +360,15 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       ],
     };
 
-    const recentMessages = messages.slice(-30);
+    // Lean Token Context Window (Last 8 messages with 1200 char clamping)
+    // Slashes prompt tokens by >70%, protecting against 429 RPM / TPM spikes
+    const recentMessages = messages.slice(-8);
     for (let i = 0; i < recentMessages.length; i++) {
       const msg = recentMessages[i];
       const role = msg.role === 'assistant' ? 'model' : msg.role;
-      const parts: any[] = [{ text: msg.content || '' }];
       const isRecent = i >= recentMessages.length - 2;
+      const contentText = isRecent ? (msg.content || '') : (msg.content || '').slice(0, 1200);
+      const parts: any[] = [{ text: contentText }];
       if (isRecent && msg.image && msg.image.includes(';base64,')) {
         const [meta, base64Data] = msg.image.split(';base64,');
         const mimeType = meta.replace('data:', '');
@@ -393,10 +396,14 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         console.warn(`[Quantum Fallback] Reached max Gemini attempts (${MAX_GEMINI_ATTEMPTS}). Cascading to Groq US LPU.`);
         break;
       }
+      if (attemptsCount > 0) {
+        // 200ms gentle breathing delay to prevent burst rate limiters from tripping
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
       attemptsCount++;
 
       const generationConfig = {
-        temperature: 0.4,
+        temperature: 0.3,
         maxOutputTokens: 4096,
       };
 
@@ -411,7 +418,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             tools: geminiTools,
             generationConfig,
           }),
-          signal: AbortSignal.timeout(2500),
+          signal: AbortSignal.timeout(6000), // Increased from 2500ms to 6000ms for reliable synthesis
         });
 
         if (res.ok) {
@@ -458,7 +465,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       } catch (fetchErr: any) {
         lastErrorText = fetchErr?.message || 'Network request failed';
         if (fetchErr.name === 'TimeoutError') {
-          console.warn(`[Quantum Fallback] Gemini endpoint timed out after 2500ms for ${candidateModel}. Shifting to next tier.`);
+          console.warn(`[Quantum Fallback] Gemini endpoint timed out after 6000ms for ${candidateModel}. Shifting to next tier.`);
         }
         continue;
       }
@@ -607,25 +614,59 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       });
 
       const toolGenerationConfig = {
-        temperature: 0.4,
+        temperature: 0.3,
         maxOutputTokens: 4096,
       };
 
-      response = await fetch(activeApiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents,
-          systemInstruction,
-          tools: geminiTools,
-          generationConfig: toolGenerationConfig,
-        }),
-      });
+      try {
+        response = await fetch(activeApiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents,
+            systemInstruction,
+            tools: geminiTools,
+            generationConfig: toolGenerationConfig,
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
 
-      if (!response.ok) break;
-      data = await response.json();
-      candidate = data.candidates?.[0];
-      functionCalls = candidate?.content?.parts?.filter((p: any) => p.functionCall);
+        if (!response.ok) {
+          // If active Gemini model throttles during tool synthesis, try secondary models in hierarchy
+          for (const fallbackModel of candidateModels) {
+            if (fallbackModel === selectedModel) continue;
+            const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${apiKey}`;
+            const fbRes = await fetch(fallbackUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents,
+                systemInstruction,
+                tools: geminiTools,
+                generationConfig: toolGenerationConfig,
+              }),
+              signal: AbortSignal.timeout(6000),
+            });
+            if (fbRes.ok) {
+              response = fbRes;
+              activeApiUrl = fallbackUrl;
+              selectedModel = fallbackModel;
+              break;
+            }
+          }
+        }
+
+        if (response && response.ok) {
+          data = await response.json();
+          candidate = data.candidates?.[0];
+          functionCalls = candidate?.content?.parts?.filter((p: any) => p.functionCall);
+        } else {
+          break;
+        }
+      } catch (toolSynthesisErr) {
+        console.warn('[Tool Synthesis Loop] Synthesis fetch error:', toolSynthesisErr);
+        break;
+      }
     }
 
     const textPart =

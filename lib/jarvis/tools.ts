@@ -65,6 +65,96 @@ async function runDirectShellCommand(command: string): Promise<{ stdout: string;
 async function runWebSearch(query: string): Promise<any> {
   const results: Array<{ title: string; snippet: string; url: string; source?: string }> = [];
 
+  // Tier 0A: Serper.dev Google Search Engine (If configured)
+  const serperKey = process.env.SERPER_API_KEY;
+  if (serperKey) {
+    try {
+      const isLocalQuery = /near|clinic|doctor|physio|hospital|shop|store|price|fee|mumbai|mira road/i.test(query);
+      const serperEndpoint = isLocalQuery
+        ? 'https://google.serper.dev/places'
+        : 'https://google.serper.dev/search';
+
+      const serperRes = await fetch(serperEndpoint, {
+        method: 'POST',
+        headers: {
+          'X-API-KEY': serperKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ q: query, gl: 'in', hl: 'en', num: 6 }),
+        signal: AbortSignal.timeout(3500),
+      });
+
+      if (serperRes.ok) {
+        const serperData = await serperRes.json();
+        if (Array.isArray(serperData.places)) {
+          for (const p of serperData.places) {
+            results.push({
+              title: `${p.title}${p.rating ? ` (★ ${p.rating})` : ''}`,
+              snippet: `${p.address || ''}${p.phoneNumber ? ` | Tel: ${p.phoneNumber}` : ''}${p.category ? ` | Category: ${p.category}` : ''}`,
+              url: p.website || p.cid ? `https://maps.google.com/?cid=${p.cid}` : '',
+              source: 'Google Places (Serper)',
+            });
+          }
+        }
+        if (Array.isArray(serperData.organic)) {
+          for (const o of serperData.organic.slice(0, 5)) {
+            results.push({
+              title: o.title,
+              snippet: o.snippet || '',
+              url: o.link,
+              source: 'Google Search (Serper)',
+            });
+          }
+        }
+        if (results.length > 0) {
+          return {
+            query,
+            resultsCount: results.length,
+            results,
+          };
+        }
+      }
+    } catch {}
+  }
+
+  // Tier 0B: Tavily AI Search Engine (If configured)
+  const tavilyKey = process.env.TAVILY_API_KEY;
+  if (tavilyKey) {
+    try {
+      const tavilyRes = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          api_key: tavilyKey,
+          query,
+          search_depth: 'basic',
+          max_results: 6,
+        }),
+        signal: AbortSignal.timeout(3500),
+      });
+      if (tavilyRes.ok) {
+        const tavilyData = await tavilyRes.json();
+        if (Array.isArray(tavilyData.results)) {
+          for (const r of tavilyData.results) {
+            results.push({
+              title: r.title,
+              snippet: r.content || '',
+              url: r.url,
+              source: 'Tavily Search',
+            });
+          }
+          if (results.length > 0) {
+            return {
+              query,
+              resultsCount: results.length,
+              results,
+            };
+          }
+        }
+      }
+    } catch {}
+  }
+
   // Tier 1: DuckDuckGo Instant Answer Knowledge Graph API
   try {
     const ddgApi = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`, {
@@ -150,7 +240,7 @@ async function runWebSearch(query: string): Promise<any> {
         );
       }
 
-      for (let i = 0; i < Math.min(rawTitles.length, 6); i++) {
+      for (let i = 0; i < Math.min(rawTitles.length, 8); i++) {
         results.push({
           title: rawTitles[i].title,
           snippet: rawSnippets[i] || '',

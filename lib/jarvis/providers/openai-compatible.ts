@@ -58,7 +58,7 @@ export async function runOpenAICompatibleAgent(
     },
   }));
 
-  // 2. Format conversation payload
+  // 2. Format conversation payload with lean token window (protecting against TPM spikes)
   const formattedMessages: OpenAICompatibleMessage[] = [
     {
       role: 'system',
@@ -66,11 +66,15 @@ export async function runOpenAICompatibleAgent(
     },
   ];
 
-  for (const m of messages.slice(-30)) {
+  const recent = messages.slice(-8);
+  for (let i = 0; i < recent.length; i++) {
+    const m = recent[i];
     const role = m.role === 'model' ? 'assistant' : (m.role as any);
+    const isCurrent = i >= recent.length - 2;
+    const content = isCurrent ? (m.content || '') : (m.content || '').slice(0, 1200);
     formattedMessages.push({
       role: role === 'assistant' ? 'assistant' : 'user',
-      content: m.content || '',
+      content,
     });
   }
 
