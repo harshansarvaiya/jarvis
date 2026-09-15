@@ -21,6 +21,10 @@ import {
   Trash2,
   Bell,
   BellRing,
+  FileText,
+  X,
+  File,
+  Check,
 } from 'lucide-react';
 import { ArcReactorOrb } from '@/components/ArcReactorOrb';
 import { DirectiveBadge } from '@/components/DirectiveBadge';
@@ -60,11 +64,24 @@ async function fetchWithRetry(url: string, opts: RequestInit, retries = 2): Prom
 }
 
 
+interface AttachedDoc {
+  name: string;
+  size: number;
+  type: string;
+  content: string;
+  isText: boolean;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   image?: string;
+  document?: {
+    name: string;
+    size: number;
+    type: string;
+  };
   toolCalls?: Array<{ name: string; args: any; result: any }>;
   timestamp: string;
   vocalSummary?: string;
@@ -159,6 +176,7 @@ export default function JarvisDashboard() {
   const isHistoryHydrated = useRef(false);
   const [inputText, setInputText] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [attachedDoc, setAttachedDoc] = useState<AttachedDoc | null>(null);
   const [orbStatus, setOrbStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
   const [audioLevel, setAudioLevel] = useState<number>(0);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -179,6 +197,9 @@ export default function JarvisDashboard() {
   // Refs
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mobileFileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mobileTextareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
 
   // Time ticker
@@ -570,20 +591,38 @@ export default function JarvisDashboard() {
   // Handle Send Command
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
-    if (!text && !selectedImage) return;
+    if (!text && !selectedImage && !attachedDoc) return;
+
+    let fullPrompt = text;
+    let docMeta: { name: string; size: number; type: string } | undefined = undefined;
+
+    if (attachedDoc) {
+      docMeta = { name: attachedDoc.name, size: attachedDoc.size, type: attachedDoc.type };
+      if (attachedDoc.isText) {
+        fullPrompt = `[ATTACHED DOCUMENT: ${attachedDoc.name} (${Math.round(attachedDoc.size / 1024)} KB)]\n\`\`\`${attachedDoc.name.split('.').pop() || 'text'}\n${attachedDoc.content.slice(0, 50000)}\n\`\`\`\n\n${text || 'Please analyze this document in detail, Sir.'}`;
+      } else {
+        fullPrompt = `[ATTACHED DOCUMENT: ${attachedDoc.name} (${Math.round(attachedDoc.size / 1024)} KB)]\n\n${text || 'Please review this attached document, Sir.'}`;
+      }
+    }
 
     const userMsg: Message = {
       id: `msg-${Date.now()}`,
       role: 'user',
-      content: text || (selectedImage ? '[Visual Sensor Input Transmitted]' : ''),
-      image: selectedImage || undefined,
+      content: fullPrompt || (selectedImage ? '[Visual Sensor Input Transmitted]' : ''),
+      image: selectedImage || (attachedDoc && !attachedDoc.isText ? attachedDoc.content : undefined),
+      document: docMeta,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
     setMessages((prev) => [...prev, userMsg]);
     setInputText('');
     setSelectedImage(null);
+    setAttachedDoc(null);
     setOrbStatus('thinking');
+
+    // Reset textarea auto-height
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    if (mobileTextareaRef.current) mobileTextareaRef.current.style.height = 'auto';
 
     try {
       const payload = {
@@ -668,16 +707,55 @@ export default function JarvisDashboard() {
     }
   };
 
-  // Image Upload Handler
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Unified File & Document Upload Handler
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setSelectedImage(event.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+    const isImg = file.type.startsWith('image/');
+    const isTextDoc =
+      file.type.startsWith('text/') ||
+      /\.(txt|md|json|csv|ts|tsx|js|jsx|py|sh|yaml|yml|xml|html|css|sql|env|log)$/i.test(file.name);
+
+    if (isImg) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setSelectedImage(event.target?.result as string);
+        setAttachedDoc(null);
+      };
+      reader.readAsDataURL(file);
+    } else if (isTextDoc) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target?.result as string;
+        setAttachedDoc({
+          name: file.name,
+          size: file.size,
+          type: file.type || 'text/plain',
+          content: text,
+          isText: true,
+        });
+        setSelectedImage(null);
+      };
+      reader.readAsText(file);
+    } else {
+      // PDF or binary document as DataURL
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setAttachedDoc({
+          name: file.name,
+          size: file.size,
+          type: file.type || 'application/octet-stream',
+          content: event.target?.result as string,
+          isText: false,
+        });
+        setSelectedImage(null);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Reset input so re-selecting same file works
+    e.target.value = '';
   };
 
   // Task Actions
@@ -927,98 +1005,123 @@ export default function JarvisDashboard() {
                 </div>
               )}
 
-              {/* Messages Area - EXPANDED FULL HEIGHT */}
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs sm:text-sm min-h-0">
+              {/* Messages Area - WHATSAPP STYLE CHAT STREAM */}
+              <div className="flex-1 overflow-y-auto space-y-3 p-1 text-xs sm:text-sm min-h-0">
                 {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex flex-col ${
-                      msg.role === 'user' ? 'items-end' : 'items-start'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-1.5 mb-1 text-[10px] font-mono text-slate-400">
-                      <span className={msg.role === 'assistant' ? 'text-cyan-400 font-semibold' : 'text-slate-300'}>
-                        {msg.role === 'user' ? 'SIR' : 'J.A.R.V.I.S.'}
-                      </span>
-                      {msg.role === 'assistant' && (
-                        <span className="px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/30 text-[9px] font-mono text-cyan-300 font-medium flex items-center gap-1">
-                          <span>{formatModelBadge(msg.telemetry).icon}</span>
-                          <span>{formatModelBadge(msg.telemetry).title}</span>
-                        </span>
-                      )}
-                      <span>•</span>
-                      <span>{formatLocalTimestamp(msg.timestamp)}</span>
-                    </div>
+                  <div key={msg.id} className="w-full">
+                    {msg.role === 'user' ? (
+                      /* USER MESSAGE: WhatsApp Right-Aligned Bubble */
+                      <div className="flex justify-end w-full group">
+                        <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-xs bg-gradient-to-br from-cyan-950/90 to-cyan-900/80 border border-cyan-500/40 text-cyan-50 shadow-md shadow-cyan-950/30 p-3 space-y-1.5 animate-fadeIn">
+                          {/* Attached Document Badge */}
+                          {msg.document && (
+                            <div className="flex items-center gap-2 p-2 rounded-xl bg-cyan-950/90 border border-cyan-500/40 text-cyan-200 text-xs">
+                              <FileText className="w-4 h-4 text-cyan-400 shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold font-mono truncate text-[11px]">{msg.document.name}</div>
+                                <div className="text-[9px] text-cyan-400/70">{Math.round(msg.document.size / 1024)} KB • Document</div>
+                              </div>
+                            </div>
+                          )}
 
-                    <div
-                      className={`max-w-[90%] p-3 rounded-2xl ${
-                        msg.role === 'user'
-                          ? 'bg-cyan-950/80 border border-cyan-500/40 text-cyan-100 rounded-tr-none'
-                          : 'bg-slate-900/90 border border-slate-800 text-slate-200 rounded-tl-none'
-                      }`}
-                    >
-                      {msg.image && (
-                        <div className="mb-2 rounded-lg overflow-hidden border border-cyan-500/30">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={msg.image} alt="Visual Uplink" className="max-h-48 w-full object-cover" />
+                          {/* Attached Visual Asset */}
+                          {msg.image && (
+                            <div className="rounded-xl overflow-hidden border border-cyan-500/30 mb-1">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={msg.image} alt="Visual Uplink" className="max-h-48 w-full object-cover" />
+                            </div>
+                          )}
+
+                          <div className="leading-relaxed whitespace-pre-wrap">{msg.content}</div>
+
+                          <div className="flex items-center justify-end gap-1 text-[9px] font-mono text-cyan-400/70 pt-0.5 select-none">
+                            <span>{formatLocalTimestamp(msg.timestamp)}</span>
+                            <span className="text-cyan-300 font-bold">✓✓</span>
+                          </div>
                         </div>
-                      )}
-                      <div className="leading-relaxed">
-                        <MarkdownRenderer content={msg.content} />
                       </div>
+                    ) : (
+                      /* ASSISTANT MESSAGE: WhatsApp Left-Aligned Bubble */
+                      <div className="flex justify-start w-full group">
+                        <div className="max-w-[90%] sm:max-w-[82%] rounded-2xl rounded-tl-xs bg-slate-900/95 border border-slate-800 text-slate-100 shadow-lg p-3.5 space-y-2 animate-fadeIn">
+                          {/* Minimal Model & Timestamp Header */}
+                          <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pb-1.5 border-b border-slate-800/80">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-cyan-400 font-bold tracking-wider">J.A.R.V.I.S.</span>
+                              {msg.telemetry && (
+                                <span className="px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/30 text-[9px] text-cyan-300 font-medium flex items-center gap-1">
+                                  <span>{formatModelBadge(msg.telemetry).icon}</span>
+                                  <span>{formatModelBadge(msg.telemetry).title}</span>
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-slate-500">{formatLocalTimestamp(msg.timestamp)}</span>
+                          </div>
 
-                      {/* Tactical Next Actions (Proactive Chips) */}
-                      {msg.role === 'assistant' && msg.tacticalActions && msg.tacticalActions.length > 0 && (
-                        <div className="mt-2.5 pt-2 border-t border-slate-800 flex flex-wrap gap-1.5">
-                          {msg.tacticalActions.map((action, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => handleSendMessage(action)}
-                              className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-950/70 border border-cyan-500/30 hover:border-cyan-400 text-cyan-300 hover:text-white transition-colors"
-                            >
-                              ⚡ {action}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                          {/* Markdown Rendered Content */}
+                          <div className="leading-relaxed text-slate-200">
+                            <MarkdownRenderer content={msg.content} />
+                          </div>
 
-                      {/* Orchestration Telemetry Badge with Exact Model & Version */}
-                      {msg.role === 'assistant' && msg.telemetry && (
-                        <div className="mt-2 text-[9px] font-mono text-slate-400 flex flex-wrap items-center gap-1.5 border-t border-slate-800/80 pt-1.5">
-                          {/* Exact Model & Model Number Pill */}
-                          <span className="px-2 py-0.5 rounded bg-cyan-950/90 border border-cyan-400/50 text-cyan-200 font-bold tracking-wider flex items-center gap-1 shadow-[0_0_8px_rgba(0,229,255,0.2)]">
-                            <span>{formatModelBadge(msg.telemetry).icon}</span>
-                            <span className="text-cyan-300 font-semibold">{formatModelBadge(msg.telemetry).title}</span>
-                            <span className="text-cyan-500 font-mono text-[8px]">({formatModelBadge(msg.telemetry).model})</span>
-                          </span>
-                          <span className="text-slate-600">•</span>
-                          <span className="text-slate-300">{msg.telemetry.latencyMs}ms</span>
-                          {msg.telemetry.recalledEpisodesCount && msg.telemetry.recalledEpisodesCount > 0 ? (
-                            <>
-                              <span className="text-slate-600">•</span>
-                              <span className="text-emerald-400">
-                                {msg.telemetry.recalledEpisodesCount} EPISODES RECALLED
-                              </span>
-                            </>
-                          ) : null}
-                          {msg.telemetry.failoverOccurred && (
-                            <>
-                              <span className="text-slate-600">•</span>
-                              <span className="text-amber-400 bg-amber-950/60 px-1 py-0.5 rounded border border-amber-500/40">
-                                FAILOVER ACTIVE
-                              </span>
-                            </>
+                          {/* Autonomous Actions Executed */}
+                          {msg.toolCalls && msg.toolCalls.length > 0 && (
+                            <div className="pt-2 border-t border-slate-800/60 text-[11px] font-mono space-y-1">
+                              <div className="text-cyan-400 font-bold flex items-center space-x-1 text-[10px]">
+                                <Activity className="w-3 h-3" />
+                                <span>AUTONOMOUS ACTIONS:</span>
+                              </div>
+                              {msg.toolCalls.map((tc, idx) => (
+                                <div key={idx} className="bg-slate-950/60 p-1.5 rounded border border-cyan-500/10 text-slate-300 text-[10px]">
+                                  <span className="text-cyan-300">{tc.name}</span>
+                                  <span className="text-slate-500"> — {tc.result?.message || 'Completed'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Tactical Next Actions (Proactive Chips) */}
+                          {msg.tacticalActions && msg.tacticalActions.length > 0 && (
+                            <div className="pt-2 border-t border-slate-800/60 flex flex-wrap gap-1.5">
+                              {msg.tacticalActions.map((action, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => handleSendMessage(action)}
+                                  className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-950/70 border border-cyan-500/30 hover:border-cyan-400 text-cyan-300 hover:text-white transition-colors"
+                                >
+                                  ⚡ {action}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Telemetry Footer */}
+                          {msg.telemetry && (
+                            <div className="pt-1.5 text-[9px] font-mono text-slate-500 flex flex-wrap items-center gap-1.5 border-t border-slate-800/60">
+                              <span>{msg.telemetry.latencyMs}ms</span>
+                              {msg.telemetry.recalledEpisodesCount && msg.telemetry.recalledEpisodesCount > 0 ? (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-emerald-400">{msg.telemetry.recalledEpisodesCount} EPISODES</span>
+                                </>
+                              ) : null}
+                              {msg.telemetry.failoverOccurred && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-amber-400 bg-amber-950/60 px-1 py-0.5 rounded border border-amber-500/40">FAILOVER</span>
+                                </>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 ))}
                 <div ref={chatBottomRef} />
               </div>
 
-              {/* Quick Action Chips Ribbon (Single line horizontal scroll) */}
+              {/* Quick Action Chips Ribbon */}
               <div className="mt-2 pt-1.5 border-t border-cyan-500/10 flex items-center space-x-1.5 overflow-x-auto no-scrollbar shrink-0 text-nowrap">
                 {quickPrompts.map((chip) => (
                   <button
@@ -1031,45 +1134,88 @@ export default function JarvisDashboard() {
                 ))}
               </div>
 
-              {/* Multimodal Input Bar with Mini Arc Reactor embedded */}
-              <div className="mt-2 flex items-center space-x-2 pt-2 border-t border-cyan-500/20 shrink-0">
+              {/* Attachment Preview Bar */}
+              {(selectedImage || attachedDoc) && (
+                <div className="mt-2 p-2 rounded-xl bg-slate-900/90 border border-cyan-500/40 flex items-center justify-between text-xs text-cyan-300 shrink-0 animate-fadeIn">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {selectedImage ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={selectedImage} alt="Preview" className="w-8 h-8 rounded object-cover border border-cyan-500/30 shrink-0" />
+                        <span className="truncate font-mono text-[11px]">Visual Sensor Asset Attached</span>
+                      </>
+                    ) : attachedDoc ? (
+                      <>
+                        <FileText className="w-5 h-5 text-cyan-400 shrink-0" />
+                        <div className="truncate">
+                          <div className="font-semibold font-mono text-[11px] truncate">{attachedDoc.name}</div>
+                          <div className="text-[9px] text-slate-400">{Math.round(attachedDoc.size / 1024)} KB • Document Attached</div>
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedImage(null);
+                      setAttachedDoc(null);
+                    }}
+                    className="p-1 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Multimodal & Document Input Bar with Auto-Expanding Multi-line Textarea */}
+              <div className="mt-2 flex items-end space-x-1.5 pt-2 border-t border-cyan-500/20 shrink-0">
                 <input
                   type="file"
-                  ref={fileInputRef}
-                  accept="image/*"
-                  onChange={handleImageUpload}
+                  ref={mobileFileInputRef}
+                  accept="image/*,application/pdf,text/*,.md,.json,.csv,.ts,.tsx,.js,.jsx,.py,.sh,.yaml,.yml,.xml,.html,.css,.doc,.docx"
+                  onChange={handleFileUpload}
                   className="hidden"
                 />
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  title="Attach visual asset"
-                  className="p-2 sm:p-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-cyan-400 text-slate-400 hover:text-cyan-300 transition-colors shrink-0"
+                  onClick={() => mobileFileInputRef.current?.click()}
+                  title="Attach Photo or Document"
+                  className="p-2.5 rounded-2xl bg-slate-900 border border-slate-700 hover:border-cyan-400 text-slate-400 hover:text-cyan-300 transition-colors shrink-0 mb-0.5"
                 >
-                  <Camera className="w-4 h-4" />
+                  <Paperclip className="w-4 h-4" />
                 </button>
-                <input
-                  type="text"
+                <textarea
+                  ref={mobileTextareaRef}
+                  rows={1}
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  onChange={(e) => {
+                    setInputText(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                  }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSendMessage();
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
                   }}
                   placeholder="Direct orders for J.A.R.V.I.S., Sir..."
-                  className="flex-1 min-w-0 bg-slate-900/90 border border-slate-700 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs font-sans text-slate-100 placeholder-slate-500 focus:outline-none transition-all"
+                  className="flex-1 min-w-0 max-h-28 resize-none bg-slate-900/90 border border-slate-700 focus:border-cyan-400 rounded-2xl px-3 py-2 text-xs font-sans text-slate-100 placeholder-slate-500 focus:outline-none transition-all shadow-inner leading-relaxed"
                 />
                 {/* Mini Arc Reactor Voice Orb */}
-                <ArcReactorOrb
-                  status={orbStatus}
-                  onToggleListen={toggleListening}
-                  audioLevel={audioLevel}
-                  size="mini"
-                />
+                <div className="mb-0.5">
+                  <ArcReactorOrb
+                    status={orbStatus}
+                    onToggleListen={toggleListening}
+                    audioLevel={audioLevel}
+                    size="mini"
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={() => handleSendMessage()}
-                  disabled={!inputText.trim() && !selectedImage}
-                  className="p-2 sm:p-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-bold transition-all shrink-0 shadow-[0_0_10px_rgba(0,229,255,0.4)]"
+                  disabled={!inputText.trim() && !selectedImage && !attachedDoc}
+                  className="p-2.5 rounded-2xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-bold transition-all shrink-0 shadow-[0_0_10px_rgba(0,229,255,0.4)] mb-0.5"
                 >
                   <Send className="w-4 h-4" />
                 </button>
@@ -1179,109 +1325,120 @@ export default function JarvisDashboard() {
               </div>
             )}
 
-            {/* Messages Area - FULL HEIGHT SCROLL */}
-            <div className="flex-1 overflow-y-auto space-y-3 pr-2 text-sm min-h-0">
+            {/* Messages Area - WHATSAPP STYLE CHAT STREAM */}
+            <div className="flex-1 overflow-y-auto space-y-3.5 pr-2 text-sm min-h-0">
               {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex flex-col ${
-                    msg.role === 'user' ? 'items-end' : 'items-start'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2 mb-1 text-[10px] font-mono text-slate-400">
-                    <span className={msg.role === 'assistant' ? 'text-cyan-400 font-semibold' : 'text-slate-300'}>
-                      {msg.role === 'user' ? 'SIR' : 'J.A.R.V.I.S.'}
-                    </span>
-                    {msg.role === 'assistant' && (
-                      <span className="px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/30 text-[9px] font-mono text-cyan-300 font-medium flex items-center gap-1">
-                        <span>{formatModelBadge(msg.telemetry).icon}</span>
-                        <span>{formatModelBadge(msg.telemetry).title}</span>
-                      </span>
-                    )}
-                    <span>•</span>
-                    <span>{formatLocalTimestamp(msg.timestamp)}</span>
-                  </div>
-
-                  <div
-                    className={`max-w-[85%] p-3.5 rounded-2xl ${
-                      msg.role === 'user'
-                        ? 'bg-cyan-950/80 border border-cyan-500/40 text-cyan-100 rounded-tr-none shadow-[0_0_15px_rgba(0,229,255,0.15)]'
-                        : 'bg-slate-900/90 border border-slate-800 text-slate-200 rounded-tl-none shadow-md'
-                    }`}
-                  >
-                    {msg.image && (
-                      <div className="mb-2 rounded-lg overflow-hidden border border-cyan-500/30">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={msg.image} alt="Visual Uplink" className="max-h-60 w-full object-cover" />
-                      </div>
-                    )}
-                    <div className="leading-relaxed">
-                      <MarkdownRenderer content={msg.content} />
-                    </div>
-
-                    {msg.toolCalls && msg.toolCalls.length > 0 && (
-                      <div className="mt-3 pt-2 border-t border-cyan-500/20 text-[11px] font-mono space-y-1">
-                        <div className="text-cyan-400 font-bold flex items-center space-x-1">
-                          <Activity className="w-3 h-3" />
-                          <span>AUTONOMOUS ACTIONS EXECUTED:</span>
-                        </div>
-                        {msg.toolCalls.map((tc, idx) => (
-                          <div key={idx} className="bg-slate-950/60 p-1.5 rounded border border-cyan-500/10 text-slate-300">
-                            <span className="text-cyan-300">{tc.name}</span>
-                            <span className="text-slate-500"> — {tc.result?.message || 'Completed'}</span>
+                <div key={msg.id} className="w-full">
+                  {msg.role === 'user' ? (
+                    /* USER MESSAGE: WhatsApp Right-Aligned Bubble */
+                    <div className="flex justify-end w-full group">
+                      <div className="max-w-[80%] rounded-2xl rounded-tr-xs bg-gradient-to-br from-cyan-950/90 to-cyan-900/80 border border-cyan-500/40 text-cyan-50 shadow-md shadow-cyan-950/30 p-3.5 space-y-1.5 animate-fadeIn">
+                        {/* Attached Document Badge */}
+                        {msg.document && (
+                          <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-cyan-950/90 border border-cyan-500/40 text-cyan-200 text-xs">
+                            <FileText className="w-4 h-4 text-cyan-400 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold font-mono truncate text-xs">{msg.document.name}</div>
+                              <div className="text-[10px] text-cyan-400/70">{Math.round(msg.document.size / 1024)} KB • Document Attached</div>
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        )}
 
-                    {/* Tactical Next Actions (Proactive Chips) */}
-                    {msg.role === 'assistant' && msg.tacticalActions && msg.tacticalActions.length > 0 && (
-                      <div className="mt-3 pt-2 border-t border-slate-800 flex flex-wrap gap-1.5">
-                        {msg.tacticalActions.map((action, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => handleSendMessage(action)}
-                            className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-cyan-950/70 border border-cyan-500/30 hover:border-cyan-400 text-cyan-300 hover:text-white transition-colors"
-                          >
-                            ⚡ {action}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                        {/* Attached Visual Asset */}
+                        {msg.image && (
+                          <div className="rounded-xl overflow-hidden border border-cyan-500/30 mb-1.5">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={msg.image} alt="Visual Uplink" className="max-h-60 w-full object-cover" />
+                          </div>
+                        )}
 
-                    {/* Orchestration Telemetry Badge with Exact Model & Version */}
-                    {msg.role === 'assistant' && msg.telemetry && (
-                      <div className="mt-2.5 text-[10px] font-mono text-slate-400 flex flex-wrap items-center gap-2 border-t border-slate-800/80 pt-1.5">
-                        {/* Exact Model & Model Number Pill */}
-                        <span className="px-2.5 py-0.5 rounded bg-cyan-950/90 border border-cyan-400/50 text-cyan-200 font-bold tracking-wider flex items-center gap-1.5 shadow-[0_0_10px_rgba(0,229,255,0.2)]">
-                          <span>{formatModelBadge(msg.telemetry).icon}</span>
-                          <span className="text-cyan-300 font-semibold">{formatModelBadge(msg.telemetry).title}</span>
-                          <span className="text-cyan-500 font-mono text-[9px]">({formatModelBadge(msg.telemetry).model})</span>
-                        </span>
-                        <span className="text-slate-600">•</span>
-                        <span className="text-slate-300">{msg.telemetry.latencyMs}ms</span>
-                        <span className="text-slate-600">•</span>
-                        <span className="text-slate-400">{msg.telemetry.archetype}</span>
-                        {msg.telemetry.recalledEpisodesCount && msg.telemetry.recalledEpisodesCount > 0 ? (
-                          <>
+                        <div className="leading-relaxed whitespace-pre-wrap">{msg.content}</div>
+
+                        <div className="flex items-center justify-end gap-1.5 text-[9px] font-mono text-cyan-400/70 pt-0.5 select-none">
+                          <span>{formatLocalTimestamp(msg.timestamp)}</span>
+                          <span className="text-cyan-300 font-bold">✓✓</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* ASSISTANT MESSAGE: WhatsApp Left-Aligned Bubble */
+                    <div className="flex justify-start w-full group">
+                      <div className="max-w-[85%] rounded-2xl rounded-tl-xs bg-slate-900/95 border border-slate-800 text-slate-100 shadow-lg p-4 space-y-2.5 animate-fadeIn">
+                        {/* Minimal Model & Timestamp Header */}
+                        <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pb-2 border-b border-slate-800/80">
+                          <div className="flex items-center gap-2">
+                            <span className="text-cyan-400 font-bold tracking-wider">J.A.R.V.I.S.</span>
+                            {msg.telemetry && (
+                              <span className="px-2 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/30 text-[9px] text-cyan-300 font-medium flex items-center gap-1">
+                                <span>{formatModelBadge(msg.telemetry).icon}</span>
+                                <span>{formatModelBadge(msg.telemetry).title}</span>
+                                <span className="text-cyan-500 font-mono text-[8px]">({formatModelBadge(msg.telemetry).model})</span>
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-slate-500">{formatLocalTimestamp(msg.timestamp)}</span>
+                        </div>
+
+                        {/* Markdown Rendered Content */}
+                        <div className="leading-relaxed text-slate-200">
+                          <MarkdownRenderer content={msg.content} />
+                        </div>
+
+                        {/* Autonomous Actions Executed */}
+                        {msg.toolCalls && msg.toolCalls.length > 0 && (
+                          <div className="pt-2.5 border-t border-slate-800/60 text-[11px] font-mono space-y-1">
+                            <div className="text-cyan-400 font-bold flex items-center space-x-1.5 text-[11px]">
+                              <Activity className="w-3.5 h-3.5" />
+                              <span>AUTONOMOUS ACTIONS EXECUTED:</span>
+                            </div>
+                            {msg.toolCalls.map((tc, idx) => (
+                              <div key={idx} className="bg-slate-950/60 p-1.5 rounded border border-cyan-500/10 text-slate-300 text-xs">
+                                <span className="text-cyan-300 font-semibold">{tc.name}</span>
+                                <span className="text-slate-500"> — {tc.result?.message || 'Completed'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Tactical Next Actions (Proactive Chips) */}
+                        {msg.tacticalActions && msg.tacticalActions.length > 0 && (
+                          <div className="pt-2.5 border-t border-slate-800/60 flex flex-wrap gap-1.5">
+                            {msg.tacticalActions.map((action, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => handleSendMessage(action)}
+                                className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-cyan-950/70 border border-cyan-500/30 hover:border-cyan-400 text-cyan-300 hover:text-white transition-colors"
+                              >
+                                ⚡ {action}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Telemetry Footer */}
+                        {msg.telemetry && (
+                          <div className="pt-2 text-[10px] font-mono text-slate-500 flex flex-wrap items-center gap-2 border-t border-slate-800/60">
+                            <span>{msg.telemetry.latencyMs}ms</span>
                             <span className="text-slate-600">•</span>
-                            <span className="text-emerald-400">
-                              {msg.telemetry.recalledEpisodesCount} EPISODES RECALLED
-                            </span>
-                          </>
-                        ) : null}
-                        {msg.telemetry.failoverOccurred && (
-                          <>
-                            <span className="text-slate-600">•</span>
-                            <span className="text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-500/40">
-                              FAILOVER ACTIVE
-                            </span>
-                          </>
+                            <span>{msg.telemetry.archetype}</span>
+                            {msg.telemetry.recalledEpisodesCount && msg.telemetry.recalledEpisodesCount > 0 ? (
+                              <>
+                                <span className="text-slate-600">•</span>
+                                <span className="text-emerald-400">{msg.telemetry.recalledEpisodesCount} EPISODES RECALLED</span>
+                              </>
+                            ) : null}
+                            {msg.telemetry.failoverOccurred && (
+                              <>
+                                <span className="text-slate-600">•</span>
+                                <span className="text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-500/40">FAILOVER ACTIVE</span>
+                              </>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               ))}
               <div ref={chatBottomRef} />
@@ -1300,45 +1457,88 @@ export default function JarvisDashboard() {
               ))}
             </div>
 
-            {/* Multimodal Input Bar with Mini Arc Reactor embedded */}
-            <div className="mt-3 flex items-center space-x-2.5 pt-2 border-t border-cyan-500/20 shrink-0">
+            {/* Attachment Preview Bar */}
+            {(selectedImage || attachedDoc) && (
+              <div className="mt-2.5 p-2.5 rounded-xl bg-slate-900/90 border border-cyan-500/40 flex items-center justify-between text-xs text-cyan-300 shrink-0 animate-fadeIn">
+                <div className="flex items-center gap-3 min-w-0">
+                  {selectedImage ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={selectedImage} alt="Preview" className="w-10 h-10 rounded-lg object-cover border border-cyan-500/30 shrink-0" />
+                      <div className="font-mono text-xs truncate">Visual Sensor Asset Attached</div>
+                    </>
+                  ) : attachedDoc ? (
+                    <>
+                      <FileText className="w-6 h-6 text-cyan-400 shrink-0" />
+                      <div className="truncate">
+                        <div className="font-semibold font-mono text-xs truncate">{attachedDoc.name}</div>
+                        <div className="text-[10px] text-slate-400">{Math.round(attachedDoc.size / 1024)} KB • Document Attached</div>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedImage(null);
+                    setAttachedDoc(null);
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Multimodal & Document Input Bar with Auto-Expanding Multi-line Textarea */}
+            <div className="mt-2.5 flex items-end space-x-2 pt-2 border-t border-cyan-500/20 shrink-0">
               <input
                 type="file"
                 ref={fileInputRef}
-                accept="image/*"
-                onChange={handleImageUpload}
+                accept="image/*,application/pdf,text/*,.md,.json,.csv,.ts,.tsx,.js,.jsx,.py,.sh,.yaml,.yml,.xml,.html,.css,.doc,.docx"
+                onChange={handleFileUpload}
                 className="hidden"
               />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                title="Attach visual asset"
-                className="p-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-cyan-400 text-slate-400 hover:text-cyan-300 transition-colors shrink-0"
+                title="Attach Photo or Document"
+                className="p-2.5 rounded-2xl bg-slate-900 border border-slate-700 hover:border-cyan-400 text-slate-400 hover:text-cyan-300 transition-colors shrink-0 mb-0.5"
               >
-                <Camera className="w-4 h-4" />
+                <Paperclip className="w-4 h-4" />
               </button>
-              <input
-                type="text"
+              <textarea
+                ref={textareaRef}
+                rows={1}
                 value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSendMessage();
+                onChange={(e) => {
+                  setInputText(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`;
                 }}
-                placeholder="Transmit command, thought, or inquiry, Sir..."
-                className="flex-1 min-w-0 bg-slate-900/90 border border-slate-700 focus:border-cyan-400 rounded-xl px-4 py-2.5 text-sm font-sans text-slate-100 placeholder-slate-500 focus:outline-none transition-all shadow-inner"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder="Transmit command, thought, or document inquiry, Sir... (Enter to send, Shift+Enter for newline)"
+                className="flex-1 min-w-0 max-h-36 resize-none bg-slate-900/90 border border-slate-700 focus:border-cyan-400 rounded-2xl px-4 py-2.5 text-sm font-sans text-slate-100 placeholder-slate-500 focus:outline-none transition-all shadow-inner leading-relaxed"
               />
               {/* Mini Arc Reactor Voice Orb */}
-              <ArcReactorOrb
-                status={orbStatus}
-                onToggleListen={toggleListening}
-                audioLevel={audioLevel}
-                size="mini"
-              />
+              <div className="mb-0.5">
+                <ArcReactorOrb
+                  status={orbStatus}
+                  onToggleListen={toggleListening}
+                  audioLevel={audioLevel}
+                  size="mini"
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => handleSendMessage()}
-                disabled={!inputText.trim() && !selectedImage}
-                className="p-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-bold transition-all shrink-0 shadow-[0_0_15px_rgba(0,229,255,0.4)]"
+                disabled={!inputText.trim() && !selectedImage && !attachedDoc}
+                className="p-2.5 rounded-2xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-bold transition-all shrink-0 shadow-[0_0_15px_rgba(0,229,255,0.4)] mb-0.5"
               >
                 <Send className="w-4 h-4" />
               </button>
