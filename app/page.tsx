@@ -332,7 +332,7 @@ export default function JarvisDashboard() {
     const seenContentSignatures = new Set<string>();
     const merged: Message[] = [];
 
-    const getSig = (m: Message) => `${m.role}::${m.timestamp || ''}::${(m.content || '').slice(0, 60)}`;
+    const getSig = (m: Message) => `${m.role}::${(m.content || '').trim().slice(0, 120)}`;
 
     // 1. Process server history as canonical
     for (const msg of incoming) {
@@ -380,6 +380,24 @@ export default function JarvisDashboard() {
       await authFetch('/api/jarvis/chat/history', { method: 'DELETE' });
     } catch {}
   };
+
+  // Continuous background synchronization across devices (every 8 seconds when unlocked)
+  useEffect(() => {
+    if (!isUnlocked) return;
+
+    // Initial sync on unlock
+    fetchChatHistory();
+    fetchTasks();
+    fetchMemories();
+
+    const intervalId = setInterval(() => {
+      // Background poll for new cross-device messages and tasks
+      fetchChatHistory();
+      fetchTasks();
+    }, 8000);
+
+    return () => clearInterval(intervalId);
+  }, [isUnlocked]);
 
   // Auto-lock with Face ID when minimized, and auto-sync cross-device transmissions on return
   useEffect(() => {

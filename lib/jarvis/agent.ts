@@ -414,10 +414,10 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         lastErrorText = await res.text();
         console.warn(`[Quantum Fallback] Model ${candidateModel} failed with HTTP ${res.status}:`, lastErrorText.slice(0, 150));
 
-        // If 429 Quota Exceeded: Do not burn time on other Gemini models. Immediately failover to Groq!
+        // If 429 Quota Exceeded on this model: Log warning and continue to next Gemini model in hierarchy
         if (res.status === 429) {
-          console.warn(`[Quantum Fallback] Gemini API Quota Exceeded (429) on ${candidateModel}. Immediate Groq US LPU failover engaged.`);
-          break;
+          console.warn(`[Quantum Fallback] Gemini API Quota Exceeded (429) on ${candidateModel}. Continuing to next live Gemini candidate...`);
+          continue;
         }
 
         let errorData: any = null;
@@ -460,7 +460,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         console.log('[Orchestrator Failover] Gemini unavailable, shifting instantly to Groq US LPU fleet...');
         try {
           const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
-          const failoverCandidates = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'groq/compound-mini'];
+          const failoverCandidates = ['openai/gpt-oss-120b'];
 
           for (const groqModel of failoverCandidates) {
             try {
