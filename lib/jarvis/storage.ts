@@ -17,6 +17,8 @@ export interface ChatMessageRecord {
   image?: string;
   toolCalls?: Array<{ name: string; args: any; result: any }>;
   timestamp: string;
+  vocalSummary?: string;
+  tacticalActions?: string[];
   telemetry?: any;
 }
 
