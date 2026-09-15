@@ -19,6 +19,86 @@ import {
   executeNetworkMCP,
   executeDatabaseMCP,
 } from './mcp';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
+async function runDirectShellCommand(command: string): Promise<{ stdout: string; stderr: string; exitCode: number; executionSubstrate: string }> {
+  // Safety filter against destructive commands per Directive 01 Guardian Protocol
+  const lower = command.toLowerCase().trim();
+  const dangerousPatterns = ['rm -rf /', 'mkfs', 'dd if=', ':(){ :|:& };:', 'shutdown', 'reboot'];
+  if (dangerousPatterns.some((p) => lower.includes(p))) {
+    throw new Error('Security Violation: Destructive command intercepted by Directive 01 Guardian Protocol.');
+  }
+
+  try {
+    const { stdout, stderr } = await execAsync(command, {
+      timeout: 15000,
+      maxBuffer: 1024 * 1024,
+      cwd: process.cwd(),
+      env: { ...process.env, PATH: process.env.PATH },
+    });
+
+    return {
+      stdout: (stdout || '').slice(0, 3500),
+      stderr: (stderr || '').slice(0, 1500),
+      exitCode: 0,
+      executionSubstrate: 'Direct VM Terminal (antigravity-cloud-runner)',
+    };
+  } catch (err: any) {
+    return {
+      stdout: (err.stdout || '').slice(0, 1500),
+      stderr: (err.stderr || err.message || 'Execution error').slice(0, 2000),
+      exitCode: err.code || 1,
+      executionSubstrate: 'Direct VM Terminal (antigravity-cloud-runner)',
+    };
+  }
+}
+
+async function runWebSearch(query: string): Promise<any> {
+  try {
+    const endpoint = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+    const res = await fetch(endpoint, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (!res.ok) {
+      return { query, error: `Search provider returned HTTP ${res.status}` };
+    }
+
+    const html = await res.text();
+    const results: Array<{ title: string; snippet: string; url: string }> = [];
+    const resultBlocks = html.split('class="result__body"').slice(1, 6);
+
+    for (const block of resultBlocks) {
+      const titleMatch = block.match(/class="result__title"[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
+      const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
+
+      if (titleMatch) {
+        const url = titleMatch[1];
+        const rawTitle = titleMatch[2].replace(/<[^>]+>/g, '').trim();
+        const rawSnippet = snippetMatch ? snippetMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+        results.push({
+          title: rawTitle,
+          snippet: rawSnippet,
+          url,
+        });
+      }
+    }
+
+    return {
+      query,
+      resultsCount: results.length,
+      results: results.length > 0 ? results : 'No text results parsed from search provider.',
+    };
+  } catch (err: any) {
+    return { query, error: err.message || 'Web search timeout' };
+  }
+}
 
 export interface ToolDefinition {
   name: string;
@@ -303,6 +383,20 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       type: 'object',
       properties: {},
       required: [],
+    },
+  },
+  {
+    name: 'search_web',
+    description: 'Search the live web for current technical documentation, market benchmarks, cloud pricing, or external facts.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The search keywords or question.',
+        },
+      },
+      required: ['query'],
     },
   },
   {
@@ -622,11 +716,29 @@ export async function executeJarvisTool(
 
       case 'cloud_execute_command': {
         const { command, taskId } = args;
-        const res = await executeGitHubMCP('dispatch_workflow_run', {
-          command,
-          taskId: taskId || `task-exec-${Date.now()}`,
-        });
-        return { success: res.success, result: res.output, error: res.error };
+        // 1. Direct sub-second execution on this Google Cloud VM substrate
+        try {
+          const directResult = await runDirectShellCommand(command);
+          return {
+            success: directResult.exitCode === 0,
+            result: directResult,
+            error: directResult.exitCode !== 0 ? directResult.stderr : undefined,
+          };
+        } catch (directErr: any) {
+          // 2. Fallback to GitHub Actions Cloud Runner if direct shell fails
+          console.warn('[Tools] Direct VM execution failed, cascading to GitHub Actions runner:', directErr?.message);
+          const res = await executeGitHubMCP('dispatch_workflow_run', {
+            command,
+            taskId: taskId || `task-exec-${Date.now()}`,
+          });
+          return { success: res.success, result: res.output, error: res.error };
+        }
+      }
+
+      case 'search_web': {
+        const { query } = args;
+        const searchResult = await runWebSearch(query);
+        return { success: !searchResult.error, result: searchResult, error: searchResult.error };
       }
 
       case 'cloud_check_deployment': {

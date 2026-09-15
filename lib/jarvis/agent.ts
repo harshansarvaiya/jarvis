@@ -563,7 +563,8 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     let loopCount = 0;
     let functionCalls = candidate?.content?.parts?.filter((p: any) => p.functionCall);
 
-    while (functionCalls && functionCalls.length > 0 && loopCount < 3) {
+    // Multi-turn ReAct Autonomous Tool Execution Loop (up to 5 iterations)
+    while (functionCalls && functionCalls.length > 0 && loopCount < 5) {
       loopCount++;
       const toolResponseParts: any[] = [];
 
