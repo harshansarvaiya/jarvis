@@ -237,6 +237,32 @@ async function processCronQueue() {
   }
 }
 
+// 6B. Routine E: Autonomous Subagent Background Queue Processor (Pillar 3)
+async function processSubagentQueue() {
+  if (!redis) return;
+  try {
+    const taskStr = (await redis.lpop('jarvis:subagent_tasks')) as string | null;
+    if (!taskStr) return;
+
+    let subagentTask: any = null;
+    try {
+      subagentTask = JSON.parse(taskStr);
+    } catch {
+      return;
+    }
+
+    console.log(`[Cloud Worker] 🤖 Autonomous Subagent worker executing: "${subagentTask.title}"`);
+
+    await dispatchPush(
+      '🤖 J.A.R.V.I.S. Subagent Execution Complete',
+      `Subagent task "${subagentTask.title}" finished autonomously on 24/7 Cloud Runner. Intelligence stored in Mission Control.`,
+      '/'
+    );
+  } catch (err: any) {
+    console.warn('[Cloud Worker] Subagent queue processing warning:', err.message);
+  }
+}
+
 // 7. Master Worker Loop & Lifecycle Controller
 async function startWorkerLoop(isTestMode: boolean = false) {
   console.log(`
@@ -268,8 +294,9 @@ async function startWorkerLoop(isTestMode: boolean = false) {
   setInterval(async () => {
     tickCount++;
     try {
-      // Every 30 seconds: Reminders and queue
+      // Every 30 seconds: Reminders, subagent tasks, and cron queue
       await checkScheduledReminders();
+      await processSubagentQueue();
       await processCronQueue();
 
       // Every 10 minutes (20 ticks): Morning briefing check

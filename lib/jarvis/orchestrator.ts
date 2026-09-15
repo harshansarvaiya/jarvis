@@ -19,6 +19,60 @@ export interface OrchestrationTelemetry {
   archetype: OperationalArchetype;
   failoverOccurred: boolean;
   recalledEpisodesCount?: number;
+  motiveAnalysis?: string;
+}
+
+export interface PreThoughtReasoningPass {
+  unstatedMotive: string;
+  targetEntities: string[];
+  requiredToolChain: string[];
+  riskVectors: string[];
+  strategicPlan: string;
+}
+
+/**
+ * Pre-Thought Reasoning Pass & Motive Deconstruction (Pillar 1)
+ * Analyzes hidden user intent, entity requirements, and tool vectors before token synthesis.
+ */
+export function deconstructOperationalMotive(userPrompt: string): PreThoughtReasoningPass {
+  const clean = userPrompt.toLowerCase().trim();
+  const targetEntities: string[] = [];
+  const requiredToolChain: string[] = [];
+  const riskVectors: string[] = [];
+
+  // Local & Healthcare entity extraction heuristics
+  if (/physio|clinic|doctor|hospital|medical|rehab|treatment/i.test(clean)) {
+    targetEntities.push('Healthcare Practitioners & Verified Local Clinics');
+    requiredToolChain.push('search_web', 'read_web_page');
+  }
+  if (/cost|price|pricing|fee|charge|rate|inexpensive|cheap|package/i.test(clean)) {
+    targetEntities.push('Quoted Per-Session Fees & Verified Pricing Breakdown');
+  }
+  if (/mira road|mumbai|near|location|address|distance|landmark/i.test(clean)) {
+    targetEntities.push('Geo-targeted Local Addresses, Phone Numbers & Landmarks');
+  }
+
+  // System & Architecture execution heuristics
+  if (/build|code|repo|github|file|terminal|script|daemon|task/i.test(clean)) {
+    targetEntities.push('Physical Codebase & Infrastructure State');
+    requiredToolChain.push('inspect_infrastructure', 'cloud_execute_command', 'cloud_write_file');
+  }
+
+  if (requiredToolChain.length === 0) {
+    if (/find|search|lookup|where|who|what is/i.test(clean)) {
+      requiredToolChain.push('search_web');
+    }
+  }
+
+  const unstatedMotive = `Sir requires specific, empirical intelligence for: "${userPrompt.slice(0, 80)}". Must extract verified entity names, addresses, and price numbers rather than generic placeholders.`;
+
+  return {
+    unstatedMotive,
+    targetEntities: targetEntities.length > 0 ? targetEntities : ['Specific Named Entities & Data Points'],
+    requiredToolChain: requiredToolChain.length > 0 ? requiredToolChain : ['Direct Synthesis'],
+    riskVectors,
+    strategicPlan: `1. Deconstruct request into explicit entity targets.\n2. Execute tool chain (${requiredToolChain.join(' -> ') || 'Direct Synthesis'}).\n3. Enforce Entity-Specific Precision Standard in response.`,
+  };
 }
 
 export interface OrchestratedResult {

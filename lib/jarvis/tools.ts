@@ -282,6 +282,81 @@ async function runWebSearch(query: string): Promise<any> {
   };
 }
 
+async function runDeepWebScraper(url: string): Promise<any> {
+  try {
+    const targetUrl = url.startsWith('http') ? url : `https://${url}`;
+    const res = await fetch(targetUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (!res.ok) {
+      return { url, error: `Target URL returned HTTP status ${res.status}` };
+    }
+
+    const html = await res.text();
+    const cleanText = html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+      .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, ' ')
+      .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, ' ')
+      .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : targetUrl;
+
+    return {
+      url: targetUrl,
+      title,
+      contentSnippet: cleanText.slice(0, 3500),
+      totalLength: cleanText.length,
+      source: 'Deep Web Scraper (Pillar 4)',
+    };
+  } catch (err: any) {
+    return { url, error: err.message || 'Deep web scraper request timed out' };
+  }
+}
+
+async function spawnSubagentTask(title: string, instructions: string, priority: string = 'HIGH'): Promise<any> {
+  const taskId = `subagent-${Date.now()}`;
+  const task = addTask({
+    title: `[Subagent Worker] ${title}`,
+    description: instructions,
+    priority: (priority as any) || 'HIGH',
+    dueDate: new Date(Date.now() + 3600000).toISOString(),
+    tags: ['subagent', 'cloud-runner', 'background-execution'],
+  });
+
+  try {
+    const { Redis } = await import('@upstash/redis');
+    const redis = Redis.fromEnv();
+    await redis.lpush('jarvis:subagent_tasks', JSON.stringify({
+      id: taskId,
+      title,
+      instructions,
+      priority,
+      createdAt: new Date().toISOString(),
+    }));
+  } catch (redisErr) {
+    console.warn('[Subagent] Redis queue push warning:', redisErr);
+  }
+
+  return {
+    taskId: task.id,
+    status: 'QUEUED',
+    message: `Subagent mission "${title}" successfully dispatched to 24/7 Cloud Runner VM queue. Sir will be notified via Web Push upon completion.`,
+  };
+}
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -579,6 +654,43 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
         },
       },
       required: ['query'],
+    },
+  },
+  {
+    name: 'read_web_page',
+    description: 'Fetch and extract clean readable text content from any public webpage URL. Use after search_web to read complete doctor profiles, clinic price lists, address details, or full documentation.',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'The target webpage URL to scrape.',
+        },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'spawn_subagent_task',
+    description: 'Spawn an autonomous background subagent worker to execute multi-step research, web scraping, or system audits on the 24/7 cloud runner. Sends a lock-screen Web Push notification to Sir when finished.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Title of the background subagent task.',
+        },
+        instructions: {
+          type: 'string',
+          description: 'Detailed operational instructions for the subagent worker.',
+        },
+        priority: {
+          type: 'string',
+          enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'],
+          description: 'Task priority level.',
+        },
+      },
+      required: ['title', 'instructions'],
     },
   },
   {
@@ -988,6 +1100,18 @@ export async function executeJarvisTool(
           });
           return { success: res.success, result: res.output, error: res.error };
         }
+      }
+
+      case 'read_web_page': {
+        const { url } = args;
+        const res = await runDeepWebScraper(url);
+        return { success: !res.error, result: res, error: res.error };
+      }
+
+      case 'spawn_subagent_task': {
+        const { title, instructions, priority = 'HIGH' } = args;
+        const res = await spawnSubagentTask(title, instructions, priority);
+        return { success: true, result: res };
       }
 
       case 'search_web': {

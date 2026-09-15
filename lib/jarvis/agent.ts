@@ -5,6 +5,7 @@ import { findCorrelatedEpisodes, formatRecalledEpisodesPrompt } from './recall';
 import { queryKnowledgeBase, formatKnowledgePromptContext } from './rag';
 import {
   classifyOperationalIntent,
+  deconstructOperationalMotive,
   extractCinematicVocalSummary,
   generateTacticalNextActions,
   OperationalArchetype,
@@ -168,14 +169,20 @@ export async function runJarvisAgent(
     console.warn('[Agent] Retrieval error:', recallErr);
   }
 
-  // 3. Synthesize Active State Context
+  // 3. Synthesize Active State Context & Pre-Thought Motive Pass (Pillar 1)
   const allTasks = getTasks();
   const activeTasks = allTasks.filter((t) => t.status !== 'COMPLETED').slice(0, 8);
   const completedTasks = allTasks.filter((t) => t.status === 'COMPLETED').slice(0, 5);
   const relevantMemories = getMemories().slice(0, 8);
+  const motivePass = deconstructOperationalMotive(lastUserMessage.content);
 
   const contextPrompt = `
 [CURRENT TEMPORAL CONTEXT]: ${new Date().toISOString()} (Local time: ${new Date().toLocaleString()})
+[PRE-THOUGHT REASONING PASS & MOTIVE DECONSTRUCTION]:
+- Unstated Motive: ${motivePass.unstatedMotive}
+- Target Entities Required: ${motivePass.targetEntities.join(', ')}
+- Tactical Plan: ${motivePass.strategicPlan}
+
 [ACTIVE TASKS ON RADAR]:
 ${activeTasks.map((t) => `- [${t.priority}] ${t.title} (ID: ${t.id}, Status: ${t.status}${t.dueDate ? `, Due: ${t.dueDate}` : ''})`).join('\n') || 'No active pending tasks.'}
 
