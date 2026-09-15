@@ -666,13 +666,14 @@ export async function executeJarvisTool(
 
         // If scheduled with a delay, record on tactical radar
         if (delaySec > 0) {
-          addTask(
-            `[NOTIFICATION REMINDER] ${title}`,
-            `Scheduled push alert: ${message}`,
-            priority === 'CRITICAL' ? 'CRITICAL' : priority === 'HIGH' ? 'HIGH' : 'MEDIUM',
-            triggerAt,
-            ['Notification', 'Reminder', category]
-          );
+          addTask({
+            title: `[NOTIFICATION REMINDER] ${title}`,
+            description: `Scheduled push alert: ${message}`,
+            priority: priority === 'CRITICAL' ? 'CRITICAL' : priority === 'HIGH' ? 'HIGH' : 'MEDIUM',
+            status: 'PENDING',
+            dueDate: triggerAt,
+            tags: ['Notification', 'Reminder', category],
+          });
         }
 
         return {
