@@ -351,30 +351,38 @@ export default function JarvisDashboard() {
     }
   }, []);
 
-  // Helper to merge local and server messages without losing unsynced turns or creating duplicates
+  // Helper to merge local and server messages with strict chronological integrity
   const mergeMessages = (existing: Message[], incoming: Message[]): Message[] => {
-    if (!Array.isArray(incoming) || incoming.length === 0) return existing;
-    if (!Array.isArray(existing) || existing.length === 0) return incoming;
+    if (!Array.isArray(incoming) || incoming.length === 0) return [INITIAL_WELCOME_MESSAGE];
 
     const seenIds = new Set<string>();
     const seenContentSignatures = new Set<string>();
     const merged: Message[] = [];
 
-    const getSig = (m: Message) => `${m.role}::${(m.content || '').trim().slice(0, 120)}`;
+    const getSig = (m: Message) => `${m.role}::${(m.content || '').trim().slice(0, 100)}`;
 
-    // 1. Process server history as canonical
+    // 1. Process server history as canonical and sequential
     for (const msg of incoming) {
       if (msg.id) seenIds.add(msg.id);
       seenContentSignatures.add(getSig(msg));
       merged.push(msg);
     }
 
-    // 2. Append any client messages that haven't reached server yet
+    // 2. Only preserve optimistic pending user turns created in the last 60 seconds
+    const recentCutoff = Date.now() - 60000;
     for (const msg of existing) {
       if (msg.id && seenIds.has(msg.id)) continue;
       if (seenContentSignatures.has(getSig(msg))) continue;
-      if (msg.id === 'msg-welcome' && merged.length > 0) continue;
-      merged.push(msg);
+      if (msg.id === INITIAL_WELCOME_MESSAGE.id || msg.id === 'welcome-1' || msg.id === 'msg-welcome') continue;
+
+      const isPendingLocalMsg =
+        msg.id &&
+        msg.id.startsWith('msg-') &&
+        Number(msg.id.replace('msg-', '').split('-')[0]) > recentCutoff;
+
+      if (isPendingLocalMsg) {
+        merged.push(msg);
+      }
     }
 
     const result = merged.slice(-150);
@@ -382,8 +390,7 @@ export default function JarvisDashboard() {
     // If result matches existing state exactly, return existing reference to prevent re-render triggers
     if (
       result.length === existing.length &&
-      result[result.length - 1]?.id === existing[existing.length - 1]?.id &&
-      result[result.length - 1]?.content === existing[existing.length - 1]?.content
+      result.every((m, i) => m.id === existing[i]?.id && m.content === existing[i]?.content)
     ) {
       return existing;
     }
@@ -494,21 +501,35 @@ export default function JarvisDashboard() {
     };
   }, [isUnlocked]);
 
-  // Fetch shared cross-device chat history from cloud/server (Non-destructive merge)
+  // Fetch shared cross-device chat history from cloud/server (Non-destructive merge & cloud purge synchronization)
   const fetchChatHistory = async () => {
     try {
       const res = await authFetch('/api/jarvis/chat/history?limit=100');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.messages) && data.messages.length > 0) {
-          setMessages((prev) => {
-            const merged = mergeMessages(prev, data.messages);
-            if (merged === prev) return prev;
-            try {
-              localStorage.setItem('jarvis_chat_history', JSON.stringify(merged.slice(-100)));
-            } catch {}
-            return merged;
-          });
+        if (Array.isArray(data.messages)) {
+          if (data.messages.length === 0) {
+            // Cloud history was purged. Synchronize this client immediately.
+            setMessages((prev) => {
+              if (prev.length === 1 && (prev[0].id === INITIAL_WELCOME_MESSAGE.id || prev[0].id === 'welcome-1')) {
+                return prev;
+              }
+              try {
+                localStorage.removeItem('jarvis_chat_history');
+              } catch {}
+              return [INITIAL_WELCOME_MESSAGE];
+            });
+          } else {
+            // Non-empty canonical cloud messages
+            setMessages((prev) => {
+              const merged = mergeMessages(prev, data.messages);
+              if (merged === prev) return prev;
+              try {
+                localStorage.setItem('jarvis_chat_history', JSON.stringify(merged.slice(-100)));
+              } catch {}
+              return merged;
+            });
+          }
         }
       }
     } catch (e) {
@@ -931,9 +952,9 @@ export default function JarvisDashboard() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col bg-hud-scanlines relative pb-16 lg:pb-0">
+    <main className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col bg-hud-scanlines relative pb-16 lg:pb-0">
       {/* Top Tactical HUD Header */}
-      <header className="sticky top-0 z-40 border-b border-cyan-500/30 bg-slate-950/90 backdrop-blur-md px-4 py-2.5 flex items-center justify-between shadow-lg">
+      <header className="sticky top-0 z-40 border-b border-cyan-500/30 bg-slate-950/90 backdrop-blur-md px-4 py-2.5 flex items-center justify-between shadow-lg shrink-0">
         <div className="flex items-center space-x-3">
           <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-cyan-950 border border-cyan-400">
             <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
@@ -1338,7 +1359,7 @@ export default function JarvisDashboard() {
       {/* ========================================================================= */}
       {/* DESKTOP VIEW (hidden lg:grid) — Dual Column Tactical Battle Station       */}
       {/* ========================================================================= */}
-      <div className="hidden lg:grid max-w-7xl w-full mx-auto p-5 grid-cols-12 gap-5 flex-1 min-h-0 h-[calc(100vh-65px)]">
+      <div className="hidden lg:grid max-w-7xl w-full mx-auto p-4 grid-cols-12 gap-4 flex-1 min-h-0 h-[calc(100vh-62px)]">
         {/* Left Column: Directives & Dominant Full-Height Communication Feed (7 cols) */}
         <div className="col-span-7 flex flex-col space-y-3 min-h-0 h-full">
           <DirectiveBadge />
@@ -1654,7 +1675,7 @@ export default function JarvisDashboard() {
             </button>
           </div>
 
-          <div className={`flex-1 min-h-0 ${desktopTab === 'TASKS' ? 'block' : 'hidden'}`}>
+          <div className={`flex-1 min-h-0 ${desktopTab === 'TASKS' ? 'flex flex-col' : 'hidden'}`}>
             <TaskMatrix
               tasks={tasks}
               onToggleTask={handleToggleTask}
@@ -1665,7 +1686,7 @@ export default function JarvisDashboard() {
             />
           </div>
 
-          <div className={`flex-1 min-h-0 ${desktopTab === 'MEMORY' ? 'block' : 'hidden'}`}>
+          <div className={`flex-1 min-h-0 ${desktopTab === 'MEMORY' ? 'flex flex-col' : 'hidden'}`}>
             <MemoryVault
               memories={memories}
               evolutionStage={evolutionStage}
