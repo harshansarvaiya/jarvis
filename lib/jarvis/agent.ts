@@ -404,7 +404,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 
     // Tier 1 Primary: Google Cloud Vertex AI (Draws 100% from ₹33,435+ GCP Credits)
     if (isVertexAIAvailable()) {
-      const vertexCandidate = mapToVertexModel(requestedModel);
+      const { model: vertexCandidate } = mapToVertexModel(requestedModel);
       try {
         console.log(`[Vertex AI] Invoking enterprise endpoint for model: ${vertexCandidate}...`);
         const vRes = await callVertexAIGenerate({
@@ -750,7 +750,13 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       toolCallsExecuted,
       telemetry: {
         engineUsed: isVertexEngine
-          ? (selectedVertexModel.includes('pro') ? 'Vertex AI Gemini 2.5 Pro (GCP Credits)' : 'Vertex AI Gemini 2.5 Flash (GCP Credits)')
+          ? (selectedVertexModel.includes('3.8')
+              ? 'Vertex AI Gemini 3.8 Flash (GCP Credits)'
+              : selectedVertexModel.includes('3.7')
+              ? 'Vertex AI Gemini 3.7 Flash (GCP Credits)'
+              : selectedVertexModel.includes('pro')
+              ? 'Vertex AI Gemini 2.5 Pro (GCP Credits)'
+              : 'Vertex AI Gemini 2.5 Flash (GCP Credits)')
           : (selectedModel.includes('3.8') ? 'Gemini 3.8 Flash Core' : `Gemini ${selectedModel}`),
         provider: isVertexEngine ? 'vertex-ai' : 'google',
         model: isVertexEngine ? selectedVertexModel : selectedModel,

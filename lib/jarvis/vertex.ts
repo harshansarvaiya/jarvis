@@ -85,15 +85,31 @@ export interface VertexGenerateOptions {
 }
 
 /**
- * Maps common model identifiers to active Vertex AI endpoints
+ * Maps common model identifiers to active Vertex AI endpoints and locations
  */
-export function mapToVertexModel(requestedModel: string): string {
+export function mapToVertexModel(requestedModel: string): { model: string; location: string } {
   const normalized = requestedModel.toLowerCase();
-  if (normalized.includes('pro')) {
-    return 'gemini-2.5-pro';
+
+  // Gemini 3.x Series (Global Multi-Region Endpoint)
+  if (normalized.includes('3.8') || normalized.includes('3.8-flash')) {
+    return { model: 'gemini-3.8-flash', location: 'global' };
   }
-  // Default to Gemini 2.5 Flash for blazing speed and deep multimodal reasoning
-  return 'gemini-2.5-flash';
+  if (normalized.includes('3.7') || normalized.includes('3.7-flash')) {
+    return { model: 'gemini-3.7-flash', location: 'global' };
+  }
+
+  // Deep Strategic Synthesis (us-central1)
+  if (normalized.includes('pro')) {
+    return { model: 'gemini-2.5-pro', location: 'us-central1' };
+  }
+
+  // Reflex Speed & Multimodal (us-central1)
+  if (normalized.includes('2.5') || normalized.includes('flash')) {
+    return { model: 'gemini-2.5-flash', location: 'us-central1' };
+  }
+
+  // Default to Gemini 3.8 Flash (Global) for ultimate frontier reasoning
+  return { model: 'gemini-3.8-flash', location: 'global' };
 }
 
 /**
@@ -107,10 +123,10 @@ export async function callVertexAIGenerate(options: VertexGenerateOptions): Prom
   }
 
   const projectId = process.env.GCP_PROJECT_ID || 'antigravity-cloud-runner';
-  const location = process.env.GCP_LOCATION || 'us-central1';
-  const vertexModel = mapToVertexModel(options.model || 'gemini-2.5-flash');
+  const { model: vertexModel, location } = mapToVertexModel(options.model || 'gemini-3.8-flash');
 
-  const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${vertexModel}:generateContent`;
+  const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
+  const endpoint = `https://${host}/v1/projects/${projectId}/locations/${location}/publishers/google/models/${vertexModel}:generateContent`;
 
   const bodyPayload: any = {
     contents: options.contents,
