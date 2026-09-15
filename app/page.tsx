@@ -37,16 +37,11 @@ import { SecurityGateModal } from '@/components/SecurityGateModal';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { Task, Priority, MemoryItem, MemoryCategory } from '@/lib/jarvis/memory';
 import { triggerDeviceNotification, playJarvisNotificationChime } from '@/lib/jarvis/notifications';
+import { formatISTTime, formatShortISTTime, formatFullISTDateTime } from '@/lib/jarvis/time';
 
-// Fix 4: Convert server-emitted ISO UTC timestamp to device local time
+// Strictly converts all server and local timestamps to Indian Standard Time (IST)
 function formatLocalTimestamp(isoOrTimeStr: string): string {
-  try {
-    const d = new Date(isoOrTimeStr);
-    if (isNaN(d.getTime())) return isoOrTimeStr; // Not a valid ISO — return as-is
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return isoOrTimeStr;
-  }
+  return formatShortISTTime(isoOrTimeStr);
 }
 
 // Fix 5: Mobile Safari socket resilience — silently retries on TCP connection drops
@@ -210,9 +205,9 @@ export default function JarvisDashboard() {
   const mobileTextareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
 
-  // Time ticker
+  // Time ticker in strict IST (Asia/Kolkata)
   useEffect(() => {
-    const updateTime = () => setTimeStr(new Date().toLocaleTimeString());
+    const updateTime = () => setTimeStr(formatISTTime(new Date()));
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
