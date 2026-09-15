@@ -127,7 +127,28 @@ J.A.R.V.I.S. can execute the following capabilities autonomously:
 
 ---
 
-## 7. Edge Deployment & CI/CD Pipeline
+## 7. 24/7 Cloud Execution Substrate & Persistent Worker
 
-* **Continuous Deployment**: Pushes to `main` on [harshansarvaiya/jarvis](https://github.com/harshansarvaiya/jarvis) automatically trigger production edge builds on Vercel.
-* **Static Tunnel**: Ngrok static tunnel provides a persistent SSL endpoint for direct terminal links or external webhook ingestion.
+J.A.R.V.I.S. operates on a sovereign cloud-native compute layer with **zero dependency on Sir's local workstation**:
+
+1. **Physical Host Substrate (`antigravity-cloud-runner`)**:
+   - **Environment**: Google Cloud Compute Engine `e2-micro` (Ubuntu 24.04 LTS, `us-central1`).
+   - **Direct Terminal Execution**: Instant sub-second shell command execution, build verification (`next build`), type checking (`tsc`), and package management without waiting for cold-start CI runners.
+   - **24/7 Background Daemon (`scripts/cloud-worker.ts`)**: Persistent TypeScript daemon running continuously on the VM:
+     - **Routine A (Reminders Poller)**: Scans Upstash Redis every 30 seconds and dispatches native lock-screen Web Push notifications when task due dates mature.
+     - **Routine B (Morning Tactical Briefing)**: Generates and delivers an executive status briefing daily at 08:00 AM.
+     - **Routine C (Production Edge Watchdog)**: Verifies Vercel Edge health and latency every 30 minutes.
+     - **Routine D (Async Cron Queue)**: Processes heavy long-running batch jobs from `jarvis:cron_queue` with zero timeout restrictions.
+
+2. **VAPID Web Push & QStash Scheduler Gateway**:
+   - **`/api/push/subscribe`**: Registers and syncs device push tokens into Upstash Redis (`jarvis:push_subs:*`) with a 60-day TTL.
+   - **`/api/push/send`**: Dispatches end-to-end encrypted W3C Web Push notifications directly to iOS Safari, Android, and Desktop PWAs.
+   - **`/api/cron/execute`**: QStash HMAC-SHA256 signature-verified receiver for scheduled serverless triggers.
+
+---
+
+## 8. Edge Deployment & CI/CD Pipeline
+
+* **Continuous Deployment**: Pushes to `main` on [harshansarvaiya/jarvis](https://github.com/harshansarvaiya/jarvis) automatically trigger production edge builds on Vercel ([https://jarvis-iota-beige.vercel.app](https://jarvis-iota-beige.vercel.app)).
+* **Static Tunnel**: Ngrok static tunnel (`washbasin-penpal-muppet.ngrok-free.dev`) provides a persistent SSL endpoint for direct terminal links and remote webhook ingestion.
+
