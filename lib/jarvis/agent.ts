@@ -75,12 +75,17 @@ export function getModelFallbackHierarchy(requestedModel: string): string[] {
     'gemini-3.8-flash',          // LAST — quota may clear between calls
   ];
 
-
   const primary = normalizeModel(requestedModel);
   const startIndex = masterHierarchy.indexOf(primary);
 
   if (startIndex !== -1) {
-    return masterHierarchy.slice(startIndex);
+    // Wrap-around rotation: try requested model first, then cycle through ALL remaining
+    // e.g. if user requests 3.8-flash (index 5): [3.8, 3.7, lite-latest, 3.1-lite, 3.5-lite, preview]
+    const rotated = [
+      ...masterHierarchy.slice(startIndex),
+      ...masterHierarchy.slice(0, startIndex),
+    ];
+    return rotated;
   }
 
   return [primary, ...masterHierarchy].filter((v, i, a) => a.indexOf(v) === i);
@@ -369,9 +374,9 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     let response: Response | null = null;
     let activeApiUrl = '';
     let lastErrorText = '';
-    let selectedModel = candidateModels[0] || 'gemini-3.8-flash';
+    let selectedModel = candidateModels[0] || 'gemini-3.7-flash';
     let attemptsCount = 0;
-    const MAX_GEMINI_ATTEMPTS = 2;
+    const MAX_GEMINI_ATTEMPTS = 6; // Must cover full hierarchy depth (6 models)
 
     for (const candidateModel of candidateModels) {
       if (attemptsCount >= MAX_GEMINI_ATTEMPTS) {

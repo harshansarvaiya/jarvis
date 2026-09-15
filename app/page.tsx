@@ -928,7 +928,7 @@ export default function JarvisDashboard() {
                         </span>
                       )}
                       <span>•</span>
-                      <span>{msg.timestamp}</span>
+                      <span>{formatLocalTimestamp(msg.timestamp)}</span>
                     </div>
 
                     <div
@@ -1178,7 +1178,7 @@ export default function JarvisDashboard() {
                       </span>
                     )}
                     <span>•</span>
-                    <span>{msg.timestamp}</span>
+                    <span>{formatLocalTimestamp(msg.timestamp)}</span>
                   </div>
 
                   <div
