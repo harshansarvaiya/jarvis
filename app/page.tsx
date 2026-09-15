@@ -335,13 +335,24 @@ export default function JarvisDashboard() {
     localStorage.setItem('jarvis_model', savedModel);
     if (savedTts !== null) setTtsEnabled(savedTts === 'true');
 
-    // Restore chat transmissions from localStorage
+    // Restore chat transmissions from localStorage with session cutoff check
     try {
+      const cutoffStr = localStorage.getItem('jarvis_session_cutoff');
+      const cutoff = cutoffStr ? Number(cutoffStr) : 0;
       const savedHistory = localStorage.getItem('jarvis_chat_history');
       if (savedHistory) {
         const parsed = JSON.parse(savedHistory);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setMessages(parsed);
+          const visible = parsed.filter((m) => {
+            if (m.id === INITIAL_WELCOME_MESSAGE.id || m.id === 'welcome-1') return true;
+            if (!cutoff) return true;
+            if (m.id && m.id.startsWith('msg-')) {
+              const ts = Number(m.id.replace('msg-', '').split('-')[0]);
+              if (!isNaN(ts)) return ts > cutoff;
+            }
+            return true;
+          });
+          setMessages(visible.length > 0 ? visible : [INITIAL_WELCOME_MESSAGE]);
         }
       }
     } catch (e) {
@@ -449,13 +460,14 @@ export default function JarvisDashboard() {
     }
   }, [messages]);
 
-  // Clear chat history handler
-  const handleClearChat = async () => {
-    setMessages([INITIAL_WELCOME_MESSAGE]);
+  // Clear chat view handler (Clears active screen view while keeping database archive intact)
+  const handleClearChat = () => {
+    const cutoff = Date.now();
     try {
+      localStorage.setItem('jarvis_session_cutoff', String(cutoff));
       localStorage.removeItem('jarvis_chat_history');
-      await authFetch('/api/jarvis/chat/history', { method: 'DELETE' });
     } catch {}
+    setMessages([INITIAL_WELCOME_MESSAGE]);
   };
 
   // Continuous background synchronization across devices (every 8 seconds when unlocked)
@@ -501,35 +513,42 @@ export default function JarvisDashboard() {
     };
   }, [isUnlocked]);
 
-  // Fetch shared cross-device chat history from cloud/server (Non-destructive merge & cloud purge synchronization)
+  // Fetch shared cross-device chat history from cloud/server with session cutoff filtering
   const fetchChatHistory = async () => {
     try {
       const res = await authFetch('/api/jarvis/chat/history?limit=100');
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.messages)) {
-          if (data.messages.length === 0) {
-            // Cloud history was purged. Synchronize this client immediately.
-            setMessages((prev) => {
+          const cutoffStr = typeof window !== 'undefined' ? localStorage.getItem('jarvis_session_cutoff') : null;
+          const cutoff = cutoffStr ? Number(cutoffStr) : 0;
+
+          // Filter out messages that occurred before the session clear cutoff
+          const visibleCloudMessages = cutoff
+            ? data.messages.filter((m: Message) => {
+                if (m.id === INITIAL_WELCOME_MESSAGE.id || m.id === 'welcome-1') return true;
+                if (m.id && m.id.startsWith('msg-')) {
+                  const ts = Number(m.id.replace('msg-', '').split('-')[0]);
+                  if (!isNaN(ts)) return ts > cutoff;
+                }
+                return false;
+              })
+            : data.messages;
+
+          setMessages((prev) => {
+            if (visibleCloudMessages.length === 0) {
               if (prev.length === 1 && (prev[0].id === INITIAL_WELCOME_MESSAGE.id || prev[0].id === 'welcome-1')) {
                 return prev;
               }
-              try {
-                localStorage.removeItem('jarvis_chat_history');
-              } catch {}
               return [INITIAL_WELCOME_MESSAGE];
-            });
-          } else {
-            // Non-empty canonical cloud messages
-            setMessages((prev) => {
-              const merged = mergeMessages(prev, data.messages);
-              if (merged === prev) return prev;
-              try {
-                localStorage.setItem('jarvis_chat_history', JSON.stringify(merged.slice(-100)));
-              } catch {}
-              return merged;
-            });
-          }
+            }
+            const merged = mergeMessages(prev, visibleCloudMessages);
+            if (merged === prev) return prev;
+            try {
+              localStorage.setItem('jarvis_chat_history', JSON.stringify(merged.slice(-100)));
+            } catch {}
+            return merged;
+          });
         }
       }
     } catch (e) {
@@ -1051,11 +1070,11 @@ export default function JarvisDashboard() {
                     <button
                       type="button"
                       onClick={handleClearChat}
-                      title="Purge chat history"
-                      className="text-[10px] text-slate-500 hover:text-red-400 transition-colors flex items-center space-x-1 px-1.5 py-0.5 rounded bg-slate-900/60 border border-slate-800 hover:border-red-500/30 font-mono"
+                      title="Clear chat window (preserves database archive)"
+                      className="text-[10px] text-slate-400 hover:text-cyan-300 transition-colors flex items-center space-x-1 px-1.5 py-0.5 rounded bg-slate-900/60 border border-slate-800 hover:border-cyan-500/40 font-mono"
                     >
                       <Trash2 className="w-2.5 h-2.5" />
-                      <span>PURGE</span>
+                      <span>CLEAR</span>
                     </button>
                   )}
                 </div>
@@ -1388,11 +1407,11 @@ export default function JarvisDashboard() {
                   <button
                     type="button"
                     onClick={handleClearChat}
-                    title="Purge chat history"
-                    className="text-[10px] text-slate-500 hover:text-red-400 transition-colors flex items-center space-x-1 px-2 py-0.5 rounded bg-slate-900/60 border border-slate-800 hover:border-red-500/30 font-mono"
+                    title="Clear chat window (preserves database archive)"
+                    className="text-[10px] text-slate-400 hover:text-cyan-300 transition-colors flex items-center space-x-1 px-2 py-0.5 rounded bg-slate-900/60 border border-slate-800 hover:border-cyan-500/40 font-mono"
                   >
                     <Trash2 className="w-3 h-3" />
-                    <span>PURGE</span>
+                    <span>CLEAR VIEW</span>
                   </button>
                 )}
               </div>
