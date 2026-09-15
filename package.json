@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "worker": "tsx scripts/cloud-worker.ts"
   },
   "dependencies": {
     "@ngrok/ngrok": "^1.7.0",
