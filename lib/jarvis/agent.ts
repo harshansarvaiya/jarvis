@@ -35,14 +35,14 @@ export interface JarvisAgentOptions {
 }
 
 export function normalizeModel(m?: string): string {
-  if (!m) return 'gemini-3.8-flash';
+  if (!m) return 'gemini-3.7-flash';
   const clean = m.trim().toLowerCase();
   if (clean.includes('120b') || clean.includes('gpt-oss-120b')) return 'openai/gpt-oss-120b';
   if (clean.includes('20b') || clean.includes('gpt-oss-20b')) return 'openai/gpt-oss-20b';
   if (clean.includes('compound-mini')) return 'groq/compound-mini';
   if (clean.includes('compound')) return 'groq/compound';
   if (clean.includes('llama-3.3') || clean.includes('llama-70b') || clean === 'llama') return 'openai/gpt-oss-120b';
-  if (clean.includes('llama-3.1') || clean.includes('llama-8b')) return 'openai/gpt-oss-20b';
+  if (clean.includes('llama-3.1') || clean.includes('llama-8b')) return 'openai/gpt-oss-120b';
   if (clean.includes('gpt-4o-mini')) return 'gpt-4o-mini';
   if (clean.includes('gpt-4') || clean === 'gpt') return 'gpt-4o';
   if (clean.includes('3.8')) return 'gemini-3.8-flash';
@@ -65,14 +65,16 @@ export function normalizeModel(m?: string): string {
  * Stepwise Quantum Fallback Hierarchy for Gemini
  */
 export function getModelFallbackHierarchy(requestedModel: string): string[] {
+  // Ordered by confirmed HTTP 200 availability (empirically verified 2026-09-15)
   const masterHierarchy = [
-    'gemini-3.8-flash',
-    'gemini-3.6-flash',
-    'gemini-flash-lite-latest',
-    'gemini-3-flash-preview',
-    'gemini-3.1-flash-lite',
-    'gemini-3.7-flash',
+    'gemini-3.7-flash',          // PRIMARY — HTTP 200 confirmed live
+    'gemini-flash-lite-latest',  // SECONDARY — HTTP 200 confirmed live
+    'gemini-3.1-flash-lite',     // TERTIARY — HTTP 200 confirmed live
+    'gemini-3.5-flash-lite',     // QUATERNARY — HTTP 200 confirmed live
+    'gemini-3-flash-preview',    // QUINARY — fallback
+    'gemini-3.8-flash',          // LAST — quota may clear between calls
   ];
+
 
   const primary = normalizeModel(requestedModel);
   const startIndex = masterHierarchy.indexOf(primary);
@@ -199,8 +201,8 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       const groqCandidates = [
         primaryModel,
         'openai/gpt-oss-120b',
-        'openai/gpt-oss-20b',
-        'groq/compound-mini',
+        // NOTE: gpt-oss-20b PERMANENTLY EXCISED — hallucinates + produces robotic tables (2026-09-15)
+        // NOTE: groq/compound-mini EXCISED — no tool call support
       ].filter((v, i, a) => a.indexOf(v) === i);
 
       for (const groqModel of groqCandidates) {

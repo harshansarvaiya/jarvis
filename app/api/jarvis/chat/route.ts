@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     // Synchronously persist user message and assistant reply to universal shared history
     const lastUser = [...messages].reverse().find((m: any) => m.role === 'user');
-    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const nowStr = new Date().toISOString(); // ISO UTC — client parses to local timezone
     const recordsToSave: ChatMessageRecord[] = [];
 
     if (lastUser && lastUser.content) {

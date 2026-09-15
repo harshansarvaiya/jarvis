@@ -31,6 +31,34 @@ import { SecurityGateModal } from '@/components/SecurityGateModal';
 import { Task, Priority, MemoryItem, MemoryCategory } from '@/lib/jarvis/memory';
 import { triggerDeviceNotification, playJarvisNotificationChime } from '@/lib/jarvis/notifications';
 
+// Fix 4: Convert server-emitted ISO UTC timestamp to device local time
+function formatLocalTimestamp(isoOrTimeStr: string): string {
+  try {
+    const d = new Date(isoOrTimeStr);
+    if (isNaN(d.getTime())) return isoOrTimeStr; // Not a valid ISO — return as-is
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return isoOrTimeStr;
+  }
+}
+
+// Fix 5: Mobile Safari socket resilience — silently retries on TCP connection drops
+async function fetchWithRetry(url: string, opts: RequestInit, retries = 2): Promise<Response> {
+  let lastErr: any;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fetch(url, opts);
+    } catch (err: any) {
+      lastErr = err;
+      if (i < retries - 1) {
+        await new Promise((r) => setTimeout(r, 700)); // 700ms backoff before retry
+      }
+    }
+  }
+  throw lastErr;
+}
+
+
 interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -554,7 +582,8 @@ export default function JarvisDashboard() {
         orchestrationMode,
       };
 
-      const res = await authFetch('/api/jarvis/chat', {
+      // Fix 5: fetchWithRetry handles Mobile Safari TCP socket drops silently
+      const res = await fetchWithRetry('/api/jarvis/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -584,7 +613,7 @@ export default function JarvisDashboard() {
         role: 'assistant',
         content: reply,
         toolCalls,
-        timestamp: data.messageRecord?.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: formatLocalTimestamp(data.messageRecord?.timestamp || new Date().toISOString()),
         vocalSummary,
         tacticalActions,
         telemetry,

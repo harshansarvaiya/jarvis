@@ -13,7 +13,7 @@ export type OperationalArchetype = 'MULTIMODAL_PERCEPTION' | 'REFLEX_SPEED' | 'D
 
 export interface OrchestrationTelemetry {
   engineUsed: string;
-  provider: 'groq' | 'google' | 'offline';
+  provider: 'groq' | 'google' | 'github-models' | 'offline';
   model: string;
   latencyMs: number;
   archetype: OperationalArchetype;
@@ -59,12 +59,29 @@ export function classifyOperationalIntent(
 
   // 2. Deep Synthesis & Strategic Reasoning Triggers
   const deepReasoningTriggers = [
+    // Original strategic triggers
     'red-team', 'adversarial', 'stress-test', 'sparring', 'deep analysis',
     'architect a', 'strategic plan', 'comprehensive review', 'tradeoff analysis',
-    'security audit', 'break down in detail', 'synthesize findings'
+    'security audit', 'break down in detail', 'synthesize findings',
+    // Cost, Financial & ROI Reasoning
+    'cost', 'price', 'pricing', 'cheap', 'cheaper', 'expensive', 'budget',
+    'roi', 'value', 'worth', 'investment', 'spend', 'afford',
+    // Infrastructure, Cloud & Hardware
+    'vm', 'virtual machine', 'cloud server', 'compute', 'instance',
+    'hardware', 'server', 'cpu', 'gpu', 'ram', 'storage', 'disk',
+    'aws', 'azure', 'gcp', 'oracle cloud', 'digitalocean', 'linode',
+    // Comparison & Evaluation
+    'compare', ' vs ', 'versus', 'benchmark', 'performance', 'difference',
+    'which is better', 'should i use', 'best option',
+    // Planning & Architecture
+    'architect', 'design', 'infrastructure', 'roadmap', 'approach', 'plan',
+    'how should', 'should we', 'what would', 'recommend',
+    // Review & Analysis
+    'review', 'audit', 'assess', 'evaluate', 'analyse', 'analyze',
+    'explain', 'breakdown', 'understand', 'why does', 'how does',
   ];
 
-  if (deepReasoningTriggers.some((t) => clean.includes(t)) || clean.length > 350) {
+  if (deepReasoningTriggers.some((t) => clean.includes(t)) || clean.length > 100) {
     return {
       archetype: 'DEEP_SYNTHESIS',
       reason: 'Complex Strategy / Analytical Depth Required — Routing to Gemini Expansive Core.',
