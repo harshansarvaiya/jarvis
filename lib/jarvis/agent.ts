@@ -2,6 +2,7 @@ import { JARVIS_SYSTEM_PROMPT, CORE_DIRECTIVES, validateActionAgainstDirectives 
 import { getTasks, getMemories, addMemory, recordEvolution } from './memory';
 import { JARVIS_TOOLS, executeJarvisTool } from './tools';
 import { findCorrelatedEpisodes, formatRecalledEpisodesPrompt } from './recall';
+import { queryKnowledgeBase, formatKnowledgePromptContext } from './rag';
 import {
   classifyOperationalIntent,
   extractCinematicVocalSummary,
@@ -149,14 +150,22 @@ export async function runJarvisAgent(
     };
   }
 
-  // 2. Correlated Episodic History Retrieval (RAG over Upstash History)
+  // 2. Correlated Episodic History & Semantic Vector RAG Retrieval
   let recalledEpisodes: any[] = [];
   let recalledContextPrompt = '';
+  let retrievedKnowledgeContext = '';
   try {
-    recalledEpisodes = await findCorrelatedEpisodes(lastUserMessage.content, [lastUserMessage.id || ''], 3);
+    const [episodes, knowledgeChunks] = await Promise.all([
+      findCorrelatedEpisodes(lastUserMessage.content, [lastUserMessage.id || ''], 3),
+      queryKnowledgeBase(lastUserMessage.content, { topK: 3, minScore: 0.45, apiKey }),
+    ]);
+    recalledEpisodes = episodes;
     recalledContextPrompt = formatRecalledEpisodesPrompt(recalledEpisodes);
+    if (knowledgeChunks && knowledgeChunks.length > 0) {
+      retrievedKnowledgeContext = formatKnowledgePromptContext(knowledgeChunks);
+    }
   } catch (recallErr) {
-    console.warn('[Agent] Episodic recall error:', recallErr);
+    console.warn('[Agent] Retrieval error:', recallErr);
   }
 
   // 3. Synthesize Active State Context
@@ -176,6 +185,7 @@ ${completedTasks.map((t) => `- [COMPLETED] ${t.title} (ID: ${t.id}${t.completedA
 [ASSIMILATED MEMORY & PREFERENCES]:
 ${relevantMemories.map((m) => `- [${m.category}]: ${m.content}`).join('\n')}
 ${recalledContextPrompt}
+${retrievedKnowledgeContext}
 [DIRECTIVE ENFORCEMENT]:
 ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 `;

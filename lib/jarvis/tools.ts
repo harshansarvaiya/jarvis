@@ -19,6 +19,12 @@ import {
   executeNetworkMCP,
   executeDatabaseMCP,
 } from './mcp';
+import {
+  queryKnowledgeBase,
+  ingestKnowledgeDocument,
+  wipeSensitiveKnowledge,
+  wipeAllKnowledge,
+} from './rag';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -435,6 +441,78 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['title', 'message'],
     },
   },
+  {
+    name: 'rag_search_knowledge',
+    description: 'Perform semantic vector search on the J.A.R.V.I.S. Knowledge Base using dense vector embeddings (Gemini 004). Returns relevant chunks with similarity confidence.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The search query or concept to look up.',
+        },
+        category: {
+          type: 'string',
+          description: 'Optional category filter (e.g. "TECHNICAL", "ARCHITECTURE", "DOCS", "PROJECT", "SENSITIVE").',
+        },
+        topK: {
+          type: 'number',
+          description: 'Number of top matching chunks to retrieve (default: 4).',
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'rag_ingest_document',
+    description: 'Chunk, embed, and permanently index a document, guide, codebase reference, or personal notes into the Semantic Vector Knowledge Base.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Title or document identifier.',
+        },
+        content: {
+          type: 'string',
+          description: 'The full text, markdown, or code content to index.',
+        },
+        category: {
+          type: 'string',
+          description: 'Category tag (e.g. "ARCHITECTURE", "TECHNICAL", "CREDENTIALS", "SENSITIVE", "REFERENCE").',
+        },
+        isSensitive: {
+          type: 'boolean',
+          description: 'Set true if this contains private, personal, or credential data subject to Directive 01 Guardian Wipe.',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional list of searchable tags.',
+        },
+      },
+      required: ['title', 'content'],
+    },
+  },
+  {
+    name: 'emergency_wipe_sensitive',
+    description: 'Execute Directive 01 Guardian Sanitization Wipe to permanently purge sensitive documents, credentials, API overrides, and private knowledge from Upstash Redis and local storage.',
+    parameters: {
+      type: 'object',
+      properties: {
+        mode: {
+          type: 'string',
+          enum: ['sensitive_only', 'nuclear_all'],
+          description: 'Wipe mode: "sensitive_only" (purges sensitive RAG chunks and credentials) or "nuclear_all" (complete factory reset).',
+        },
+        reason: {
+          type: 'string',
+          description: 'Audit explanation for why the sanitization was invoked.',
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 export async function executeJarvisTool(
@@ -797,6 +875,66 @@ export async function executeJarvisTool(
             notification: notificationRecord,
           },
         };
+      }
+
+      case 'rag_search_knowledge': {
+        const { query, category, topK = 4 } = args;
+        const results = await queryKnowledgeBase(query, { topK: Number(topK) || 4, category });
+        return {
+          success: true,
+          result: {
+            query,
+            chunksFound: results.length,
+            results: results.map((r) => ({
+              title: r.title,
+              category: r.category,
+              similarity: `${(r.similarity * 100).toFixed(1)}%`,
+              content: r.content,
+              isSensitive: r.isSensitive,
+            })),
+          },
+        };
+      }
+
+      case 'rag_ingest_document': {
+        const { title, content, category = 'GENERAL', isSensitive, tags } = args;
+        const res = await ingestKnowledgeDocument({
+          title,
+          content,
+          category,
+          isSensitive,
+          tags: Array.isArray(tags) ? tags : [],
+        });
+        return {
+          success: true,
+          result: {
+            message: `Document "${title}" successfully chunked, embedded, and indexed into knowledge base (${res.chunksIndexed} vector chunks).`,
+            ...res,
+          },
+        };
+      }
+
+      case 'emergency_wipe_sensitive': {
+        const { mode = 'sensitive_only', reason } = args;
+        if (mode === 'nuclear_all') {
+          const wipeRes = await wipeAllKnowledge();
+          return {
+            success: true,
+            result: {
+              message: `DEFCON 0 Emergency Nuclear Wipe executed. Purged ${wipeRes.totalChunksPurged} vector chunks across ${wipeRes.totalDocsPurged} documents.`,
+              reason: reason || 'Directive 01 Guardian Sanitization Mandate',
+            },
+          };
+        } else {
+          const wipeRes = await wipeSensitiveKnowledge();
+          return {
+            success: true,
+            result: {
+              message: `Directive 01 Guardian Sensitive Wipe executed. Purged ${wipeRes.chunksRemoved} sensitive vector chunks across ${wipeRes.docsRemoved} documents.`,
+              reason: reason || 'Directive 01 Guardian Sanitization Mandate',
+            },
+          };
+        }
       }
 
       default:

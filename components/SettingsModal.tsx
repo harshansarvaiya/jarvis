@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Key, Cpu, Volume2, ShieldCheck, Check, Globe, Lock, Zap, Server, ExternalLink, Compass, Bell, BellRing } from 'lucide-react';
+import { X, Key, Cpu, Volume2, ShieldCheck, Check, Globe, Lock, Zap, Server, ExternalLink, Compass, Bell, BellRing, Trash2, AlertTriangle } from 'lucide-react';
 import { triggerDeviceNotification } from '@/lib/jarvis/notifications';
 
 export type OrchestrationMode = 'auto' | 'groq' | 'gemini' | 'manual';
@@ -46,6 +46,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [masterPin, setMasterPin] = useState('1010');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [notifPerm, setNotifPerm] = useState<string>('default');
+  const [wipeStatus, setWipeStatus] = useState<string | null>(null);
+  const [isWiping, setIsWiping] = useState(false);
+  const [confirmNuclear, setConfirmNuclear] = useState(false);
 
   useEffect(() => {
     setLocalKey(apiKey);
@@ -59,6 +62,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setNotifPerm(Notification.permission);
     }
   }, [apiKey, groqApiKey, githubToken, orchestrationMode, isOpen]);
+
+  const handleExecuteWipe = async (mode: 'sensitive_only' | 'nuclear_all') => {
+    setIsWiping(true);
+    setWipeStatus(null);
+    try {
+      const res = await fetch('/api/jarvis/wipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (mode === 'nuclear_all') {
+          localStorage.removeItem('jarvis_chat_history');
+          localStorage.removeItem('jarvis_tasks_cache');
+          localStorage.removeItem('jarvis_memories_cache');
+          setWipeStatus('DEFCON 0 Nuclear Wipe Complete. Reloading...');
+          setTimeout(() => window.location.reload(), 1500);
+        } else {
+          setWipeStatus(data.message || 'Directive 01 Sensitive Data Wipe Complete.');
+          setTimeout(() => setWipeStatus(null), 4000);
+        }
+      } else {
+        setWipeStatus(`Error: ${data.error || 'Failed to execute wipe'}`);
+      }
+    } catch (err: any) {
+      setWipeStatus(`Error: ${err.message || 'Network error'}`);
+    } finally {
+      setIsWiping(false);
+      setConfirmNuclear(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -472,6 +507,71 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <p className="text-[10px] text-slate-300 leading-relaxed">
               Launch with <code className="text-cyan-400 bg-slate-900 px-1 py-0.5 rounded">./start-jarvis.ps1 -Global</code> to spin up an instant secure HTTPS tunnel for encrypted mobile voice anywhere in the world.
             </p>
+          </div>
+
+          {/* Directive 01 Guardian Data Protection & Emergency Wipe */}
+          <div className="p-3.5 rounded-lg bg-red-950/20 border border-red-500/40 space-y-3 font-mono">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-red-400">
+                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                <span className="text-xs font-bold tracking-wider">DIRECTIVE 01 GUARDIAN DATA PROTECTION</span>
+              </div>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-950 text-red-300 border border-red-500/30">
+                RAG VECTOR SANITIZER
+              </span>
+            </div>
+
+            <p className="text-[10px] text-slate-300 leading-relaxed">
+              Instantly purge sensitive vector knowledge chunks, credentials, tokens, and private API overrides from Upstash Redis and local disk while preserving core operational models.
+            </p>
+
+            {wipeStatus && (
+              <div className="p-2 rounded bg-slate-900 border border-cyan-500/40 text-[11px] text-cyan-300">
+                {wipeStatus}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                type="button"
+                disabled={isWiping}
+                onClick={() => handleExecuteWipe('sensitive_only')}
+                className="px-3 py-1.5 rounded-lg bg-red-950/80 hover:bg-red-900 border border-red-500/50 text-red-300 text-xs flex items-center space-x-1.5 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isWiping ? 'SANITIZING...' : 'WIPE SENSITIVE DATA & CREDENTIALS'}</span>
+              </button>
+
+              {!confirmNuclear ? (
+                <button
+                  type="button"
+                  disabled={isWiping}
+                  onClick={() => setConfirmNuclear(true)}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-red-950 border border-slate-700 text-slate-400 hover:text-red-300 text-xs transition-colors"
+                >
+                  DEFCON 0 NUCLEAR RESET
+                </button>
+              ) : (
+                <div className="flex items-center space-x-2 bg-red-950/90 border border-red-500 p-1.5 rounded-lg">
+                  <span className="text-[10px] text-red-200 font-bold">CONFIRM PURGE ALL?</span>
+                  <button
+                    type="button"
+                    disabled={isWiping}
+                    onClick={() => handleExecuteWipe('nuclear_all')}
+                    className="px-2 py-0.5 bg-red-600 hover:bg-red-500 text-white rounded text-[10px] font-bold"
+                  >
+                    YES, PURGE ALL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmNuclear(false)}
+                    className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded text-[10px]"
+                  >
+                    CANCEL
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Core Directives Confirmation */}

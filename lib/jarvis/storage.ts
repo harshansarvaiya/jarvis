@@ -25,6 +25,7 @@ export interface ChatMessageRecord {
 export interface StorageProvider {
   name: 'upstash-redis' | 'local-disk';
   isCloud: boolean;
+  execute(command: string, ...args: any[]): Promise<any>;
   getState(): Promise<JarvisState | null>;
   saveState(state: JarvisState): Promise<void>;
   getChatHistory(limit?: number): Promise<ChatMessageRecord[]>;
@@ -48,7 +49,7 @@ class UpstashRedisProvider implements StorageProvider {
     this.token = token;
   }
 
-  private async execute(command: string, ...args: any[]): Promise<any> {
+  async execute(command: string, ...args: any[]): Promise<any> {
     const endpoint = `${this.url}/${command}/${args.map((a) => encodeURIComponent(typeof a === 'object' ? JSON.stringify(a) : String(a))).join('/')}`;
     const res = await fetch(endpoint, {
       headers: {
@@ -265,6 +266,38 @@ class LocalDiskProvider implements StorageProvider {
       console.error('[Storage:Local] Failed to clear chat history:', err);
     }
   }
+
+  async execute(command: string, ...args: any[]): Promise<any> {
+    const cmd = command.toLowerCase();
+    const key = String(args[0] || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const customFile = path.join(this.dataDir, `${key}.json`);
+
+    try {
+      this.ensureDataDir();
+      if (cmd === 'get') {
+        if (!fs.existsSync(customFile)) return null;
+        const raw = fs.readFileSync(customFile, 'utf-8');
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return raw;
+        }
+      } else if (cmd === 'set') {
+        const val = args[1];
+        const content = typeof val === 'string' ? val : JSON.stringify(val, null, 2);
+        fs.writeFileSync(customFile, content, 'utf-8');
+        return 'OK';
+      } else if (cmd === 'del') {
+        if (fs.existsSync(customFile)) {
+          fs.unlinkSync(customFile);
+        }
+        return 1;
+      }
+    } catch (err) {
+      console.error(`[Storage:Local] execute(${command}) failed:`, err);
+    }
+    return null;
+  }
 }
 
 // ==========================================
@@ -287,6 +320,8 @@ export function getStorage(): StorageProvider {
 
   return activeProvider;
 }
+
+export const getUniversalStorage = getStorage;
 
 /**
  * High-level unified asynchronous storage helpers
