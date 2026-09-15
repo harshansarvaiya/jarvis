@@ -69,7 +69,7 @@ export interface RepairStep {
 export const SystemHealthMatrix: React.FC = () => {
   const [data, setData] = useState<HealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
 
   // Selected Node for Deep Telemetry Modal
@@ -276,13 +276,14 @@ export const SystemHealthMatrix: React.FC = () => {
             <button
               type="button"
               onClick={() => setAutoRefresh(!autoRefresh)}
+              title={autoRefresh ? 'Click to disable 10s auto-polling' : 'Click to enable 10s auto-polling'}
               className={`px-2.5 py-1.5 rounded-lg text-xs font-mono border transition-colors ${
                 autoRefresh
-                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
-                  : 'bg-slate-800 text-slate-400 border-slate-700'
+                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40 shadow-sm shadow-emerald-900/50'
+                  : 'bg-slate-900/80 text-slate-400 border-slate-700/60 hover:text-slate-200'
               }`}
             >
-              {autoRefresh ? 'AUTO 10S: ON' : 'AUTO 10S: OFF'}
+              {autoRefresh ? 'AUTO POLL: ON' : 'AUTO POLL: OFF'}
             </button>
           </div>
         </div>
