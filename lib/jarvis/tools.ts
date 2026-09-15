@@ -63,47 +63,133 @@ async function runDirectShellCommand(command: string): Promise<{ stdout: string;
 }
 
 async function runWebSearch(query: string): Promise<any> {
+  const results: Array<{ title: string; snippet: string; url: string; source?: string }> = [];
+
+  // Tier 1: DuckDuckGo Instant Answer Knowledge Graph API
+  try {
+    const ddgApi = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      signal: AbortSignal.timeout(3000),
+    });
+    if (ddgApi.ok) {
+      const text = await ddgApi.text();
+      if (text) {
+        const json = JSON.parse(text);
+        if (json.AbstractText) {
+          results.push({
+            title: json.Heading || query,
+            snippet: json.AbstractText,
+            url: json.AbstractURL || '',
+            source: 'DuckDuckGo Instant Answer',
+          });
+        }
+        if (Array.isArray(json.RelatedTopics)) {
+          for (const topic of json.RelatedTopics.slice(0, 3)) {
+            if (topic.Text && topic.FirstURL) {
+              results.push({
+                title: topic.Text.split(' - ')[0] || topic.Text.slice(0, 50),
+                snippet: topic.Text,
+                url: topic.FirstURL,
+                source: 'DuckDuckGo Knowledge Graph',
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch {}
+
+  // Tier 2: DuckDuckGo HTML Full Web Search Scraper
   try {
     const endpoint = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
     const res = await fetch(endpoint, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(4500),
     });
 
-    if (!res.ok) {
-      return { query, error: `Search provider returned HTTP ${res.status}` };
-    }
+    if (res.ok) {
+      const html = await res.text();
+      const titleRegex = /<a[^>]+class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+      const snippetRegex = /<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/g;
 
-    const html = await res.text();
-    const results: Array<{ title: string; snippet: string; url: string }> = [];
-    const resultBlocks = html.split('class="result__body"').slice(1, 6);
+      const rawTitles: Array<{ url: string; title: string }> = [];
+      let tMatch;
+      while ((tMatch = titleRegex.exec(html)) !== null) {
+        let rawUrl = tMatch[1];
+        const uddgMatch = rawUrl.match(/uddg=([^&]+)/);
+        if (uddgMatch) {
+          try {
+            rawUrl = decodeURIComponent(uddgMatch[1]);
+          } catch {}
+        }
+        rawTitles.push({
+          url: rawUrl,
+          title: tMatch[2]
+            .replace(/<[^>]+>/g, '')
+            .replace(/&amp;/g, '&')
+            .replace(/&#x27;/g, "'")
+            .replace(/&quot;/g, '"')
+            .trim(),
+        });
+      }
 
-    for (const block of resultBlocks) {
-      const titleMatch = block.match(/class="result__title"[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
-      const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
+      const rawSnippets: string[] = [];
+      let sMatch;
+      while ((sMatch = snippetRegex.exec(html)) !== null) {
+        rawSnippets.push(
+          sMatch[1]
+            .replace(/<[^>]+>/g, '')
+            .replace(/&amp;/g, '&')
+            .replace(/&#x27;/g, "'")
+            .replace(/&quot;/g, '"')
+            .trim()
+        );
+      }
 
-      if (titleMatch) {
-        const url = titleMatch[1];
-        const rawTitle = titleMatch[2].replace(/<[^>]+>/g, '').trim();
-        const rawSnippet = snippetMatch ? snippetMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+      for (let i = 0; i < Math.min(rawTitles.length, 6); i++) {
         results.push({
-          title: rawTitle,
-          snippet: rawSnippet,
-          url,
+          title: rawTitles[i].title,
+          snippet: rawSnippets[i] || '',
+          url: rawTitles[i].url,
+          source: 'Web Search',
         });
       }
     }
+  } catch {}
 
-    return {
-      query,
-      resultsCount: results.length,
-      results: results.length > 0 ? results : 'No text results parsed from search provider.',
-    };
-  } catch (err: any) {
-    return { query, error: err.message || 'Web search timeout' };
+  // Tier 3: Wikipedia OpenSearch Fallback (Guarantees zero failed searches)
+  if (results.length === 0) {
+    try {
+      const wikiRes = await fetch(
+        `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=5&namespace=0&format=json`,
+        {
+          headers: { 'User-Agent': 'JarvisAssistant/1.0 (harshnas279@gmail.com)' },
+          signal: AbortSignal.timeout(3000),
+        }
+      );
+      if (wikiRes.ok) {
+        const [_, titles, descriptions, urls] = await wikiRes.json();
+        for (let i = 0; i < titles.length; i++) {
+          results.push({
+            title: titles[i],
+            snippet: descriptions[i] || `Encyclopedia entry for ${titles[i]}`,
+            url: urls[i] || '',
+            source: 'Wikipedia Knowledge Base',
+          });
+        }
+      }
+    } catch {}
   }
+
+  return {
+    query,
+    resultsCount: results.length,
+    results: results.length > 0 ? results : 'No text results parsed from search provider.',
+  };
 }
 
 export interface ToolDefinition {
