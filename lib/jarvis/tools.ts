@@ -27,6 +27,8 @@ import {
 } from './rag';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const execAsync = promisify(exec);
 
@@ -358,6 +360,150 @@ async function spawnSubagentTask(title: string, instructions: string, priority: 
   };
 }
 
+async function handleReadWorkspaceFile(args: { path: string; startLine?: number; endLine?: number; allowEnv?: boolean }) {
+  const rootDir = process.cwd();
+  const relPath = args.path;
+  if (!relPath) throw new Error('Parameter "path" is required');
+  const resolved = path.resolve(rootDir, relPath);
+  if (!resolved.startsWith(rootDir)) throw new Error('Security Violation: Path traversal outside project root blocked.');
+  if (relPath.includes('.env') && !args.allowEnv) {
+    throw new Error('Security Violation: Access to secrets blocked by Guardian Protocol.');
+  }
+  if (!fs.existsSync(resolved)) throw new Error(`File does not exist: ${relPath}`);
+  const stat = fs.statSync(resolved);
+  if (stat.isDirectory()) throw new Error(`Path is a directory: ${relPath}. Use find_files or mcp_filesystem instead.`);
+
+  const content = fs.readFileSync(resolved, 'utf-8');
+  const lines = content.split('\n');
+  const totalLines = lines.length;
+
+  const start = Math.max(1, args.startLine || 1);
+  const end = Math.min(totalLines, args.endLine || (args.startLine ? Math.min(totalLines, start + 100) : Math.min(totalLines, 120)));
+
+  const slicedLines = lines.slice(start - 1, end);
+  const formatted = slicedLines.map((line, idx) => `${start + idx}: ${line}`).join('\n');
+
+  return {
+    path: relPath,
+    totalLines,
+    showingLines: `${start} to ${end}`,
+    content: formatted,
+  };
+}
+
+async function handleEditWorkspaceFile(args: { path: string; targetContent?: string; replacementContent: string; createIfMissing?: boolean }) {
+  const rootDir = process.cwd();
+  const relPath = args.path;
+  if (!relPath) throw new Error('Parameter "path" is required');
+  const resolved = path.resolve(rootDir, relPath);
+  if (!resolved.startsWith(rootDir)) throw new Error('Security Violation: Path traversal outside project root blocked.');
+  if (relPath.includes('.env')) {
+    throw new Error('Security Violation: Modifying secrets blocked by Guardian Protocol.');
+  }
+
+  const fileExists = fs.existsSync(resolved);
+  if (!fileExists) {
+    if (args.createIfMissing || !args.targetContent) {
+      fs.mkdirSync(path.dirname(resolved), { recursive: true });
+      fs.writeFileSync(resolved, args.replacementContent, 'utf-8');
+      return {
+        path: relPath,
+        action: 'file_created',
+        bytesWritten: Buffer.byteLength(args.replacementContent),
+      };
+    }
+    throw new Error(`File does not exist: ${relPath}. Set createIfMissing to true to create.`);
+  }
+
+  const currentContent = fs.readFileSync(resolved, 'utf-8');
+  if (args.targetContent) {
+    if (!currentContent.includes(args.targetContent)) {
+      throw new Error(`Target content not found in ${relPath}. Read the file first to get the exact lines to replace.`);
+    }
+    const occurrences = currentContent.split(args.targetContent).length - 1;
+    if (occurrences > 1) {
+      throw new Error(`Target content occurs ${occurrences} times in ${relPath}. Provide more surrounding context to match a unique block.`);
+    }
+    const newContent = currentContent.replace(args.targetContent, args.replacementContent);
+    fs.writeFileSync(resolved, newContent, 'utf-8');
+    return {
+      path: relPath,
+      action: 'content_replaced',
+      success: true,
+      bytesWritten: Buffer.byteLength(newContent),
+    };
+  } else {
+    fs.writeFileSync(resolved, args.replacementContent, 'utf-8');
+    return {
+      path: relPath,
+      action: 'file_overwritten',
+      success: true,
+      bytesWritten: Buffer.byteLength(args.replacementContent),
+    };
+  }
+}
+
+async function handleGrepWorkspace(args: { query: string; path?: string; caseInsensitive?: boolean }) {
+  const rootDir = process.cwd();
+  const relTarget = args.path || '.';
+  const searchPath = path.resolve(rootDir, relTarget);
+  if (!searchPath.startsWith(rootDir)) throw new Error('Security Violation: Path traversal blocked.');
+
+  const caseFlag = args.caseInsensitive ? '-i' : '';
+  const cmd = `grep -rn ${caseFlag} --exclude-dir=".git" --exclude-dir="node_modules" --exclude-dir=".next" --exclude-dir=".gemini" --exclude-dir="dist" --exclude=".env*" ${JSON.stringify(args.query)} ${JSON.stringify(relTarget)}`;
+  try {
+    const { stdout } = await execAsync(cmd, {
+      cwd: rootDir,
+      timeout: 10000,
+      maxBuffer: 512 * 1024,
+    });
+    const lines = (stdout || '').trim().split('\n').filter(Boolean);
+    const capped = lines.slice(0, 30);
+    return {
+      query: args.query,
+      matchesCount: lines.length,
+      matches: capped.map(line => {
+        const parts = line.split(':');
+        return {
+          file: parts[0],
+          line: parts[1],
+          snippet: parts.slice(2).join(':').trim(),
+        };
+      }),
+      truncated: lines.length > 30,
+    };
+  } catch (err: any) {
+    if (err.code === 1) {
+      return { query: args.query, matchesCount: 0, matches: [] };
+    }
+    throw new Error(err.message || 'Grep failed');
+  }
+}
+
+async function handleFindFiles(args: { pattern: string; directory?: string }) {
+  const rootDir = process.cwd();
+  const relDir = args.directory || '.';
+  const searchDir = path.resolve(rootDir, relDir);
+  if (!searchDir.startsWith(rootDir)) throw new Error('Security Violation: Path traversal blocked.');
+
+  const cmd = `find ${JSON.stringify(relDir)} -not -path '*/.*' -not -path '*/node_modules/*' -not -path '*/.next/*' -not -name '.env*' -name ${JSON.stringify(args.pattern)}`;
+  try {
+    const { stdout } = await execAsync(cmd, {
+      cwd: rootDir,
+      timeout: 10000,
+      maxBuffer: 256 * 1024,
+    });
+    const files = (stdout || '').trim().split('\n').filter(Boolean).slice(0, 40);
+    return {
+      pattern: args.pattern,
+      count: files.length,
+      files,
+    };
+  } catch (err: any) {
+    return { pattern: args.pattern, count: 0, files: [], error: err.message };
+  }
+}
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -546,6 +692,94 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
         content: { type: 'string', description: 'File content to write.' },
       },
       required: ['action', 'path'],
+    },
+  },
+  {
+    name: 'read_workspace_file',
+    description: 'View the contents of any workspace file with line numbers (1-indexed). You can specify startLine and endLine to inspect specific code sections. Crucial for empirical code inspection before modifying files.',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description: 'Relative path to the workspace file (e.g. "lib/jarvis/agent.ts", "package.json").',
+        },
+        startLine: {
+          type: 'number',
+          description: 'Optional 1-indexed starting line number.',
+        },
+        endLine: {
+          type: 'number',
+          description: 'Optional 1-indexed ending line number.',
+        },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'edit_workspace_file',
+    description: 'Surgically edit or create a workspace file directly on the VM. Provide targetContent (the exact existing snippet) and replacementContent to make precise atomic replacements. If targetContent is omitted, writes replacementContent directly.',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description: 'Relative path to the target file in the workspace.',
+        },
+        targetContent: {
+          type: 'string',
+          description: 'The exact string snippet in the existing file to replace. Must match existing text uniquely.',
+        },
+        replacementContent: {
+          type: 'string',
+          description: 'The new replacement code or text to substitute in.',
+        },
+        createIfMissing: {
+          type: 'boolean',
+          description: 'Set true if creating a new file from scratch.',
+        },
+      },
+      required: ['path', 'replacementContent'],
+    },
+  },
+  {
+    name: 'grep_workspace',
+    description: 'Search workspace files for a text pattern or regular expression. Returns matching files, line numbers, and exact code snippets (ripgrep / grep speed).',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The text pattern or search term.',
+        },
+        path: {
+          type: 'string',
+          description: 'Optional relative directory or file to restrict search to (default: ".").',
+        },
+        caseInsensitive: {
+          type: 'boolean',
+          description: 'Set true for case-insensitive search.',
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'find_files',
+    description: 'Find files in workspace by filename or extension pattern (e.g. "*.ts", "*worker*", "agent").',
+    parameters: {
+      type: 'object',
+      properties: {
+        pattern: {
+          type: 'string',
+          description: 'Glob or name pattern to search for.',
+        },
+        directory: {
+          type: 'string',
+          description: 'Optional search root directory (default: ".").',
+        },
+      },
+      required: ['pattern'],
     },
   },
   {
@@ -1084,6 +1318,30 @@ export async function executeJarvisTool(
         const { action } = args;
         const res = await executeCloudMCP(action);
         return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'read_workspace_file': {
+        const { path: filePath, startLine, endLine } = args;
+        const res = await handleReadWorkspaceFile({ path: filePath, startLine, endLine });
+        return { success: true, result: res };
+      }
+
+      case 'edit_workspace_file': {
+        const { path: filePath, targetContent, replacementContent, createIfMissing } = args;
+        const res = await handleEditWorkspaceFile({ path: filePath, targetContent, replacementContent, createIfMissing });
+        return { success: true, result: res };
+      }
+
+      case 'grep_workspace': {
+        const { query, path: searchPath, caseInsensitive } = args;
+        const res = await handleGrepWorkspace({ query, path: searchPath, caseInsensitive });
+        return { success: true, result: res };
+      }
+
+      case 'find_files': {
+        const { pattern, directory } = args;
+        const res = await handleFindFiles({ pattern, directory });
+        return { success: true, result: res };
       }
 
       case 'mcp_network': {

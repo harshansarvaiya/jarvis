@@ -447,7 +447,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
               maxOutputTokens: 4096,
               thinkingConfig: {
                 includeThoughts: true,
-                thinkingBudget: 1024,
+                thinkingBudget: 2048,
               },
             },
             signal: AbortSignal.timeout(60000),
@@ -661,8 +661,8 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     let loopCount = 0;
     let functionCalls = candidate?.content?.parts?.filter((p: any) => p.functionCall);
 
-    // Multi-turn ReAct Autonomous Tool Execution Loop (up to 5 iterations)
-    while (functionCalls && functionCalls.length > 0 && loopCount < 5) {
+    // Multi-turn ReAct Autonomous Tool Execution Loop (up to 8 iterations)
+    while (functionCalls && functionCalls.length > 0 && loopCount < 8) {
       loopCount++;
       const toolResponseParts: any[] = [];
 

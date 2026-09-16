@@ -147,11 +147,11 @@ export async function callVertexAIGenerate(options: VertexGenerateOptions): Prom
     ...(options.generationConfig || {}),
   };
 
-  // Ensure Google's native internal thinking layer is active for Gemini 3.8 and Pro (Pillar 1)
-  if (!mergedGenConfig.thinkingConfig && (vertexModel.includes('3.8') || vertexModel.includes('pro'))) {
+  // Ensure Google's native internal thinking layer is active for Gemini 3.8, 3.7, and Pro (Pillar 1)
+  if (!mergedGenConfig.thinkingConfig && (vertexModel.includes('3.8') || vertexModel.includes('3.7') || vertexModel.includes('pro'))) {
     mergedGenConfig.thinkingConfig = {
       includeThoughts: true,
-      thinkingBudget: 1024,
+      thinkingBudget: 2048,
     };
   }
 
