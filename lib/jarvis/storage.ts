@@ -22,6 +22,9 @@ export interface ChatMessageRecord {
   motiveAnalysis?: string;
   internalThoughts?: string;
   telemetry?: any;
+  // Shared Brain Attribution — which agent/channel produced this message
+  source?: 'friday' | 'jarvis' | 'web' | 'system';
+  channel?: 'antigravity' | 'telegram' | 'web-pwa' | 'api';
 }
 
 export interface StorageProvider {
@@ -350,4 +353,62 @@ export async function appendUniversalChatMessages(msgs: ChatMessageRecord[]): Pr
 
 export async function clearUniversalChatHistory(): Promise<void> {
   await getStorage().clearChatHistory();
+}
+
+/**
+ * Source-attributed write — every agent turn is tagged with who produced it.
+ * Use this instead of appendUniversalChatMessage when agent identity matters.
+ */
+export async function appendAgentChatMessage(
+  msg: Omit<ChatMessageRecord, 'source' | 'channel'>,
+  source: ChatMessageRecord['source'],
+  channel: ChatMessageRecord['channel']
+): Promise<void> {
+  await getStorage().appendChatMessage({ ...msg, source, channel });
+}
+
+/**
+ * SHARED BRAIN — Cross-Channel Context Reader
+ *
+ * Returns the last N messages from the universal history that originated from
+ * a *different* agent/channel than the caller, formatted as a compact prompt
+ * block. This is how Friday knows what Jarvis said (and vice versa).
+ *
+ * @param callerSource - 'friday' | 'jarvis' | 'web' — the calling agent's identity
+ * @param limit        - max messages to pull from the other channel (default: 8)
+ */
+export async function getCrossChannelContext(
+  callerSource: ChatMessageRecord['source'],
+  limit = 8
+): Promise<string> {
+  try {
+    const all = await getStorage().getChatHistory(60);
+
+    // Pull turns from other channels — exclude messages produced by the caller
+    const crossTurns = all
+      .filter((m) => m.source && m.source !== callerSource && m.role !== 'system')
+      .slice(-limit);
+
+    if (crossTurns.length === 0) return '';
+
+    const lines = crossTurns.map((m) => {
+      const who = m.source === 'friday'
+        ? '🛡️ Friday (Antigravity)'
+        : m.source === 'jarvis'
+        ? '⚡ Jarvis (Telegram)'
+        : m.source === 'web'
+        ? '🌐 Web PWA'
+        : `[${m.source}]`;
+      const when = m.timestamp
+        ? new Date(m.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+        : '';
+      const roleLabel = m.role === 'user' ? 'Sir' : who;
+      const snippet = m.content.length > 300 ? m.content.slice(0, 300) + '…' : m.content;
+      return `[${when}] ${roleLabel}: ${snippet}`;
+    });
+
+    return `\n[SHARED BRAIN — CROSS-CHANNEL AWARENESS]:\nThe following are recent turns from another active agent channel. Use this to stay in sync with what Sir has been working on elsewhere. Do NOT repeat or summarise these back to Sir unless directly asked:\n${lines.join('\n')}\n`;
+  } catch {
+    return '';
+  }
 }

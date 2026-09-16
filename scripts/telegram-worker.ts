@@ -12,6 +12,7 @@ import { runJarvisAgent } from '../lib/jarvis/agent';
 import {
   getUniversalChatHistory,
   appendUniversalChatMessages,
+  appendAgentChatMessage,
   ChatMessageRecord,
 } from '../lib/jarvis/storage';
 
@@ -156,6 +157,8 @@ async function handleIncomingMessage(update: TelegramUpdate) {
       content: cleanUserText,
       image: base64Image,
       timestamp: new Date().toISOString(),
+      source: 'jarvis',
+      channel: 'telegram',
     };
     contextMessages.push({
       id: userMsgRecord.id,
@@ -181,9 +184,16 @@ async function handleIncomingMessage(update: TelegramUpdate) {
       internalThoughts: result.internalThoughts,
       telemetry: result.telemetry,
       timestamp: new Date().toISOString(),
+      source: 'jarvis',
+      channel: 'telegram',
     };
 
-    await appendUniversalChatMessages([userMsgRecord, assistantMsgRecord]);
+    // Write both records to Shared Brain with full attribution
+    // (Friday can read these via getCrossChannelContext('friday'))
+    await Promise.all([
+      appendAgentChatMessage(userMsgRecord, 'jarvis', 'telegram'),
+      appendAgentChatMessage(assistantMsgRecord, 'jarvis', 'telegram'),
+    ]);
 
     // 4. Format Output for Telegram
     let responseText = result.reply;

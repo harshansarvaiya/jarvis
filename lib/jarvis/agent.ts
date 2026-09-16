@@ -14,7 +14,7 @@ import {
   detectActivePersona,
   ActivePersona,
 } from './orchestrator';
-import { appendUniversalChatMessage } from './storage';
+import { appendUniversalChatMessage, appendAgentChatMessage, getCrossChannelContext } from './storage';
 
 export interface ChatMessage {
   id?: string;
@@ -159,7 +159,9 @@ export async function runJarvisAgent(
     };
   }
 
-  // 2. 4-Tier Cognitive Recall (Working, Episodic, Semantic, Procedural) & Hybrid RAG Retrieval
+  // 2. Persona Detection & 4-Tier Cognitive Recall
+  const { persona, explicit: personaExplicit } = detectActivePersona(lastUserMessage.content);
+
   let recalledEpisodes: any[] = [];
   let cognitiveContextPrompt = '';
   let retrievedKnowledgeContext = '';
@@ -167,9 +169,10 @@ export async function runJarvisAgent(
     const isSimpleMessage = lastUserMessage.content.length < 40 && !/remember|recall|history|what did|search|find|how|rule|recipe|run|test|build/i.test(lastUserMessage.content);
     if (!isSimpleMessage) {
       const { recallCognitiveContext } = await import('./recall');
-      const [cognitiveRecall, knowledgeChunks] = await Promise.all([
+      const [cognitiveRecall, knowledgeChunks, crossChannel] = await Promise.all([
         recallCognitiveContext(lastUserMessage.content, { excludeIds: [lastUserMessage.id || ''] }),
         queryKnowledgeBase(lastUserMessage.content, { topK: 3, minScore: 0.35, apiKey }),
+        getCrossChannelContext(persona === 'FRIDAY' ? 'friday' : 'jarvis', 8),
       ]);
       recalledEpisodes = cognitiveRecall.episodicEpisodes;
       if (cognitiveRecall.distilledPromptBlock) {
@@ -177,6 +180,9 @@ export async function runJarvisAgent(
       }
       if (knowledgeChunks && knowledgeChunks.length > 0) {
         retrievedKnowledgeContext = formatKnowledgePromptContext(knowledgeChunks);
+      }
+      if (crossChannel) {
+        retrievedKnowledgeContext += crossChannel;
       }
     }
   } catch (recallErr) {
@@ -188,7 +194,7 @@ export async function runJarvisAgent(
   const activeTasks = allTasks.filter((t) => t.status !== 'COMPLETED').slice(0, 8);
   const completedTasks = allTasks.filter((t) => t.status === 'COMPLETED').slice(0, 5);
   const motivePass = deconstructOperationalMotive(lastUserMessage.content);
-  const { persona, explicit: personaExplicit } = detectActivePersona(lastUserMessage.content);
+
 
   // 3.5. Match Relevant Modular Skills (Hermes agentskills.io Engine)
   let skillsContext = '';
@@ -958,19 +964,23 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         },
       });
 
-      await appendUniversalChatMessage({
-        id: `msg-${Date.now()}-a`,
-        role: 'assistant',
-        content: finalReply,
-        vocalSummary: extractCinematicVocalSummary(finalReply),
-        toolCalls: toolCallsExecuted,
-        timestamp: new Date().toISOString(),
-        telemetry: {
-          engineUsed: isVertexEngine ? `Vertex AI ${selectedVertexModel}` : selectedModel,
-          model: isVertexEngine ? selectedVertexModel : selectedModel,
-          persona,
+      await appendAgentChatMessage(
+        {
+          id: `msg-${Date.now()}-a`,
+          role: 'assistant',
+          content: finalReply,
+          vocalSummary: extractCinematicVocalSummary(finalReply),
+          toolCalls: toolCallsExecuted,
+          timestamp: new Date().toISOString(),
+          telemetry: {
+            engineUsed: isVertexEngine ? `Vertex AI ${selectedVertexModel}` : selectedModel,
+            model: isVertexEngine ? selectedVertexModel : selectedModel,
+            persona,
+          },
         },
-      }).catch(() => {});
+        persona === 'FRIDAY' ? 'friday' : 'web',
+        persona === 'FRIDAY' ? 'antigravity' : 'web-pwa'
+      ).catch(() => {});
     } catch (trajErr) {
       console.warn('[Agent] Trajectory recording warning:', trajErr);
     }
