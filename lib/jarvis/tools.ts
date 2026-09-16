@@ -328,6 +328,115 @@ async function runDeepWebScraper(url: string): Promise<any> {
   }
 }
 
+async function runAdvancedBrowserAction(
+  url: string,
+  options: {
+    extractType?: 'all' | 'tables' | 'forms' | 'links' | 'metadata' | 'text';
+    queryFilter?: string;
+    maxContentLength?: number;
+  } = {}
+): Promise<any> {
+  try {
+    const targetUrl = url.startsWith('http') ? url : `https://${url}`;
+    const res = await fetch(targetUrl, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) {
+      return { url: targetUrl, error: `HTTP ${res.status}: ${res.statusText}` };
+    }
+
+    const html = await res.text();
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : targetUrl;
+
+    // Extract forms
+    const forms: any[] = [];
+    const formRegex = /<form\b[^>]*>([\s\S]*?)<\/form>/gi;
+    let formMatch;
+    while ((formMatch = formRegex.exec(html)) !== null && forms.length < 5) {
+      const formHtml = formMatch[1];
+      const inputs = Array.from(formHtml.matchAll(/<input\b[^>]*name=["']([^"']+)["'][^>]*>/gi)).map((m) => m[1]);
+      const actionMatch = formMatch[0].match(/action=["']([^"']+)["']/i);
+      forms.push({
+        action: actionMatch ? actionMatch[1] : undefined,
+        inputs,
+      });
+    }
+
+    // Extract tables
+    const tables: string[] = [];
+    const tableRegex = /<table\b[^>]*>([\s\S]*?)<\/table>/gi;
+    let tableMatch;
+    while ((tableMatch = tableRegex.exec(html)) !== null && tables.length < 5) {
+      const cleanTable = tableMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (cleanTable.length > 20) tables.push(cleanTable.slice(0, 800));
+    }
+
+    // Extract links
+    const links: Array<{ text: string; href: string }> = [];
+    const linkRegex = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    let linkMatch;
+    while ((linkMatch = linkRegex.exec(html)) !== null && links.length < 15) {
+      const href = linkMatch[1];
+      const text = linkMatch[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (text.length > 2 && !href.startsWith('#') && !href.startsWith('javascript:')) {
+        links.push({ text: text.slice(0, 50), href });
+      }
+    }
+
+    // Clean body text
+    const cleanText = html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+      .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, ' ')
+      .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, ' ')
+      .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const maxLen = options.maxContentLength || 4000;
+    let contentSnippet = cleanText.slice(0, maxLen);
+
+    if (options.queryFilter) {
+      const q = options.queryFilter.toLowerCase();
+      const sentences = cleanText.split(/\. |\n+/);
+      const filtered = sentences.filter((s) => s.toLowerCase().includes(q));
+      if (filtered.length > 0) {
+        contentSnippet = filtered.join('. ').slice(0, maxLen);
+      }
+    }
+
+    return {
+      url: targetUrl,
+      title,
+      status: res.status,
+      contentSnippet,
+      extractedFormsCount: forms.length,
+      forms: forms.length > 0 ? forms : undefined,
+      extractedTablesCount: tables.length,
+      tables: tables.length > 0 ? tables : undefined,
+      extractedLinksCount: links.length,
+      links: links.length > 0 ? links : undefined,
+      totalLength: cleanText.length,
+      source: 'Autonomous Browser Engine (Project Hands)',
+    };
+  } catch (err: any) {
+    return { url, error: err.message || 'Browser navigation request timed out' };
+  }
+}
+
 async function spawnSubagentTask(title: string, instructions: string, priority: string = 'HIGH'): Promise<any> {
   const taskId = `subagent-${Date.now()}`;
   const task = addTask({
@@ -933,6 +1042,33 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'browser_navigate_and_act',
+    description: 'Autonomous browser automation tool (Project Hands). Navigates to any web URL, emulates real browser headers, extracts interactive forms, tables, links, metadata, and filters content by query.',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: 'Target website URL to navigate to.',
+        },
+        extractType: {
+          type: 'string',
+          enum: ['all', 'tables', 'forms', 'links', 'metadata', 'text'],
+          description: 'Type of content to prioritize extracting.',
+        },
+        queryFilter: {
+          type: 'string',
+          description: 'Optional semantic keyword or query to filter page content around.',
+        },
+        maxContentLength: {
+          type: 'number',
+          description: 'Max character length of the extracted content snippet (default: 4000).',
+        },
+      },
+      required: ['url'],
+    },
+  },
+  {
     name: 'spawn_subagent_task',
     description: 'Spawn an autonomous background subagent worker to execute multi-step research, web scraping, or system audits on the 24/7 cloud runner. Sends a lock-screen Web Push notification to Sir when finished.',
     parameters: {
@@ -1472,6 +1608,16 @@ export async function executeJarvisTool(
       case 'read_web_page': {
         const { url } = args;
         const res = await runDeepWebScraper(url);
+        return { success: !res.error, result: res, error: res.error };
+      }
+
+      case 'browser_navigate_and_act': {
+        const { url, extractType, queryFilter, maxContentLength } = args;
+        const res = await runAdvancedBrowserAction(url, {
+          extractType,
+          queryFilter,
+          maxContentLength,
+        });
         return { success: !res.error, result: res, error: res.error };
       }
 
