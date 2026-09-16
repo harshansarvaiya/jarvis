@@ -120,13 +120,14 @@
     "extractedFeatures": [
       "Exa Neural Search MCP (`mcp:exa`)",
       "Vercel Deployment Management MCP (`mcp:vercel`)",
-      "Anthropic Knowledge Graph Memory MCP (`mcp:memory`)"
+      "Anthropic Knowledge Graph Memory MCP (`mcp:memory`)",
+      "Google Calendar & Workspace MCP (`mcp:calendar`)",
+      "Headless Playwright Visual Actuation MCP (`mcp:playwright`)"
     ],
     "futureRoadmap": [
-      "Google Calendar / Workspace MCP Integration",
       "Sentry Telemetry & Exception Auto-Healing MCP",
-      "Playwright / Stagehand Vision Actuation MCP",
-      "Cloudflare Workers & Edge DNS MCP"
+      "Cloudflare Workers & Edge DNS MCP",
+      "Slack / Discord Interactive Notification Bridge MCP"
     ],
     "addedAt": "2026-09-16T13:27:00Z"
   }

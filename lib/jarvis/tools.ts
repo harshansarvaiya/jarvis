@@ -21,6 +21,8 @@ import {
   executeExaMCP,
   executeVercelMCP,
   executeMemoryMCP,
+  executeGoogleCalendarMCP,
+  executePlaywrightMCP,
 } from './mcp';
 import {
   queryKnowledgeBase,
@@ -426,6 +428,25 @@ async function runAdvancedBrowserAction(
     const maxLen = options.maxContentLength || 4000;
     let contentSnippet = cleanText.slice(0, maxLen);
 
+    // If client-side JavaScript SPA is detected (empty body or < 100 chars), cascade to Playwright Chromium
+    if (cleanText.length < 120 && (html.includes('id="root"') || html.includes('id="app"') || html.includes('__next') || html.includes('noscript'))) {
+      try {
+        const pwRes = await executePlaywrightMCP('navigate_and_extract', { url: targetUrl });
+        if (pwRes.success && pwRes.output?.text && pwRes.output.text.length > cleanText.length) {
+          return {
+            url: targetUrl,
+            title: pwRes.output.title || title,
+            status: 200,
+            contentSnippet: pwRes.output.text.slice(0, maxLen),
+            extractedLinksCount: (pwRes.output.links || []).length,
+            links: pwRes.output.links,
+            totalLength: pwRes.output.totalLength,
+            source: 'Headless Playwright Chromium Engine (Project Hands)',
+          };
+        }
+      } catch {}
+    }
+
     if (options.queryFilter) {
       const q = options.queryFilter.toLowerCase();
       const sentences = cleanText.split(/\. |\n+/);
@@ -450,6 +471,23 @@ async function runAdvancedBrowserAction(
       source: 'Autonomous Browser Engine (Project Hands)',
     };
   } catch (err: any) {
+    // If standard fetch fails (e.g. SSL or blocked UA), attempt Playwright Chromium fallback
+    try {
+      const pwFallback = await executePlaywrightMCP('navigate_and_extract', { url });
+      if (pwFallback.success && pwFallback.output) {
+        return {
+          url,
+          title: pwFallback.output.title,
+          status: 200,
+          contentSnippet: (pwFallback.output.text || '').slice(0, options.maxContentLength || 4000),
+          extractedLinksCount: (pwFallback.output.links || []).length,
+          links: pwFallback.output.links,
+          totalLength: pwFallback.output.totalLength,
+          source: 'Headless Playwright Chromium Fallback (Project Hands)',
+        };
+      }
+    } catch {}
+
     return { url, error: err.message || 'Browser navigation request timed out' };
   }
 }
@@ -1331,6 +1369,54 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['action'],
     },
   },
+  {
+    name: 'mcp_calendar',
+    description: 'Google Calendar MCP Engine — Inspect Sir’s real-time schedule, meetings, upcoming events, and find free availability slots. Actions: list_events, create_event, get_event, delete_event, get_free_busy.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['list_events', 'create_event', 'get_event', 'delete_event', 'get_free_busy'],
+          description: 'list_events: fetch upcoming schedule | create_event: schedule a meeting | get_event: single event details | delete_event: cancel an event | get_free_busy: check free slots',
+        },
+        timeMin: { type: 'string', description: 'Start time filter in ISO format (e.g. 2026-09-16T00:00:00Z). Defaults to now.' },
+        timeMax: { type: 'string', description: 'End time filter in ISO format (e.g. 2026-09-16T23:59:59Z).' },
+        maxResults: { type: 'number', description: 'Max events to return (default: 10).' },
+        summary: { type: 'string', description: 'Title of the event to create.' },
+        description: { type: 'string', description: 'Description/notes for the event.' },
+        start: { type: 'string', description: 'Start time ISO string for create_event.' },
+        end: { type: 'string', description: 'End time ISO string for create_event.' },
+        location: { type: 'string', description: 'Physical or virtual location / meeting link.' },
+        attendees: { type: 'array', items: { type: 'string' }, description: 'List of attendee email addresses.' },
+        eventId: { type: 'string', description: 'Event ID for get_event or delete_event.' },
+        calendarId: { type: 'string', description: 'Target calendar ID (defaults to "primary").' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'mcp_playwright',
+    description: 'Playwright Visual Web Actuation MCP ("Project Hands") — Headless Chromium engine running on the Cloud Runner VM for client-side JavaScript rendering, capturing viewport screenshots, clicking interactive buttons, filling forms, and evaluating DOM scripts.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['navigate_and_extract', 'screenshot', 'click_and_act', 'evaluate_js'],
+          description: 'navigate_and_extract: load dynamic JS page & extract rendered text + links | screenshot: capture visual page render | click_and_act: click selector / fill inputs | evaluate_js: run custom page JS',
+        },
+        url: { type: 'string', description: 'Target webpage URL.' },
+        selector: { type: 'string', description: 'CSS selector to click or fill (for click_and_act).' },
+        fillText: { type: 'string', description: 'Text to type into the input element (for click_and_act).' },
+        clickAfterFill: { type: 'boolean', description: 'Whether to click the selector after filling text (default: true).' },
+        waitForSelector: { type: 'string', description: 'CSS selector to wait for before extracting text.' },
+        fullPage: { type: 'boolean', description: 'Capture full scrollable page for screenshot (default: false).' },
+        script: { type: 'string', description: 'JavaScript expression string to execute inside browser (for evaluate_js).' },
+      },
+      required: ['action', 'url'],
+    },
+  },
 ];
 
 export async function executeJarvisTool(
@@ -1887,6 +1973,18 @@ export async function executeJarvisTool(
       case 'mcp_memory': {
         const { action, ...params } = args;
         const res = await executeMemoryMCP(action, params);
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'mcp_calendar': {
+        const { action, ...params } = args;
+        const res = await executeGoogleCalendarMCP(action, params);
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'mcp_playwright': {
+        const { action, ...params } = args;
+        const res = await executePlaywrightMCP(action, params);
         return { success: res.success, result: res.output, error: res.error };
       }
 

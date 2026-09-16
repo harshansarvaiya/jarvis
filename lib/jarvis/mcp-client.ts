@@ -15,10 +15,22 @@ import {
   executeExaMCP,
   executeVercelMCP,
   executeMemoryMCP,
+  executeGoogleCalendarMCP,
+  executePlaywrightMCP,
   MCPExecutionResult,
 } from './mcp';
 
-export type MCPServerId = 'github' | 'filesystem' | 'cloud' | 'network' | 'database' | 'exa' | 'vercel' | 'memory';
+export type MCPServerId =
+  | 'github'
+  | 'filesystem'
+  | 'cloud'
+  | 'network'
+  | 'database'
+  | 'exa'
+  | 'vercel'
+  | 'memory'
+  | 'calendar'
+  | 'playwright';
 
 export interface MCPClientRequest {
   server: MCPServerId;
@@ -67,6 +79,12 @@ export class JarvisMCPClient {
 
       case 'memory':
         return await executeMemoryMCP(action as any, params);
+
+      case 'calendar':
+        return await executeGoogleCalendarMCP(action as any, params);
+
+      case 'playwright':
+        return await executePlaywrightMCP(action as any, params);
 
       default:
         return {

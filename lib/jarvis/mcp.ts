@@ -1236,3 +1236,412 @@ export async function executeMemoryMCP(
     };
   }
 }
+
+// ============================================================================
+// 9. GOOGLE CALENDAR & WORKSPACE MCP ENGINE
+// Synchronizes Sir's live schedule, meetings, reminders, and availability.
+// Authenticates via Google Auth Library / Service Account / Access Token.
+// ============================================================================
+
+async function getGoogleCalendarAuthHeader(): Promise<string | null> {
+  const explicitToken = process.env.GOOGLE_CALENDAR_ACCESS_TOKEN;
+  if (explicitToken) return `Bearer ${explicitToken}`;
+
+  const credsPath =
+    process.env.GOOGLE_APPLICATION_CREDENTIALS ||
+    '/home/harshans279/.gcp/jarvis-vertex.json';
+
+  if (fs.existsSync(credsPath)) {
+    try {
+      const { GoogleAuth } = await import('google-auth-library');
+      const auth = new GoogleAuth({
+        keyFilename: credsPath,
+        scopes: ['https://www.googleapis.com/auth/calendar'],
+      });
+      const client = await auth.getClient();
+      const token = await client.getAccessToken();
+      if (token?.token) return `Bearer ${token.token}`;
+    } catch {}
+  }
+  return null;
+}
+
+export async function executeGoogleCalendarMCP(
+  action:
+    | 'list_events'
+    | 'create_event'
+    | 'get_event'
+    | 'delete_event'
+    | 'get_free_busy',
+  params: Record<string, any> = {}
+): Promise<MCPExecutionResult> {
+  const startTime = Date.now();
+  const calendarId = params.calendarId || 'primary';
+  const baseUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}`;
+
+  try {
+    const authHeader = await getGoogleCalendarAuthHeader();
+    if (!authHeader) {
+      return {
+        success: false,
+        server: 'mcp:calendar',
+        action,
+        output: null,
+        error: 'Google Calendar credentials not found. Provide GOOGLE_CALENDAR_ACCESS_TOKEN or configure Google Cloud Service Account.',
+        latencyMs: Date.now() - startTime,
+      };
+    }
+
+    const headers: Record<string, string> = {
+      Authorization: authHeader,
+      'Content-Type': 'application/json',
+    };
+
+    switch (action) {
+      case 'list_events': {
+        const timeMin = params.timeMin || new Date().toISOString();
+        const timeMax = params.timeMax;
+        const maxResults = params.maxResults || 10;
+        let url = `${baseUrl}/events?singleEvents=true&orderBy=startTime&timeMin=${encodeURIComponent(timeMin)}&maxResults=${maxResults}`;
+        if (timeMax) url += `&timeMax=${encodeURIComponent(timeMax)}`;
+
+        const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Google Calendar list_events failed: ${res.status}`);
+
+        const events = (data.items || []).map((e: any) => ({
+          id: e.id,
+          summary: e.summary || '(No title)',
+          description: e.description || '',
+          start: e.start?.dateTime || e.start?.date,
+          end: e.end?.dateTime || e.end?.date,
+          location: e.location || '',
+          status: e.status,
+          htmlLink: e.htmlLink,
+          attendees: (e.attendees || []).map((a: any) => a.email),
+        }));
+
+        return {
+          success: true,
+          server: 'mcp:calendar',
+          action,
+          output: { calendarId, count: events.length, events },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'create_event': {
+        const { summary, start, end, description, location, attendees } = params;
+        if (!summary || !start || !end) throw new Error('Parameters "summary", "start" (ISO), and "end" (ISO) are required');
+
+        const body: Record<string, any> = {
+          summary,
+          description: description || 'Scheduled by J.A.R.V.I.S. Core.',
+          start: { dateTime: new Date(start).toISOString() },
+          end: { dateTime: new Date(end).toISOString() },
+        };
+        if (location) body.location = location;
+        if (Array.isArray(attendees)) {
+          body.attendees = attendees.map((email: string) => ({ email }));
+        }
+
+        const res = await fetch(`${baseUrl}/events`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(8000),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Google Calendar create_event failed: ${res.status}`);
+
+        return {
+          success: true,
+          server: 'mcp:calendar',
+          action,
+          output: {
+            id: data.id,
+            summary: data.summary,
+            start: data.start?.dateTime,
+            end: data.end?.dateTime,
+            htmlLink: data.htmlLink,
+            status: data.status,
+          },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'get_event': {
+        const { eventId } = params;
+        if (!eventId) throw new Error('Parameter "eventId" is required');
+
+        const res = await fetch(`${baseUrl}/events/${encodeURIComponent(eventId)}`, {
+          headers,
+          signal: AbortSignal.timeout(8000),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Google Calendar get_event failed: ${res.status}`);
+
+        return {
+          success: true,
+          server: 'mcp:calendar',
+          action,
+          output: {
+            id: data.id,
+            summary: data.summary,
+            description: data.description,
+            start: data.start?.dateTime || data.start?.date,
+            end: data.end?.dateTime || data.end?.date,
+            location: data.location,
+            status: data.status,
+            htmlLink: data.htmlLink,
+          },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'delete_event': {
+        const { eventId } = params;
+        if (!eventId) throw new Error('Parameter "eventId" is required');
+
+        const res = await fetch(`${baseUrl}/events/${encodeURIComponent(eventId)}`, {
+          method: 'DELETE',
+          headers,
+          signal: AbortSignal.timeout(8000),
+        });
+
+        if (!res.ok && res.status !== 204) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error?.message || `Failed to delete event: ${res.status}`);
+        }
+
+        return {
+          success: true,
+          server: 'mcp:calendar',
+          action,
+          output: { eventId, status: 'DELETED' },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'get_free_busy': {
+        const timeMin = params.timeMin || new Date().toISOString();
+        const timeMax = params.timeMax || new Date(Date.now() + 86400000).toISOString();
+        const res = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            timeMin: new Date(timeMin).toISOString(),
+            timeMax: new Date(timeMax).toISOString(),
+            items: [{ id: calendarId }],
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Google Calendar freeBusy query failed: ${res.status}`);
+
+        const busySlots = data.calendars?.[calendarId]?.busy || [];
+        return {
+          success: true,
+          server: 'mcp:calendar',
+          action,
+          output: { timeMin, timeMax, busySlots, busyCount: busySlots.length },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      default:
+        throw new Error(`Unsupported Calendar action: ${action}`);
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      server: 'mcp:calendar',
+      action,
+      output: null,
+      error: error.message || 'Google Calendar MCP execution failure',
+      latencyMs: Date.now() - startTime,
+    };
+  }
+}
+
+// ============================================================================
+// 10. PLAYWRIGHT VISUAL WEB ACTUATION MCP ENGINE ("Project Hands")
+// Headless Chromium engine running on Linux VM for JavaScript rendering,
+// interactive clicking, form filling, and DOM evaluation.
+// ============================================================================
+
+export async function executePlaywrightMCP(
+  action:
+    | 'navigate_and_extract'
+    | 'screenshot'
+    | 'click_and_act'
+    | 'evaluate_js',
+  params: Record<string, any> = {}
+): Promise<MCPExecutionResult> {
+  const startTime = Date.now();
+  const { url } = params;
+
+  try {
+    let chromium: any;
+    try {
+      const pw = await import('playwright-chromium');
+      chromium = pw.chromium;
+    } catch {
+      throw new Error('Playwright Chromium is not available on this environment.');
+    }
+
+    const browser = await chromium.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--single-process',
+        '--no-zygote',
+      ],
+    });
+
+    try {
+      const context = await browser.newContext({
+        userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 JARVIS-Agent',
+        viewport: { width: 1280, height: 800 },
+      });
+
+      const page = await context.newPage();
+
+      switch (action) {
+        case 'navigate_and_extract': {
+          if (!url) throw new Error('Parameter "url" is required');
+          const waitUntil = params.waitUntil || 'domcontentloaded';
+          await page.goto(url, { waitUntil, timeout: 15000 });
+
+          // Wait for JS hydration if requested
+          if (params.waitForSelector) {
+            await page.waitForSelector(params.waitForSelector, { timeout: 5000 }).catch(() => {});
+          }
+
+          const pageTitle = await page.title();
+          const pageUrl = page.url();
+
+          const extracted = await page.evaluate(() => {
+            const body = document.body;
+            // Strip scripts and styles
+            const clone = body.cloneNode(true) as HTMLElement;
+            clone.querySelectorAll('script, style, noscript, svg, iframe').forEach((el) => el.remove());
+            const text = clone.innerText || '';
+            const links = Array.from(clone.querySelectorAll('a[href]')).slice(0, 20).map((a) => ({
+              text: (a as HTMLElement).innerText.trim().slice(0, 60),
+              href: (a as HTMLAnchorElement).href,
+            })).filter((l) => l.text);
+
+            return {
+              text: text.slice(0, 4000),
+              textLength: text.length,
+              links,
+            };
+          });
+
+          return {
+            success: true,
+            server: 'mcp:playwright',
+            action,
+            output: {
+              url: pageUrl,
+              title: pageTitle,
+              text: extracted.text,
+              totalLength: extracted.textLength,
+              links: extracted.links,
+            },
+            latencyMs: Date.now() - startTime,
+          };
+        }
+
+        case 'screenshot': {
+          if (!url) throw new Error('Parameter "url" is required');
+          await page.goto(url, { waitUntil: 'networkidle', timeout: 15000 }).catch(() => page.goto(url, { waitUntil: 'domcontentloaded' }));
+          const screenshotBuffer = await page.screenshot({ fullPage: Boolean(params.fullPage) });
+          const base64 = screenshotBuffer.toString('base64');
+
+          return {
+            success: true,
+            server: 'mcp:playwright',
+            action,
+            output: {
+              url,
+              title: await page.title(),
+              imageType: 'image/png',
+              base64Data: `data:image/png;base64,${base64.slice(0, 200)}... (truncated ${Math.round(base64.length / 1024)} KB)`,
+              sizeBytes: screenshotBuffer.byteLength,
+            },
+            latencyMs: Date.now() - startTime,
+          };
+        }
+
+        case 'click_and_act': {
+          if (!url) throw new Error('Parameter "url" is required');
+          const { selector, fillText, clickAfterFill = true } = params;
+          if (!selector) throw new Error('Parameter "selector" is required');
+
+          await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+          await page.waitForSelector(selector, { timeout: 6000 });
+
+          if (fillText !== undefined) {
+            await page.fill(selector, fillText);
+          }
+
+          if (clickAfterFill || !fillText) {
+            await page.click(selector);
+            await page.waitForLoadState('domcontentloaded').catch(() => {});
+          }
+
+          return {
+            success: true,
+            server: 'mcp:playwright',
+            action,
+            output: {
+              url: page.url(),
+              interactedSelector: selector,
+              currentTitle: await page.title(),
+              status: 'INTERACTION_SUCCESSFUL',
+            },
+            latencyMs: Date.now() - startTime,
+          };
+        }
+
+        case 'evaluate_js': {
+          if (!url) throw new Error('Parameter "url" is required');
+          const { script } = params;
+          if (!script) throw new Error('Parameter "script" is required');
+
+          await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+          const result = await page.evaluate(script);
+
+          return {
+            success: true,
+            server: 'mcp:playwright',
+            action,
+            output: { url, evalResult: result },
+            latencyMs: Date.now() - startTime,
+          };
+        }
+
+        default:
+          throw new Error(`Unsupported Playwright action: ${action}`);
+      }
+    } finally {
+      await browser.close().catch(() => {});
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      server: 'mcp:playwright',
+      action,
+      output: null,
+      error: error.message || 'Playwright MCP execution failure',
+      latencyMs: Date.now() - startTime,
+    };
+  }
+}
