@@ -102,11 +102,58 @@ async function handleIncomingMessage(update: TelegramUpdate) {
       image: h.image,
     }));
 
+    // Parse model/engine command override if supplied (e.g. /groq, /nim, /openrouter, /pro, /model <name>)
+    let requestedModel = 'gemini-3.7-flash';
+    let requestedMode: any = 'auto';
+    let cleanUserText = userText.trim();
+
+    if (cleanUserText.startsWith('/groq')) {
+      requestedModel = 'openai/gpt-oss-120b';
+      requestedMode = 'groq';
+      cleanUserText = cleanUserText.replace(/^\/groq\s*/i, '').trim();
+    } else if (cleanUserText.startsWith('/nim')) {
+      requestedModel = 'meta/llama-3.2-90b-vision-instruct';
+      requestedMode = 'nvidia';
+      cleanUserText = cleanUserText.replace(/^\/nim\s*/i, '').trim();
+    } else if (cleanUserText.startsWith('/openrouter')) {
+      requestedModel = 'nvidia/nemotron-3-super-120b-a12b:free';
+      requestedMode = 'openrouter';
+      cleanUserText = cleanUserText.replace(/^\/openrouter\s*/i, '').trim();
+    } else if (cleanUserText.startsWith('/pro')) {
+      requestedModel = 'gemini-2.5-pro';
+      requestedMode = 'auto';
+      cleanUserText = cleanUserText.replace(/^\/pro\s*/i, '').trim();
+    } else if (cleanUserText.startsWith('/gemini') || cleanUserText.startsWith('/flash')) {
+      requestedModel = 'gemini-3.7-flash';
+      requestedMode = 'auto';
+      cleanUserText = cleanUserText.replace(/^\/(gemini|flash)\s*/i, '').trim();
+    } else if (cleanUserText.startsWith('/friday')) {
+      cleanUserText = cleanUserText.replace(/^\/friday\s*/i, '').trim();
+      cleanUserText = `Friday, ${cleanUserText}`;
+      requestedModel = 'gemini-3.7-flash';
+      requestedMode = 'auto';
+    } else if (cleanUserText.startsWith('/jarvis')) {
+      cleanUserText = cleanUserText.replace(/^\/jarvis\s*/i, '').trim();
+      cleanUserText = `Jarvis, ${cleanUserText}`;
+      requestedModel = 'gemini-3.7-flash';
+      requestedMode = 'auto';
+    } else if (cleanUserText.startsWith('/model ')) {
+      const match = cleanUserText.match(/^\/model\s+([^\s]+)\s*(.*)$/i);
+      if (match) {
+        requestedModel = match[1];
+        cleanUserText = match[2].trim();
+      }
+    }
+
+    if (!cleanUserText && userText) {
+      cleanUserText = userText;
+    }
+
     // Append Current Message
     const userMsgRecord: ChatMessageRecord = {
       id: `msg-${Date.now()}-u`,
       role: 'user',
-      content: userText,
+      content: cleanUserText,
       image: base64Image,
       timestamp: new Date().toISOString(),
     };
@@ -117,10 +164,10 @@ async function handleIncomingMessage(update: TelegramUpdate) {
       image: base64Image,
     });
 
-    // 2. Invoke J.A.R.V.I.S. Agent (Vertex AI Gemini 3.7 Flash for fast, accurate response)
+    // 2. Invoke J.A.R.V.I.S. Agent
     const result = await runJarvisAgent(contextMessages, {
-      model: 'gemini-3.7-flash',
-      orchestrationMode: 'auto',
+      model: requestedModel,
+      orchestrationMode: requestedMode,
     });
 
     // 3. Save Both Records to Universal Storage (Syncs to Web PWA in Real-Time)

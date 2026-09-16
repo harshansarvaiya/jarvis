@@ -37,7 +37,7 @@ export interface JarvisAgentOptions {
   githubToken?: string;
   nvidiaApiKey?: string;
   openrouterApiKey?: string;
-  provider?: 'google' | 'groq' | 'github-models' | 'nvidia' | 'openrouter' | 'auto';
+  provider?: 'google' | 'groq' | 'github-models' | 'openai' | 'nvidia' | 'openrouter' | 'auto';
   orchestrationMode?: 'auto' | 'groq' | 'gemini' | 'nvidia' | 'openrouter' | 'manual';
 }
 
@@ -245,7 +245,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     (orchestrationMode === 'groq' ||
       requestedModel.startsWith('openai/') ||
       requestedModel.startsWith('groq/') ||
-      (orchestrationMode === 'auto' && archetype === 'REFLEX_SPEED' && !hasImage && !isVertexAIAvailable()));
+      (orchestrationMode === 'auto' && archetype === 'REFLEX_SPEED' && !hasImage));
 
   // =========================================================================
   // ROUTE A: GROQ US LPU REFLEX ENGINE (Sub-Second 100–180ms Dispatch)
@@ -298,24 +298,25 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         }
       }
     } catch (groqErr) {
-      console.warn('[Orchestrator] Groq dispatch failed, seamlessly engaging Gemini failover...', groqErr);
+      console.warn('[Groq Engine] Non-fatal failure, escalating to Tier 2:', groqErr);
     }
   }
 
   // =========================================================================
-  // ROUTE B: GITHUB MODELS (If explicitly requested)
+  // ROUTE B: GITHUB MODELS / OPENAI DIRECT (Sovereign Dual-Key Cloud Pool)
   // =========================================================================
-  if (requestedModel.startsWith('gpt-') || options.provider === 'github-models') {
+  if (requestedModel.startsWith('gpt-') || options.provider === 'github-models' || options.provider === 'openai') {
+    const githubKey = options.githubToken || process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_API_KEY;
     if (githubKey) {
       const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
       const ghResult = await runOpenAICompatibleAgent(messages, {
-        endpoint: 'https://models.inference.ai.azure.com/chat/completions',
+        endpoint: 'https://models.inference.ai.azure.com',
         apiKey: githubKey,
-        model: requestedModel.startsWith('gpt-') ? requestedModel : 'gpt-4o',
+        model: requestedModel || 'gpt-4o',
         systemPrompt: fullSystemPrompt,
       });
 
-      if (!ghResult.error) {
+      if (!ghResult.error && ghResult.reply) {
         const latencyMs = Date.now() - startTime;
         return {
           reply: ghResult.reply,
@@ -323,9 +324,9 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           tacticalActions: generateTacticalNextActions(lastUserMessage.content, ghResult.reply, ghResult.toolCallsExecuted),
           toolCallsExecuted: ghResult.toolCallsExecuted,
           telemetry: {
-            engineUsed: 'GitHub Models (Azure)',
+            engineUsed: `GitHub Models (${requestedModel || 'gpt-4o'})`,
             provider: 'github-models',
-            model: 'gpt-4o',
+            model: requestedModel || 'gpt-4o',
             latencyMs,
             archetype,
             failoverOccurred: false,
@@ -377,7 +378,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
   if (requestedModel.startsWith('openrouter/') || options.provider === 'openrouter' || options.orchestrationMode === 'openrouter') {
     if (openrouterKey) {
       const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
-      const routerModel = requestedModel.replace(/^openrouter\//, '') || 'meta-llama/llama-3.3-70b-instruct:free';
+      const routerModel = requestedModel.replace(/^openrouter\//, '') || 'nvidia/nemotron-3-super-120b-a12b:free';
       const routerResult = await runOpenAICompatibleAgent(messages, {
         endpoint: 'https://openrouter.ai/api/v1/chat/completions',
         apiKey: openrouterKey,
