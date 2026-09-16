@@ -3,7 +3,7 @@
     "name": "rohitg00/agentmemory",
     "url": "https://github.com/rohitg00/agentmemory",
     "domain": "Cognitive Memory & Retrieval",
-    "status": "INTEGRATED",
+    "status": "ACTIVE_EXTRACTION",
     "extractedFeatures": [
       "4-Tier Cognitive Hierarchy (Working, Episodic, Semantic, Procedural)",
       "Okapi BM25 Ranking Engine (k1=1.2, b=0.75)",
@@ -20,14 +20,14 @@
     "name": "ai-boost/awesome-harness-engineering",
     "url": "https://github.com/ai-boost/awesome-harness-engineering",
     "domain": "Harness Engineering & Infrastructure",
-    "status": "INTEGRATED",
+    "status": "ACTIVE_EXTRACTION",
     "extractedFeatures": [
       "Closed-Loop TypeScript Compiler Verification Harness",
       "Token Context Compression & Whitespace Normalizer",
       "Multi-Tier Execution Observability Traces"
     ],
     "futureRoadmap": [
-      "Automated Sandbox Eval Benchmarks",
+      "Automated Agent Eval Sandboxes",
       "Dynamic Context Budget Auto-Tuning"
     ],
     "addedAt": "2026-09-16T11:55:00Z"
@@ -36,7 +36,7 @@
     "name": "browser-use/browser-use",
     "url": "https://github.com/browser-use/browser-use",
     "domain": "Physical Web Actuation (Project Hands)",
-    "status": "PARTIALLY_EXTRACTED",
+    "status": "ACTIVE_EXTRACTION",
     "extractedFeatures": [
       "Autonomous Browser Tool (browser_navigate_and_act)",
       "Structured Form, Table, and Link Parsing",
@@ -52,13 +52,13 @@
     "name": "mukul975/anthropic-cybersecurity-skills",
     "url": "https://github.com/mukul975/anthropic-cybersecurity-skills",
     "domain": "Security & Guardian Armor",
-    "status": "PARTIALLY_EXTRACTED",
+    "status": "ACTIVE_EXTRACTION",
     "extractedFeatures": [
       "MITRE ATLAS AML.T0051/AML.T0054 Adversarial Prompt Injection Defense",
       "NIST CSF 2.0 / Cloud IAM Secret Exposure Sentry"
     ],
     "futureRoadmap": [
-      "DevSecOps SAST Automated Code Vulnerability Scanner",
+      "DevSecOps SAST Automated Code Vulnerability Scanner (OWASP)",
       "Linux VM & Systemd Daemon Hardening Playbook",
       "API Security & JWT Replay Attack Auditor"
     ],
@@ -68,10 +68,10 @@
     "name": "k-dense-ai/scientific-agent-skills",
     "url": "https://github.com/k-dense-ai/scientific-agent-skills",
     "domain": "Domain Skills Library",
-    "status": "PARTIALLY_EXTRACTED",
+    "status": "ACTIVE_EXTRACTION",
     "extractedFeatures": [
-      "Scientific Literature Review & Whitepaper Synthesis Skill",
-      "Distributed Systems & Spring Boot Audit Skill",
+      "Scientific Literature Synthesis Skill",
+      "Enterprise Distributed Systems & Spring Boot Audit Skill",
       "Cloud Runner VM Diagnostics Skill"
     ],
     "futureRoadmap": [
@@ -79,69 +79,5 @@
       "Data Science & Benchmark Visualizer Skill"
     ],
     "addedAt": "2026-09-16T11:55:00Z"
-  },
-  {
-    "name": "diegosouzapw/OmniRoute",
-    "url": "https://github.com/diegosouzapw/OmniRoute",
-    "domain": "Routing & Token Optimization",
-    "status": "EVALUATED_EXTRACTED_CONCEPTS",
-    "extractedFeatures": [
-      "Syntactic Prompt Compression Concept"
-    ],
-    "futureRoadmap": [
-      "Dynamic Multi-Key API Quota Rotator"
-    ],
-    "notes": "Skipped local proxy architecture to maintain zero-latency sub-200ms direct dispatch.",
-    "addedAt": "2026-09-16T11:20:00Z"
-  },
-  {
-    "name": "cjpais/handy",
-    "url": "https://github.com/cjpais/handy",
-    "domain": "Voice & Client Interfaces",
-    "status": "RECOMMENDED_CLIENT_SIDE",
-    "extractedFeatures": [],
-    "futureRoadmap": [
-      "Direct Push-to-Talk Desktop Shortcut for Sir's Workstation"
-    ],
-    "notes": "Offline Whisper + Silero VAD desktop dictation for Sir's local machine.",
-    "addedAt": "2026-09-16T11:30:00Z"
-  },
-  {
-    "name": "developer.nvidia.com/nim",
-    "url": "https://developer.nvidia.com/nim",
-    "domain": "Enterprise Cloud GPU Microservices",
-    "status": "INTEGRATED",
-    "extractedFeatures": [
-      "Tier 3 NVIDIA NIM Provider in agent.ts",
-      "Llama 3.2 90B Vision Instruct & Mistral Large 2 Support"
-    ],
-    "futureRoadmap": [
-      "Nemotron-4 340B Enterprise Alignment when enabled on account"
-    ],
-    "addedAt": "2026-09-16T10:40:00Z"
-  },
-  {
-    "name": "openrouter.ai",
-    "url": "https://openrouter.ai",
-    "domain": "Global Multi-Model Gateway",
-    "status": "INTEGRATED",
-    "extractedFeatures": [
-      "Tier 4 Sovereign Failover Route in agent.ts",
-      "Nemotron 3 Super 120B Free Tier Target"
-    ],
-    "futureRoadmap": [
-      "Automated Fallback Model Cascade on HTTP 429/404"
-    ],
-    "addedAt": "2026-09-16T10:45:00Z"
-  },
-  {
-    "name": "tashfeenahmed/freellmapi",
-    "url": "https://github.com/tashfeenahmed/freellmapi",
-    "domain": "Model Catalogs & Endpoints",
-    "status": "EVALUATED_REJECTED",
-    "extractedFeatures": [],
-    "futureRoadmap": [],
-    "notes": "Rejected under Directive 01 (routes through non-Western/Chinese providers: ModelScope, Qwen, GLM-5).",
-    "addedAt": "2026-09-16T10:30:00Z"
   }
 ]
