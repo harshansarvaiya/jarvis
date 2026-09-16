@@ -976,10 +976,28 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
         },
         actionUrl: {
           type: 'string',
-          description: 'Optional URL or route to open when Sir taps the notification.',
+          description: 'Optional target path to open when user taps notification (e.g. "/", "/tasks").',
         },
       },
       required: ['title', 'message'],
+    },
+  },
+  {
+    name: 'send_telegram_message',
+    description: 'Dispatch an immediate proactive Telegram text message directly to Sir’s private Telegram channel (@harshan_jarvis_bot).',
+    parameters: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          description: 'The text message or operational update to send directly to Sir’s Telegram.',
+        },
+        chatId: {
+          type: 'string',
+          description: 'Optional Telegram chat ID (defaults to Sir’s verified user ID).',
+        },
+      },
+      required: ['message'],
     },
   },
   {
@@ -1510,6 +1528,22 @@ export async function executeJarvisTool(
               ? `Scheduled push notification armed for ${new Date(triggerAt).toLocaleTimeString()} (${delaySec}s delay).`
               : `Push notification dispatched directly to Sir's device.`,
             notification: notificationRecord,
+          },
+        };
+      }
+
+      case 'send_telegram_message': {
+        const { message, chatId } = args;
+        const targetChatId = chatId || process.env.TELEGRAM_ALLOWED_USER_ID || '864360540';
+        const { TelegramGateway } = await import('./telegram');
+        const gateway = new TelegramGateway();
+        const sent = await gateway.sendMessage(Number(targetChatId), message);
+        return {
+          success: sent,
+          result: {
+            messageSent: message,
+            targetChatId,
+            status: sent ? 'DELIVERED_TO_SIR' : 'TELEGRAM_DISPATCH_FAILED',
           },
         };
       }
