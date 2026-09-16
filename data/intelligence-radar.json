@@ -130,5 +130,22 @@
       "Slack / Discord Interactive Notification Bridge MCP"
     ],
     "addedAt": "2026-09-16T13:27:00Z"
+  },
+  {
+    "name": "ruvnet/ruview",
+    "url": "https://github.com/ruvnet/ruview",
+    "domain": "Physical Spatial Intelligence & Biometric IoT",
+    "status": "ON_RADAR",
+    "extractedFeatures": [
+      "WiFi CSI RF Tomography Architecture Analysis",
+      "Camera-less Presence & Vitals Monitoring Protocol Design"
+    ],
+    "futureRoadmap": [
+      "J.A.R.V.I.S. Physical Ingress Webhook (`/api/telemetry/presence`)",
+      "ESP32-S3 WiFi CSI Telemetry Bridge",
+      "Ambient Vital Signs & Presence Integration into Morning Briefings",
+      "Home Assistant MQTT / Matter Ingress Adapter"
+    ],
+    "addedAt": "2026-09-16T15:52:00Z"
   }
 ]
