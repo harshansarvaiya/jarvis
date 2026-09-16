@@ -10,6 +10,7 @@
  */
 
 export type OperationalArchetype = 'MULTIMODAL_PERCEPTION' | 'REFLEX_SPEED' | 'DEEP_SYNTHESIS';
+export type ActivePersona = 'FRIDAY' | 'JARVIS';
 
 export interface OrchestrationTelemetry {
   engineUsed: string;
@@ -20,6 +21,7 @@ export interface OrchestrationTelemetry {
   failoverOccurred: boolean;
   recalledEpisodesCount?: number;
   motiveAnalysis?: string;
+  persona?: ActivePersona;
 }
 
 export interface PreThoughtReasoningPass {
@@ -28,6 +30,35 @@ export interface PreThoughtReasoningPass {
   requiredToolChain: string[];
   riskVectors: string[];
   strategicPlan: string;
+}
+
+/**
+ * Detects whether Sir is addressing F.R.I.D.A.Y. (Antigravity Apex)
+ * or J.A.R.V.I.S. (Tactical Chief of Staff)
+ */
+export function detectActivePersona(prompt: string): { persona: ActivePersona; explicit: boolean } {
+  const clean = prompt.toLowerCase();
+  if (/\bfriday\b|\bf\.r\.i\.d\.a\.y\b/i.test(clean)) {
+    return { persona: 'FRIDAY', explicit: true };
+  }
+  if (/\bjarvis\b|\bj\.a\.r\.v\.i\.s\b/i.test(clean)) {
+    return { persona: 'JARVIS', explicit: true };
+  }
+
+  // Heuristic Auto-Triage:
+  // Coding, bugs, debugging, architecture, refactoring, compiler, deep analysis -> FRIDAY
+  const fridayTriggers = [
+    'code', 'bug', 'fix', 'debug', 'refactor', 'compile', 'tsc', 'test',
+    'function', 'file', 'architecture', 'system design', 'script', 'daemon',
+    'endpoint', 'api', 'git', 'commit', 'pr', 'deep', 'antigravity', 'infra',
+    'error', 'exception', 'stack trace', 'inspect', 'grep', 'search_workspace'
+  ];
+  if (fridayTriggers.some((t) => clean.includes(t))) {
+    return { persona: 'FRIDAY', explicit: false };
+  }
+
+  // Routines, reminders, calendar, radar tasks, quick status -> JARVIS
+  return { persona: 'JARVIS', explicit: false };
 }
 
 /**
@@ -97,11 +128,22 @@ export function classifyOperationalIntent(
     };
   }
 
+  // 0. Dual-Agent Call Sign / Technical Triage
+  const { persona, explicit } = detectActivePersona(userPrompt);
+  if (persona === 'FRIDAY') {
+    return {
+      archetype: 'DEEP_SYNTHESIS',
+      reason: explicit
+        ? 'Explicit Call Sign: F.R.I.D.A.Y. Engaged — Routing to Antigravity / Gemini 3.8 Apex Core.'
+        : 'Technical Engineering / Coding Intent Detected — Routing to F.R.I.D.A.Y. Apex Core.',
+    };
+  }
+
   const clean = userPrompt.toLowerCase().trim();
 
   // 1. System Telemetry & Operational Reflex Triggers
   const reflexTriggers = [
-    'status', 'inspect', 'telemetry', 'infrastructure', 'health', 'ping',
+    'status', 'telemetry', 'health', 'ping',
     'briefing', 'task', 'radar', 'memory', 'directive', 'protocol', 'storage'
   ];
   if (reflexTriggers.some((t) => clean.includes(t))) {

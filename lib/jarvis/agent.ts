@@ -11,6 +11,8 @@ import {
   generateTacticalNextActions,
   OperationalArchetype,
   OrchestrationTelemetry,
+  detectActivePersona,
+  ActivePersona,
 } from './orchestrator';
 
 export interface ChatMessage {
@@ -177,6 +179,7 @@ export async function runJarvisAgent(
   const completedTasks = allTasks.filter((t) => t.status === 'COMPLETED').slice(0, 5);
   const relevantMemories = getMemories().slice(0, 8);
   const motivePass = deconstructOperationalMotive(lastUserMessage.content);
+  const { persona, explicit: personaExplicit } = detectActivePersona(lastUserMessage.content);
 
   // 3.5. Match Relevant Modular Skills (Hermes agentskills.io Engine)
   let skillsContext = '';
@@ -194,6 +197,12 @@ export async function runJarvisAgent(
 
   const contextPrompt = `
 [CURRENT TEMPORAL CONTEXT]: ${new Date().toISOString()} (Local time: ${new Date().toLocaleString()})
+[ACTIVE DUAL-COGNITIVE PERSONA]:
+- Active Identity: ${persona === 'FRIDAY' ? 'F.R.I.D.A.Y. (Antigravity Sovereign Apex Core)' : 'J.A.R.V.I.S. (Tactical Chief of Staff & Ops Butler)'}
+- Mandate: ${persona === 'FRIDAY'
+  ? 'You are responding as F.R.I.D.A.Y. (Antigravity Apex). Maintain fierce, surgical Staff-level technical rigor. Execute code inspections, atomic edits, and compiler verification directly. Speak directly as Friday.'
+  : 'You are responding as J.A.R.V.I.S. (Tactical Chief of Staff). Composed, British-tinged elegance. Manage daily routines, radar tasks, habit execution, and fast reflex responses.'}
+
 [PRE-THOUGHT REASONING PASS & MOTIVE DECONSTRUCTION]:
 - Unstated Motive: ${motivePass.unstatedMotive}
 - Target Entities Required: ${motivePass.targetEntities.join(', ')}
@@ -226,6 +235,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 
   const shouldPreferGroq =
     groqKey &&
+    persona !== 'FRIDAY' && // Friday ALWAYS engages the Apex Core (Vertex AI / Antigravity)
     (orchestrationMode === 'groq' ||
       requestedModel.startsWith('openai/') ||
       requestedModel.startsWith('groq/') ||
@@ -857,6 +867,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         model: isVertexEngine ? selectedVertexModel : selectedModel,
         latencyMs,
         archetype,
+        persona,
         failoverOccurred: false,
         recalledEpisodesCount: recalledEpisodes.length,
       },
@@ -874,6 +885,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         model: 'recovery',
         latencyMs: Date.now() - startTime,
         archetype,
+        persona,
         failoverOccurred: true,
       },
       error: err.message,

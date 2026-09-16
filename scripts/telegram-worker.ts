@@ -144,10 +144,12 @@ async function handleIncomingMessage(update: TelegramUpdate) {
       responseText += `\n\n_${toolSummaries}_`;
     }
 
-    // Append Telemetry Badge
+    // Append Telemetry Badge (F.R.I.D.A.Y. vs J.A.R.V.I.S.)
     if (result.telemetry) {
       const engineName = result.telemetry.engineUsed || 'Vertex AI Gemini 3.8';
-      responseText += `\n\n🛡️ \`[ANTIGRAVITY APEX] ${engineName} // ${result.telemetry.latencyMs}ms\``;
+      const isFriday = result.telemetry.persona === 'FRIDAY';
+      const badgePrefix = isFriday ? '🛡️ `[F.R.I.D.A.Y. APEX]' : '⚡ `[J.A.R.V.I.S. TACTICAL]';
+      responseText += `\n\n${badgePrefix} ${engineName} // ${result.telemetry.latencyMs}ms\``;
     }
 
     await gateway.sendMessage(chatId, responseText, {
