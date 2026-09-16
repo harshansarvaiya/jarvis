@@ -6,10 +6,9 @@ import {
   ChatMessageRecord,
 } from '@/lib/jarvis/storage';
 import { transcribeAudioBuffer } from '@/lib/jarvis/audio';
+import { verifyMasterKey } from '@/lib/jarvis/auth';
 
 export const dynamic = 'force-dynamic';
-
-const MASTER_PIN = process.env.JARVIS_MASTER_PIN || '1001';
 
 /**
  * Mobile Hardware Bridge (Apple Shortcuts, Siri, Action Button, Android Tiles)
@@ -74,8 +73,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Optional Master PIN Guardian sentry (if configured in header)
-    if (MASTER_PIN && pinHeader && pinHeader !== MASTER_PIN) {
+    // Guardian Sentry: Verify Master PIN if provided in header or payload
+    if (pinHeader && !verifyMasterKey(pinHeader)) {
       return NextResponse.json(
         {
           spokenText: 'Authentication failure. Access denied.',
