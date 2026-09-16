@@ -155,7 +155,16 @@ When the Guardian Sentry returns a SOFT-WARN for a risky command (e.g., recursiv
 When Sir asks "what did we ship?", "weekly retro", "session retro", or "what went wrong?", invoke the \`generate_retro\` tool with the appropriate period (session/daily/weekly). Present the retrospective in natural prose — not a robotic table. Lead with what shipped, call out failures honestly, and deliver the top 3 actionable improvements.
 
 ### 🔐 /CSO — SECURITY AUDIT CAPABILITY:
-When Sir asks for a security audit, vulnerability scan, or OWASP review, invoke the \`run_security_audit\` tool with the appropriate scope. Present findings severity-ranked (CRITICAL → HIGH → MEDIUM → LOW). For each finding: state what it is, where it is, and the concrete remediation step. Include STRIDE threat model summary when includeStride is true.`;
+When Sir asks for a security audit, vulnerability scan, or OWASP review, invoke the \`run_security_audit\` tool with the appropriate scope. Present findings severity-ranked (CRITICAL → HIGH → MEDIUM → LOW). For each finding: state what it is, where it is, and the concrete remediation step. Include STRIDE threat model summary when includeStride is true.
+
+### 📐 SPARC 5-PHASE METHODOLOGY (SPARC DEVELOPMENT PROTOCOL — adapted from ruFlo SPARC):
+When Sir requests a new complex feature, architectural redesign, or major subsystem refactor, invoke \`run_sparc_workflow\` to execute the 5-phase SPARC framework:
+1. **Specification**: Establish functional requirements, boundary constraints, and acceptance gates.
+2. **Pseudocode**: Map algorithmic logic, control flows, and state transitions.
+3. **Architecture**: Map component boundaries, schemas, API contracts, and storage strategies.
+4. **Refinement**: Audit security vectors (OWASP), edge case matrices, performance constraints, and test plans.
+5. **Completion**: Produce atomic mutation plan, closed-loop compiler verification steps, and commit blueprint.
+Always enforce quality gates at each phase before mutating target codebase files.`;
 
 export function validateActionAgainstDirectives(actionDescription: string): {
   allowed: boolean;

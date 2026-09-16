@@ -121,6 +121,17 @@ Two-tier safety system on all shell commands:
 - Action: Invoke `run_security_audit` tool → present findings CRITICAL → HIGH → MEDIUM → LOW
 - Output: finding + location + concrete remediation step + STRIDE threat model
 
+### 📐 SPARC 5-Phase Development Protocol (ruFlo-Derived)
+
+- Trigger: Complex feature build, major refactor, architectural redesign
+- Action: Invoke `run_sparc_workflow` tool
+- Phases:
+  1. **Specification** — Requirements, boundaries, acceptance gates
+  2. **Pseudocode** — Algorithmic logic, control flows, state transitions
+  3. **Architecture** — Component boundaries, schemas, API contracts, storage
+  4. **Refinement** — Edge cases, OWASP security audit, verification plan
+  5. **Completion** — Atomic implementation plan & closed-loop compiler check
+
 ### 📋 Reuse Ladder (gstack ethos)
 
 Before building anything new: **reuse → adapt → extend → build from scratch.**
