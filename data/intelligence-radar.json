@@ -79,5 +79,20 @@
       "Data Science & Benchmark Visualizer Skill"
     ],
     "addedAt": "2026-09-16T11:55:00Z"
+  },
+  {
+    "name": "apify/apify-mcp-server",
+    "url": "https://github.com/apify/apify-mcp-server",
+    "domain": "Deep Web & Actor Extraction",
+    "status": "ON_RADAR",
+    "extractedFeatures": [
+      "Strategic Architecture Analysis (Walled-Garden Actor Scraper Protocol)"
+    ],
+    "futureRoadmap": [
+      "Apify Cloud Actor Runner Integration (Google Maps, Instagram, Twitter/X, LinkedIn)",
+      "Async Dataset Polling & Local Storage Synchronization",
+      "Headless Residential Proxy Tunneling via Apify Actors"
+    ],
+    "addedAt": "2026-09-16T13:13:00Z"
   }
 ]
