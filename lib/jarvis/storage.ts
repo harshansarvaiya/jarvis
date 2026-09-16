@@ -24,7 +24,7 @@ export interface ChatMessageRecord {
   telemetry?: any;
   // Shared Brain Attribution — which agent/channel produced this message
   source?: 'friday' | 'jarvis' | 'web' | 'system';
-  channel?: 'antigravity' | 'telegram' | 'web-pwa' | 'api';
+  channel?: 'antigravity' | 'telegram' | 'web-pwa' | 'api' | 'shortcut' | 'raycast';
 }
 
 export interface StorageProvider {

@@ -1,17 +1,29 @@
 /**
  * J.A.R.V.I.S. Mark II — Sovereign Telegram Bot Gateway Substrate
  * 
- * Implements direct HTTP Telegram Bot API long-polling and transmission
- * without external npm dependencies.
+ * Implements direct HTTP Telegram Bot API long-polling, audio voice handling,
+ * inline interactive callbacks, and proactive alert transmission without external npm dependencies.
  * 
  * Provides:
  * - 24/7 mobile uplink for Sir (Harshan Sarvaiya)
- * - Master PIN authentication sentry
+ * - Master PIN authentication sentry (Directive 01)
+ * - Groq Whisper speech-to-text integration for instant voice memos
+ * - Rich interactive inline action keyboards (Approve/Deploy/Tasks)
  * - Bi-directional synchronization with Universal Chat History (Upstash Redis)
  * - Proactive alert dispatch for scheduled task reminders and subagent events
  */
 
 import { getUniversalStorage } from './storage';
+
+export interface TelegramInlineKeyboardButton {
+  text: string;
+  callback_data?: string;
+  url?: string;
+}
+
+export interface TelegramInlineKeyboardMarkup {
+  inline_keyboard: TelegramInlineKeyboardButton[][];
+}
 
 export interface TelegramUpdate {
   update_id: number;
@@ -46,6 +58,40 @@ export interface TelegramUpdate {
       mime_type?: string;
       file_size?: number;
     };
+    voice?: {
+      file_id: string;
+      file_unique_id: string;
+      duration: number;
+      mime_type?: string;
+      file_size?: number;
+    };
+    audio?: {
+      file_id: string;
+      file_unique_id: string;
+      duration: number;
+      mime_type?: string;
+      file_size?: number;
+      file_name?: string;
+    };
+  };
+  callback_query?: {
+    id: string;
+    from: {
+      id: number;
+      is_bot: boolean;
+      first_name: string;
+      last_name?: string;
+      username?: string;
+    };
+    message?: {
+      message_id: number;
+      chat: {
+        id: number;
+        type: string;
+      };
+      text?: string;
+    };
+    data: string;
   };
 }
 
@@ -72,7 +118,7 @@ export class TelegramGateway {
       const url = new URL(`${this.baseUrl}/getUpdates`);
       if (offset !== undefined) url.searchParams.set('offset', String(offset));
       url.searchParams.set('timeout', String(timeout));
-      url.searchParams.set('allowed_updates', JSON.stringify(['message']));
+      url.searchParams.set('allowed_updates', JSON.stringify(['message', 'callback_query']));
 
       const res = await fetch(url.toString(), {
         method: 'GET',
@@ -128,9 +174,11 @@ export class TelegramGateway {
   }
 
   /**
-   * Downloads a file from Telegram and converts it to a base64 Data URI
+   * Downloads raw file buffer with detected mime type
    */
-  public async downloadFileAsBase64(fileId: string, defaultMime = 'image/jpeg'): Promise<string | null> {
+  public async downloadFileBuffer(
+    fileId: string
+  ): Promise<{ buffer: Buffer; filePath: string; mimeType: string } | null> {
     if (!this.isConfigured()) return null;
     try {
       const filePath = await this.getFilePath(fileId);
@@ -141,23 +189,47 @@ export class TelegramGateway {
       if (!res.ok) return null;
 
       const arrayBuffer = await res.arrayBuffer();
-      const base64 = Buffer.from(arrayBuffer).toString('base64');
-      const mimeType = filePath.endsWith('.png') ? 'image/png' : filePath.endsWith('.webp') ? 'image/webp' : defaultMime;
-      return `data:${mimeType};base64,${base64}`;
+      const buffer = Buffer.from(arrayBuffer);
+
+      let mimeType = 'application/octet-stream';
+      if (filePath.endsWith('.oga') || filePath.endsWith('.ogg')) mimeType = 'audio/ogg';
+      else if (filePath.endsWith('.mp3')) mimeType = 'audio/mpeg';
+      else if (filePath.endsWith('.m4a')) mimeType = 'audio/mp4';
+      else if (filePath.endsWith('.wav')) mimeType = 'audio/wav';
+      else if (filePath.endsWith('.png')) mimeType = 'image/png';
+      else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) mimeType = 'image/jpeg';
+      else if (filePath.endsWith('.webp')) mimeType = 'image/webp';
+
+      return { buffer, filePath, mimeType };
     } catch (err: any) {
-      console.warn('[Telegram] Failed to download file as base64:', err?.message);
+      console.warn('[Telegram] Failed to download file buffer:', err?.message);
       return null;
     }
   }
 
   /**
-   * Sends a message to a Telegram chat with automatic chunking (>4096 chars)
-   * and fallback to plain text if Markdown parsing fails.
+   * Downloads a file from Telegram and converts it to a base64 Data URI
+   */
+  public async downloadFileAsBase64(fileId: string, defaultMime = 'image/jpeg'): Promise<string | null> {
+    const downloaded = await this.downloadFileBuffer(fileId);
+    if (!downloaded) return null;
+
+    const mime = downloaded.mimeType !== 'application/octet-stream' ? downloaded.mimeType : defaultMime;
+    return `data:${mime};base64,${downloaded.buffer.toString('base64')}`;
+  }
+
+  /**
+   * Sends a message to a Telegram chat with automatic chunking (>4096 chars),
+   * optional inline action keyboards, and fallback to plain text if Markdown parsing fails.
    */
   public async sendMessage(
     chatId: number | string,
     text: string,
-    options?: { parseMode?: 'Markdown' | 'HTML'; replyToMessageId?: number }
+    options?: {
+      parseMode?: 'Markdown' | 'HTML';
+      replyToMessageId?: number;
+      replyMarkup?: TelegramInlineKeyboardMarkup;
+    }
   ): Promise<boolean> {
     if (!this.isConfigured()) return false;
 
@@ -185,17 +257,22 @@ export class TelegramGateway {
     }
 
     let success = true;
-    for (const chunk of chunks) {
+    for (let i = 0; i < chunks.length; i++) {
+      const isLastChunk = i === chunks.length - 1;
       const payload: any = {
         chat_id: chatId,
-        text: chunk,
+        text: chunks[i],
       };
 
       if (options?.parseMode) {
         payload.parse_mode = options.parseMode;
       }
-      if (options?.replyToMessageId) {
+      if (options?.replyToMessageId && i === 0) {
         payload.reply_to_message_id = options.replyToMessageId;
+      }
+      // Attach inline keyboard to the last message chunk only
+      if (isLastChunk && options?.replyMarkup) {
+        payload.reply_markup = options.replyMarkup;
       }
 
       try {
@@ -226,6 +303,56 @@ export class TelegramGateway {
     }
 
     return success;
+  }
+
+  /**
+   * Responds to an inline callback query (e.g., button press acknowledgment)
+   */
+  public async answerCallbackQuery(
+    callbackQueryId: string,
+    text?: string,
+    showAlert = false
+  ): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    try {
+      const res = await fetch(`${this.baseUrl}/answerCallbackQuery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          callback_query_id: callbackQueryId,
+          text,
+          show_alert: showAlert,
+        }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Edits inline keyboard on an existing message
+   */
+  public async editMessageReplyMarkup(
+    chatId: number | string,
+    messageId: number,
+    replyMarkup?: TelegramInlineKeyboardMarkup
+  ): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    try {
+      const res = await fetch(`${this.baseUrl}/editMessageReplyMarkup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: replyMarkup || { inline_keyboard: [] },
+        }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
   }
 
   /**

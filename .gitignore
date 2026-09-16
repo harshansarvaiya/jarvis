@@ -32,3 +32,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local logs and scratch
+/data/trajectories/
+/data/jarvis_knowledge*.json
+scripts/inspect-chats.ts
