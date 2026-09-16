@@ -113,7 +113,7 @@ export async function runJarvisAgent(
   const apiKey = options.apiKey || process.env.GEMINI_API_KEY || '';
   const groqKey = options.groqApiKey || process.env.GROQ_API_KEY || '';
   const githubKey = options.githubToken || process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_TOKEN || '';
-  const requestedModel = normalizeModel(options.model || 'gemini-3.8-flash');
+  const requestedModel = normalizeModel(options.model || 'gemini-3.7-flash');
   const orchestrationMode = options.orchestrationMode || 'auto';
 
   const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
@@ -160,14 +160,17 @@ export async function runJarvisAgent(
   let recalledContextPrompt = '';
   let retrievedKnowledgeContext = '';
   try {
-    const [episodes, knowledgeChunks] = await Promise.all([
-      findCorrelatedEpisodes(lastUserMessage.content, [lastUserMessage.id || ''], 3),
-      queryKnowledgeBase(lastUserMessage.content, { topK: 3, minScore: 0.45, apiKey }),
-    ]);
-    recalledEpisodes = episodes;
-    recalledContextPrompt = formatRecalledEpisodesPrompt(recalledEpisodes);
-    if (knowledgeChunks && knowledgeChunks.length > 0) {
-      retrievedKnowledgeContext = formatKnowledgePromptContext(knowledgeChunks);
+    const isSimpleMessage = lastUserMessage.content.length < 40 && !/remember|recall|history|what did|search|find|how/i.test(lastUserMessage.content);
+    if (!isSimpleMessage) {
+      const [episodes, knowledgeChunks] = await Promise.all([
+        findCorrelatedEpisodes(lastUserMessage.content, [lastUserMessage.id || ''], 3),
+        queryKnowledgeBase(lastUserMessage.content, { topK: 3, minScore: 0.45, apiKey }),
+      ]);
+      recalledEpisodes = episodes;
+      recalledContextPrompt = formatRecalledEpisodesPrompt(recalledEpisodes);
+      if (knowledgeChunks && knowledgeChunks.length > 0) {
+        retrievedKnowledgeContext = formatKnowledgePromptContext(knowledgeChunks);
+      }
     }
   } catch (recallErr) {
     console.warn('[Agent] Retrieval error:', recallErr);

@@ -117,9 +117,9 @@ async function handleIncomingMessage(update: TelegramUpdate) {
       image: base64Image,
     });
 
-    // 2. Invoke J.A.R.V.I.S. Agent (Vertex AI Gemini 3.8 Flash with Extended Thinking)
+    // 2. Invoke J.A.R.V.I.S. Agent (Vertex AI Gemini 3.7 Flash for fast, accurate response)
     const result = await runJarvisAgent(contextMessages, {
-      model: 'gemini-3.8-flash',
+      model: 'gemini-3.7-flash',
       orchestrationMode: 'auto',
     });
 
