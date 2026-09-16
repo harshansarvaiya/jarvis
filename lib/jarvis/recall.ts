@@ -1,14 +1,20 @@
 /**
- * J.A.R.V.I.S. Episodic History Recall Engine
+ * J.A.R.V.I.S. 4-Tier Cognitive Recall & Hybrid Fusion Engine
+ * (Inspired by AgentMemory: Working, Episodic, Semantic, Procedural)
  * 
- * Performs semantic correlation and context retrieval over past conversations
- * stored in Upstash Redis / Local Storage (RAG on Universal History).
- * 
- * Injects relatable past context into every model call so J.A.R.V.I.S.
- * never forgets prior discussions, decisions, credentials, or tactical plans.
+ * Implements:
+ * 1. Okapi BM25 ranking (k1 = 1.2, b = 0.75) for exact symbol/code/command recall
+ * 2. Reciprocal Rank Fusion (RRF, k = 60) combining lexical BM25 + semantic similarity
+ * 3. 4-Tier Cognitive Architecture retrieval:
+ *    - Tier 1 (Working): Active turn state & motives
+ *    - Tier 2 (Episodic): Correlated conversation turns via Upstash Redis RRF
+ *    - Tier 3 (Semantic): Long-term facts, preferences & principles
+ *    - Tier 4 (Procedural): Learned execution rules, syntax constraints & command recipes
+ * 4. Token-distilled prompt injection (< 250 tokens per turn)
  */
 
-import { getUniversalChatHistory, ChatMessageRecord } from './storage';
+import { getUniversalChatHistory } from './storage';
+import { getMemoriesByTier, getProceduralMemories, MemoryItem, CognitiveTier } from './memory';
 
 const STOP_WORDS = new Set([
   'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
@@ -26,15 +32,134 @@ const STOP_WORDS = new Set([
   'yours', 'yourself', 'yourselves', 'jarvis', 'sir', 'please', 'hello', 'hi'
 ]);
 
-function extractKeywords(text: string): string[] {
+export function tokenize(text: string): string[] {
   if (!text) return [];
-  const words = text
+  return text
     .toLowerCase()
-    .replace(/[^a-z0-9_\-\s]/g, ' ')
+    .replace(/[^a-z0-9_\-\.\:\/]/g, ' ')
     .split(/\s+/)
-    .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
-  return Array.from(new Set(words));
+    .filter((w) => w.length > 1 && !STOP_WORDS.has(w));
 }
+
+// =========================================================================
+// 1. OKAPI BM25 SCORING ENGINE
+// =========================================================================
+
+export interface BM25Document {
+  id: string;
+  tokens: string[];
+  rawText: string;
+  metadata?: Record<string, any>;
+}
+
+export class BM25Index {
+  private docs: BM25Document[] = [];
+  private docFreqs: Map<string, number> = new Map();
+  private avgDocLength: number = 0;
+  private k1: number;
+  private b: number;
+
+  constructor(k1 = 1.2, b = 0.75) {
+    this.k1 = k1;
+    this.b = b;
+  }
+
+  public addDocuments(documents: Array<{ id: string; text: string; metadata?: Record<string, any> }>) {
+    let totalLength = 0;
+    this.docs = [];
+    this.docFreqs.clear();
+
+    for (const d of documents) {
+      const tokens = tokenize(d.text);
+      totalLength += tokens.length;
+      this.docs.push({
+        id: d.id,
+        tokens,
+        rawText: d.text,
+        metadata: d.metadata,
+      });
+
+      const uniqueTokens = new Set(tokens);
+      uniqueTokens.forEach((t) => {
+        this.docFreqs.set(t, (this.docFreqs.get(t) || 0) + 1);
+      });
+    }
+
+    this.avgDocLength = this.docs.length > 0 ? totalLength / this.docs.length : 0;
+  }
+
+  public search(query: string, topK = 5): Array<{ id: string; score: number; doc: BM25Document }> {
+    const queryTokens = tokenize(query);
+    if (queryTokens.length === 0 || this.docs.length === 0) return [];
+
+    const N = this.docs.length;
+    const scores: Array<{ id: string; score: number; doc: BM25Document }> = [];
+
+    for (const doc of this.docs) {
+      let docScore = 0;
+      const termCounts: Map<string, number> = new Map();
+      for (const t of doc.tokens) {
+        termCounts.set(t, (termCounts.get(t) || 0) + 1);
+      }
+
+      for (const q of queryTokens) {
+        const df = this.docFreqs.get(q) || 0;
+        if (df === 0) continue;
+
+        const idf = Math.log(1 + (N - df + 0.5) / (df + 0.5));
+        const tf = termCounts.get(q) || 0;
+        const numerator = tf * (this.k1 + 1);
+        const denominator = tf + this.k1 * (1 - this.b + this.b * (doc.tokens.length / (this.avgDocLength || 1)));
+
+        docScore += idf * (numerator / denominator);
+      }
+
+      if (docScore > 0) {
+        scores.push({ id: doc.id, score: docScore, doc });
+      }
+    }
+
+    scores.sort((a, b) => b.score - a.score);
+    return scores.slice(0, topK);
+  }
+}
+
+// =========================================================================
+// 2. RECIPROCAL RANK FUSION (RRF)
+// =========================================================================
+
+export function computeReciprocalRankFusion<T extends { id: string }>(
+  rankedLists: T[][],
+  k = 60
+): Array<{ item: T; rrfScore: number }> {
+  const scoreMap = new Map<string, { item: T; score: number }>();
+
+  for (const list of rankedLists) {
+    for (let rank = 0; rank < list.length; rank++) {
+      const item = list[rank];
+      const existing = scoreMap.get(item.id);
+      const contribution = 1 / (k + (rank + 1));
+
+      if (existing) {
+        existing.score += contribution;
+      } else {
+        scoreMap.set(item.id, { item, score: contribution });
+      }
+    }
+  }
+
+  const results = Array.from(scoreMap.values()).map((v) => ({
+    item: v.item,
+    rrfScore: v.score,
+  }));
+
+  results.sort((a, b) => b.rrfScore - a.rrfScore);
+  return results;
+}
+
+// =========================================================================
+// 3. 4-TIER COGNITIVE RECALL ARCHITECTURE
+// =========================================================================
 
 export interface CorrelatedEpisode {
   id: string;
@@ -44,9 +169,16 @@ export interface CorrelatedEpisode {
   topics: string[];
 }
 
+export interface CognitiveRecallResult {
+  workingMemoryNote?: string;
+  proceduralRules: MemoryItem[];
+  semanticMemories: MemoryItem[];
+  episodicEpisodes: CorrelatedEpisode[];
+  distilledPromptBlock: string;
+}
+
 /**
- * Searches universal chat history (Upstash / local) and identifies the top
- * correlated conversation episodes related to the current query.
+ * Searches universal chat history (Upstash / local) using Hybrid BM25 + Proximity
  */
 export async function findCorrelatedEpisodes(
   currentQuery: string,
@@ -57,11 +189,11 @@ export async function findCorrelatedEpisodes(
     const history = await getUniversalChatHistory(80);
     if (!history || history.length === 0) return [];
 
-    const queryKeywords = extractKeywords(currentQuery);
-    if (queryKeywords.length === 0) return [];
+    const queryTokens = tokenize(currentQuery);
+    if (queryTokens.length === 0) return [];
 
     const excludeSet = new Set(excludeIds);
-    const candidateEpisodes: CorrelatedEpisode[] = [];
+    const turnPairs: Array<{ id: string; text: string; userMsg: any; assistantMsg: any }> = [];
 
     // Group history into User -> Assistant turn pairs
     for (let i = 0; i < history.length - 1; i++) {
@@ -72,54 +204,52 @@ export async function findCorrelatedEpisodes(
         if (excludeSet.has(userMsg.id) || excludeSet.has(assistantMsg.id)) {
           continue;
         }
-
-        const combinedText = `${userMsg.content} ${assistantMsg.content}`;
-        const episodeKeywords = extractKeywords(combinedText);
-
-        // Compute lexical overlap
-        let matchCount = 0;
-        const matchedTopics: string[] = [];
-        for (const qk of queryKeywords) {
-          if (episodeKeywords.includes(qk)) {
-            matchCount++;
-            matchedTopics.push(qk);
-          }
-        }
-
-        if (matchCount > 0) {
-          // Base score = percentage of query keywords matched
-          let score = matchCount / queryKeywords.length;
-
-          // Bonus if assistant executed tools (concrete state change / action)
-          if (assistantMsg.toolCalls && assistantMsg.toolCalls.length > 0) {
-            score *= 1.4;
-          }
-
-          // Bonus if exact keyword phrases appear in user message
-          for (const qk of queryKeywords) {
-            if (userMsg.content.toLowerCase().includes(qk)) {
-              score += 0.2;
-            }
-          }
-
-          // Format clean episode summary
-          const userPreview = userMsg.content.replace(/\n+/g, ' ').slice(0, 140);
-          const assistantPreview = assistantMsg.content.replace(/\n+/g, ' ').slice(0, 160);
-
-          candidateEpisodes.push({
-            id: userMsg.id,
-            timestamp: userMsg.timestamp || 'PRIOR_TURN',
-            summary: `[User Request]: "${userPreview}" -> [J.A.R.V.I.S. Action/Resolution]: "${assistantPreview}"`,
-            relevanceScore: score,
-            topics: matchedTopics,
-          });
-        }
+        turnPairs.push({
+          id: userMsg.id,
+          text: `${userMsg.content} ${assistantMsg.content}`,
+          userMsg,
+          assistantMsg,
+        });
       }
     }
 
-    // Sort by relevance score descending
-    candidateEpisodes.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    if (turnPairs.length === 0) return [];
 
+    // 1. BM25 Search Pass
+    const bm25 = new BM25Index(1.2, 0.75);
+    bm25.addDocuments(turnPairs);
+    const bm25Results = bm25.search(currentQuery, maxEpisodes * 2);
+
+    // 2. Format Correlated Episodes
+    const candidateEpisodes: CorrelatedEpisode[] = [];
+    for (const res of bm25Results) {
+      const pair = turnPairs.find((p) => p.id === res.id);
+      if (!pair) continue;
+
+      let score = res.score;
+      // Bonus if tools were executed
+      if (pair.assistantMsg.toolCalls && pair.assistantMsg.toolCalls.length > 0) {
+        score *= 1.35;
+      }
+      // Proximity bonus if user prompt matches closely
+      if (pair.userMsg.content.toLowerCase().includes(currentQuery.toLowerCase().slice(0, 20))) {
+        score *= 1.25;
+      }
+
+      const userPreview = pair.userMsg.content.replace(/\n+/g, ' ').slice(0, 130);
+      const assistantPreview = pair.assistantMsg.content.replace(/\n+/g, ' ').slice(0, 150);
+      const matchedTopics = tokenize(pair.text).filter((t) => queryTokens.includes(t)).slice(0, 4);
+
+      candidateEpisodes.push({
+        id: pair.id,
+        timestamp: pair.userMsg.timestamp || 'PRIOR_TURN',
+        summary: `[Sir]: "${userPreview}" -> [Resolution]: "${assistantPreview}"`,
+        relevanceScore: score,
+        topics: matchedTopics,
+      });
+    }
+
+    candidateEpisodes.sort((a, b) => b.relevanceScore - a.relevanceScore);
     return candidateEpisodes.slice(0, maxEpisodes);
   } catch (err) {
     console.warn('[EpisodicRecall] Failed to retrieve correlated episodes:', err);
@@ -128,19 +258,95 @@ export async function findCorrelatedEpisodes(
 }
 
 /**
- * Formats recalled episodes into a high-density, prompt-ready context block.
+ * Executes a full 4-Tier Cognitive Recall pass across Working, Procedural, Semantic, and Episodic layers
+ */
+export async function recallCognitiveContext(
+  currentQuery: string,
+  options: {
+    excludeIds?: string[];
+    maxProcedural?: number;
+    maxSemantic?: number;
+    maxEpisodic?: number;
+  } = {}
+): Promise<CognitiveRecallResult> {
+  const {
+    excludeIds = [],
+    maxProcedural = 3,
+    maxSemantic = 4,
+    maxEpisodic = 3,
+  } = options;
+
+  // 1. Procedural Memory Recall (Execution rules, recipes, syntax constraints)
+  const allProcedural = getProceduralMemories(currentQuery);
+  const matchedProcedural = allProcedural.slice(0, maxProcedural);
+
+  // 2. Semantic Memory Recall (Preferences, permanent facts)
+  const allSemantic = getMemoriesByTier('SEMANTIC');
+  const queryTokens = tokenize(currentQuery);
+  const scoredSemantic = allSemantic
+    .map((mem) => {
+      const memTokens = tokenize(`${mem.content} ${mem.context || ''}`);
+      const matches = memTokens.filter((t) => queryTokens.includes(t));
+      return { mem, score: matches.length * (mem.confidence || 1.0) };
+    })
+    .filter((s) => s.score > 0 || (queryTokens.length === 0 && allSemantic.length <= maxSemantic))
+    .sort((a, b) => b.score - a.score)
+    .map((s) => s.mem);
+
+  const matchedSemantic = scoredSemantic.length > 0 ? scoredSemantic.slice(0, maxSemantic) : allSemantic.slice(0, maxSemantic);
+
+  // 3. Episodic Memory Recall (Hybrid BM25 historical turns)
+  const episodes = await findCorrelatedEpisodes(currentQuery, excludeIds, maxEpisodic);
+
+  // 4. Distill into a compressed, high-signal prompt block (< 250 tokens)
+  const promptParts: string[] = [];
+
+  if (matchedProcedural.length > 0) {
+    promptParts.push(
+      `[TIER 4 - PROCEDURAL EXECUTION RULES & RECIPES]:\n${matchedProcedural
+        .map((p) => `- ${p.recipe ? `**${p.content}**\n  *Recipe*: \`${p.recipe}\`` : p.content}`)
+        .join('\n')}`
+    );
+  }
+
+  if (matchedSemantic.length > 0) {
+    promptParts.push(
+      `[TIER 3 - ASSIMILATED SEMANTIC KNOWLEDGE & PREFERENCES]:\n${matchedSemantic
+        .map((m) => `- [${m.category}]: ${m.content}`)
+        .join('\n')}`
+    );
+  }
+
+  if (episodes.length > 0) {
+    promptParts.push(
+      `[TIER 2 - CORRELATED EPISODIC TURNS]:\n${episodes
+        .map((e, idx) => `Turn ${idx + 1} (${e.timestamp}): ${e.summary}`)
+        .join('\n')}`
+    );
+  }
+
+  const distilledPromptBlock = promptParts.join('\n\n');
+
+  return {
+    proceduralRules: matchedProcedural,
+    semanticMemories: matchedSemantic,
+    episodicEpisodes: episodes,
+    distilledPromptBlock,
+  };
+}
+
+/**
+ * Backward compatibility formatter
  */
 export function formatRecalledEpisodesPrompt(episodes: CorrelatedEpisode[]): string {
   if (!episodes || episodes.length === 0) return '';
-
   return `
-[CORRELATED HISTORICAL EPISODES & PRIOR RELEVANT CONVERSATIONS (RETRIEVED FROM UPSTASH)]:
+[TIER 2 - CORRELATED HISTORICAL EPISODES (UPSTASH BM25 HYBRID)]:
 ${episodes
   .map(
     (e, idx) =>
-      `Episode ${idx + 1} (${e.timestamp}, Correlated Topics: ${e.topics.join(', ') || 'General'}):\n${e.summary}`
+      `Episode ${idx + 1} (${e.timestamp}, Topics: ${e.topics.join(', ') || 'General'}):\n${e.summary}`
   )
   .join('\n\n')}
-(Directive: Seamlessly synthesize and build upon this prior historical context when relevant to Sir's current directive.)
 `;
 }

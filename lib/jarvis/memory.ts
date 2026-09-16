@@ -30,20 +30,28 @@ export interface Task {
   executionAudit?: TaskExecutionRecord[];
 }
 
+export type CognitiveTier = 'WORKING' | 'EPISODIC' | 'SEMANTIC' | 'PROCEDURAL';
+
 export type MemoryCategory =
   | 'PRINCIPLE'
   | 'PREFERENCE'
   | 'PROJECT'
   | 'DECISION'
   | 'INSIGHT'
-  | 'EVOLUTION';
+  | 'EVOLUTION'
+  | 'PROCEDURAL_RULE'
+  | 'WORKFLOW_RECIPE'
+  | 'CORRECTION';
 
 export interface MemoryItem {
   id: string;
+  tier?: CognitiveTier;
   category: MemoryCategory;
   content: string;
   confidence: number; // 0.0 - 1.0
   context?: string;
+  triggers?: string[];
+  recipe?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -133,10 +141,35 @@ const INITIAL_STATE: JarvisState = {
     },
     {
       id: 'mem-pref-1',
+      tier: 'SEMANTIC',
       category: 'PREFERENCE',
       content: 'Prefers high-signal, visionary solutions over generic tools. Values autonomous action and unstated intent deconstruction.',
       confidence: 0.95,
       context: 'Initial User Alignment',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: 'mem-proc-1',
+      tier: 'PROCEDURAL',
+      category: 'PROCEDURAL_RULE',
+      content: 'Compiler Verification Pipeline: Always execute zero-error TypeScript validation before pushing code.',
+      recipe: 'npx tsc --noEmit',
+      triggers: ['build', 'compile', 'tsc', 'push', 'commit', 'deploy', 'code'],
+      confidence: 1.0,
+      context: 'Core Architecture Protocol',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: 'mem-proc-2',
+      tier: 'PROCEDURAL',
+      category: 'PROCEDURAL_RULE',
+      content: 'Multi-Engine Routing Tiers: Route Telegram reflex to Groq LPU (100ms), Apex engineering to Gemini 3.7 Flash, and heavy GPUs to NVIDIA NIM.',
+      recipe: 'Groq (100ms) -> Gemini 3.7 Flash -> NVIDIA NIM -> OpenRouter',
+      triggers: ['model', 'groq', 'nim', 'openrouter', 'routing', 'engine', 'speed', 'latency'],
+      confidence: 1.0,
+      context: 'Multi-Engine Substrate Specification',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
@@ -332,7 +365,26 @@ export function recordTaskExecution(
   return state.tasks[index];
 }
 
-// Memory & Evolution API
+// Memory & Evolution API (4-Tier Cognitive Architecture)
+export function getMemoryTier(item: MemoryItem | { category: MemoryCategory; tier?: CognitiveTier }): CognitiveTier {
+  if (item.tier) return item.tier;
+  switch (item.category) {
+    case 'PROCEDURAL_RULE':
+    case 'WORKFLOW_RECIPE':
+    case 'CORRECTION':
+      return 'PROCEDURAL';
+    case 'DECISION':
+    case 'EVOLUTION':
+      return 'EPISODIC';
+    case 'PRINCIPLE':
+    case 'PREFERENCE':
+    case 'PROJECT':
+    case 'INSIGHT':
+    default:
+      return 'SEMANTIC';
+  }
+}
+
 export function getMemories(category?: MemoryCategory): MemoryItem[] {
   const state = loadJarvisState();
   if (category) {
@@ -341,26 +393,71 @@ export function getMemories(category?: MemoryCategory): MemoryItem[] {
   return state.memories;
 }
 
+export function getMemoriesByTier(tier: CognitiveTier): MemoryItem[] {
+  const state = loadJarvisState();
+  return state.memories.filter((m) => getMemoryTier(m) === tier);
+}
+
 export function addMemory(
   category: MemoryCategory,
   content: string,
   context?: string,
-  confidence = 0.9
+  confidence = 0.9,
+  tier?: CognitiveTier,
+  triggers?: string[],
+  recipe?: string
 ): MemoryItem {
   const state = loadJarvisState();
+  const inferredTier = tier || getMemoryTier({ category, tier });
   const newMemory: MemoryItem = {
     id: `mem-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    tier: inferredTier,
     category,
     content,
     confidence,
     context,
+    triggers,
+    recipe,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
   state.memories.unshift(newMemory);
-  addLog(state, 'EVOLUTION', `Memory assimilated [${category}]: ${content.slice(0, 60)}...`);
+  addLog(state, 'EVOLUTION', `Memory assimilated [${inferredTier}:${category}]: ${content.slice(0, 60)}...`);
   saveJarvisState(state);
   return newMemory;
+}
+
+export function addProceduralMemory(params: {
+  title: string;
+  recipe: string;
+  triggers: string[];
+  context?: string;
+  confidence?: number;
+}): MemoryItem {
+  const content = `${params.title}: ${params.recipe}`;
+  return addMemory(
+    'PROCEDURAL_RULE',
+    content,
+    params.context,
+    params.confidence ?? 0.95,
+    'PROCEDURAL',
+    params.triggers,
+    params.recipe
+  );
+}
+
+export function getProceduralMemories(triggerQuery?: string): MemoryItem[] {
+  const procedural = getMemoriesByTier('PROCEDURAL');
+  if (!triggerQuery || !triggerQuery.trim()) return procedural;
+
+  const clean = triggerQuery.toLowerCase();
+  return procedural.filter((p) => {
+    if (p.triggers && p.triggers.some((t) => clean.includes(t.toLowerCase()))) {
+      return true;
+    }
+    const haystack = `${p.content} ${p.context || ''} ${p.recipe || ''}`.toLowerCase();
+    return clean.split(/\s+/).some((word) => word.length > 2 && haystack.includes(word));
+  });
 }
 
 export function searchMemories(query: string): MemoryItem[] {

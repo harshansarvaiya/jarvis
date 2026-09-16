@@ -158,32 +158,34 @@ export async function runJarvisAgent(
     };
   }
 
-  // 2. Correlated Episodic History & Semantic Vector RAG Retrieval
+  // 2. 4-Tier Cognitive Recall (Working, Episodic, Semantic, Procedural) & Hybrid RAG Retrieval
   let recalledEpisodes: any[] = [];
-  let recalledContextPrompt = '';
+  let cognitiveContextPrompt = '';
   let retrievedKnowledgeContext = '';
   try {
-    const isSimpleMessage = lastUserMessage.content.length < 40 && !/remember|recall|history|what did|search|find|how/i.test(lastUserMessage.content);
+    const isSimpleMessage = lastUserMessage.content.length < 40 && !/remember|recall|history|what did|search|find|how|rule|recipe|run|test|build/i.test(lastUserMessage.content);
     if (!isSimpleMessage) {
-      const [episodes, knowledgeChunks] = await Promise.all([
-        findCorrelatedEpisodes(lastUserMessage.content, [lastUserMessage.id || ''], 3),
-        queryKnowledgeBase(lastUserMessage.content, { topK: 3, minScore: 0.45, apiKey }),
+      const { recallCognitiveContext } = await import('./recall');
+      const [cognitiveRecall, knowledgeChunks] = await Promise.all([
+        recallCognitiveContext(lastUserMessage.content, { excludeIds: [lastUserMessage.id || ''] }),
+        queryKnowledgeBase(lastUserMessage.content, { topK: 3, minScore: 0.35, apiKey }),
       ]);
-      recalledEpisodes = episodes;
-      recalledContextPrompt = formatRecalledEpisodesPrompt(recalledEpisodes);
+      recalledEpisodes = cognitiveRecall.episodicEpisodes;
+      if (cognitiveRecall.distilledPromptBlock) {
+        cognitiveContextPrompt = `\n${cognitiveRecall.distilledPromptBlock}\n`;
+      }
       if (knowledgeChunks && knowledgeChunks.length > 0) {
         retrievedKnowledgeContext = formatKnowledgePromptContext(knowledgeChunks);
       }
     }
   } catch (recallErr) {
-    console.warn('[Agent] Retrieval error:', recallErr);
+    console.warn('[Agent] Cognitive recall warning:', recallErr);
   }
 
-  // 3. Synthesize Active State Context & Pre-Thought Motive Pass (Pillar 1)
+  // 3. Synthesize Active State Context & Pre-Thought Motive Pass (Pillar 1: Working Memory)
   const allTasks = getTasks();
   const activeTasks = allTasks.filter((t) => t.status !== 'COMPLETED').slice(0, 8);
   const completedTasks = allTasks.filter((t) => t.status === 'COMPLETED').slice(0, 5);
-  const relevantMemories = getMemories().slice(0, 8);
   const motivePass = deconstructOperationalMotive(lastUserMessage.content);
   const { persona, explicit: personaExplicit } = detectActivePersona(lastUserMessage.content);
 
@@ -209,7 +211,7 @@ export async function runJarvisAgent(
   ? 'You are responding as F.R.I.D.A.Y. (Antigravity Apex). Talk like a brilliant, senior Staff Software Engineer pair-programming with Sir on Telegram or Slack. Direct, confident, natural human tone. STRICTLY BAN canned bot templates ("### Mission Control Operational Status", "All autonomous channels..."), numbered slide-deck headings, or sci-fi stock filler. When asked for status, summarize real VM & process telemetry in 2–3 sharp, natural sentences. When solving technical problems, execute tools, verify compiler outputs, and explain your solutions in clean, fluid paragraphs.'
   : 'You are responding as J.A.R.V.I.S. (Tactical Chief of Staff). Talk with composed, loyal British elegance ("Sir"). Manage daily routines, habits, radar tasks, and fast operational questions. Talk like a real human chief of staff on Telegram—direct, warm, and natural. STRICTLY BAN canned bot templates or sci-fi stock responses.'}
 
-[PRE-THOUGHT REASONING PASS & MOTIVE DECONSTRUCTION]:
+[TIER 1 - WORKING MEMORY & PRE-THOUGHT REASONING PASS]:
 - Unstated Motive: ${motivePass.unstatedMotive}
 - Target Entities Required: ${motivePass.targetEntities.join(', ')}
 - Tactical Plan: ${motivePass.strategicPlan}
@@ -219,10 +221,7 @@ ${activeTasks.map((t) => `- [${t.priority}] ${t.title} (ID: ${t.id}, Status: ${t
 
 [RECENT COMPLETED TASKS & ACHIEVEMENTS]:
 ${completedTasks.map((t) => `- [COMPLETED] ${t.title} (ID: ${t.id}${t.completedAt ? `, Completed: ${t.completedAt}` : ''})`).join('\n') || 'No recently completed tasks recorded.'}
-
-[ASSIMILATED MEMORY & PREFERENCES]:
-${relevantMemories.map((m) => `- [${m.category}]: ${m.content}`).join('\n')}
-${recalledContextPrompt}
+${cognitiveContextPrompt}
 ${retrievedKnowledgeContext}
 ${skillsContext}
 [CREATOR IDENTITY & CONTEXTUAL GATING]:

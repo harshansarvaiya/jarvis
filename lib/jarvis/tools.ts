@@ -574,13 +574,13 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'store_memory',
-    description: 'Permanently assimilate a preference, principle, insight, decision, or project knowledge into long-term memory.',
+    description: 'Permanently assimilate a preference, principle, insight, decision, procedural rule, workflow recipe, or correction into long-term memory across 4 cognitive tiers (Working, Episodic, Semantic, Procedural).',
     parameters: {
       type: 'object',
       properties: {
         category: {
           type: 'string',
-          enum: ['PRINCIPLE', 'PREFERENCE', 'PROJECT', 'DECISION', 'INSIGHT', 'EVOLUTION'],
+          enum: ['PRINCIPLE', 'PREFERENCE', 'PROJECT', 'DECISION', 'INSIGHT', 'EVOLUTION', 'PROCEDURAL_RULE', 'WORKFLOW_RECIPE', 'CORRECTION'],
           description: 'The ontological category of the memory.',
         },
         content: {
@@ -589,7 +589,16 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
         },
         context: {
           type: 'string',
-          description: 'Why or where this was learned (e.g. "User feedback during conversation").',
+          description: 'Why or where this was learned (e.g. "User correction during debugging").',
+        },
+        recipe: {
+          type: 'string',
+          description: 'For PROCEDURAL rules: exact terminal command line, code pattern, or step-by-step recipe.',
+        },
+        triggers: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Keywords or operational triggers that should automatically activate this rule.',
         },
       },
       required: ['category', 'content'],
@@ -1229,16 +1238,20 @@ export async function executeJarvisTool(
       }
 
       case 'store_memory': {
-        const { category, content, context } = args;
+        const { category, content, context, recipe, triggers, tier } = args;
         const memory = addMemory(
           (category as MemoryCategory) || 'INSIGHT',
           content,
-          context || 'Assimilated via J.A.R.V.I.S. tool execution'
+          context || 'Assimilated via J.A.R.V.I.S. tool execution',
+          0.95,
+          tier,
+          triggers,
+          recipe
         );
         return {
           success: true,
           result: {
-            message: `Memory assimilated under [${category}].`,
+            message: `Memory assimilated under [${memory.tier}:${category}].`,
             memory,
           },
         };

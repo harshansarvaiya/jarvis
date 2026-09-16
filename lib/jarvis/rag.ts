@@ -419,7 +419,7 @@ export async function deleteKnowledgeDocument(docId: string): Promise<boolean> {
 }
 
 /**
- * Performs dense vector similarity search across all indexed knowledge chunks
+ * Performs Hybrid Search (Dense Vector + BM25 Lexical Fusion via RRF) across indexed knowledge chunks
  */
 export async function queryKnowledgeBase(
   query: string,
@@ -430,39 +430,61 @@ export async function queryKnowledgeBase(
     apiKey?: string;
   } = {}
 ): Promise<RetrievalResult[]> {
-  const { topK = 4, minScore = 0.45, category, apiKey } = options;
+  const { topK = 4, minScore = 0.35, category, apiKey } = options;
   if (!query || !query.trim()) return [];
 
   const chunks = await getAllKnowledgeChunks();
   if (chunks.length === 0) return [];
 
+  const filteredChunks = category
+    ? chunks.filter((c) => c.category === category)
+    : chunks;
+
+  if (filteredChunks.length === 0) return [];
+
+  // 1. Dense Vector Scoring Pass
   const queryEmbedding = await generateEmbedding(query, apiKey);
+  const vectorRanked = filteredChunks
+    .map((chunk) => ({
+      id: chunk.id,
+      chunk,
+      similarity: cosineSimilarity(queryEmbedding, chunk.embedding),
+    }))
+    .filter((c) => c.similarity >= minScore)
+    .sort((a, b) => b.similarity - a.similarity);
 
-  const scored: RetrievalResult[] = [];
+  // 2. BM25 Lexical Scoring Pass
+  const { BM25Index, computeReciprocalRankFusion } = await import('./recall');
+  const bm25 = new BM25Index(1.2, 0.75);
+  bm25.addDocuments(filteredChunks.map((c) => ({ id: c.id, text: `${c.title} ${c.content}` })));
+  const bm25Ranked = bm25.search(query, topK * 3);
 
-  for (const chunk of chunks) {
-    if (category && chunk.category && chunk.category !== category) {
-      continue;
-    }
+  // 3. Reciprocal Rank Fusion (RRF)
+  const vectorList = vectorRanked.map((v) => ({ id: v.id }));
+  const bm25List = bm25Ranked.map((b) => ({ id: b.id }));
+  const fused = computeReciprocalRankFusion([vectorList, bm25List], 60);
 
-    const similarity = cosineSimilarity(queryEmbedding, chunk.embedding);
-    if (similarity >= minScore) {
-      scored.push({
-        chunkId: chunk.id,
-        docId: chunk.docId,
-        title: chunk.title,
-        content: chunk.content,
-        similarity,
-        category: chunk.category,
-        source: chunk.source,
-        isSensitive: chunk.isSensitive,
-      });
-    }
+  const results: RetrievalResult[] = [];
+  for (const f of fused.slice(0, topK)) {
+    const chunk = filteredChunks.find((c) => c.id === f.item.id);
+    if (!chunk) continue;
+
+    const vecMatch = vectorRanked.find((v) => v.id === chunk.id);
+    const sim = vecMatch ? vecMatch.similarity : 0.75;
+
+    results.push({
+      chunkId: chunk.id,
+      docId: chunk.docId,
+      title: chunk.title,
+      content: chunk.content,
+      similarity: sim,
+      category: chunk.category,
+      source: chunk.source,
+      isSensitive: chunk.isSensitive,
+    });
   }
 
-  // Sort descending by similarity
-  scored.sort((a, b) => b.similarity - a.similarity);
-  return scored.slice(0, topK);
+  return results;
 }
 
 /**
