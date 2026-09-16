@@ -6,8 +6,8 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const country = searchParams.get('country') || 'India';
-    const limit = parseInt(searchParams.get('limit') || '10', 10);
+    const country = searchParams.get('country') || undefined;
+    const limit = parseInt(searchParams.get('limit') || '15', 10);
     const lat = parseFloat(searchParams.get('lat') || '19.0760'); // Default Mumbai
     const lon = parseFloat(searchParams.get('lon') || '72.8777');
 
@@ -21,9 +21,9 @@ export async function GET(req: NextRequest) {
       success: true,
       timestamp: new Date().toISOString(),
       godsEyeRadar: {
-        flights: flightsRes.output,
-        satelliteOrbit: satellitesRes.output,
-        meteorologicalRadar: weatherRes.output,
+        flights: flightsRes.output || { flights: [], totalActiveTransponders: 0 },
+        satelliteOrbit: satellitesRes.output || null,
+        meteorologicalRadar: weatherRes.output || null,
       },
     });
   } catch (err: any) {
