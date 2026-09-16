@@ -34,6 +34,7 @@ function loadEnv() {
 
 loadEnv();
 
+const ALLOWED_USER_ID = process.env.TELEGRAM_ALLOWED_USER_ID || '864360540';
 const MASTER_PIN = process.env.JARVIS_MASTER_PIN || '1001';
 const gateway = new TelegramGateway();
 
@@ -41,40 +42,30 @@ async function handleIncomingMessage(update: TelegramUpdate) {
   const msg = update.message;
   if (!msg || !msg.text) return;
 
+  const senderId = msg.from?.id;
   const chatId = msg.chat.id;
   const userText = msg.text.trim();
-  const authorizedChatId = await gateway.getAuthorizedChatId();
 
-  console.log(`[Telegram Gateway] Message from Chat ID ${chatId} (${msg.from?.first_name}): "${userText.substring(0, 50)}..."`);
-
-  // SENTRY AUTHENTICATION CHECK
-  const isAuthorized = authorizedChatId && String(authorizedChatId) === String(chatId);
-
-  if (!isAuthorized) {
-    const cleanPinCandidate = userText.replace(/^\/auth\s*/i, '').trim();
-    if (cleanPinCandidate === MASTER_PIN) {
-      await gateway.setAuthorizedChatId(chatId);
-      await gateway.sendMessage(
-        chatId,
-        `🛡️ *[SENTRY VERIFICATION SUCCESSFUL]*\n\nWelcome back, Sir. J.A.R.V.I.S. Mark II Sovereign Telegram Uplink is now securely locked to your account.\n\n` +
-        `• **Engine**: Google Cloud Vertex AI Enterprise (Gemini 3.8 Flash)\n` +
-        `• **Mode**: Stage 5 Performance Mode\n` +
-        `• **Directives**: All 5 Core Directives Enforced\n\n` +
-        `How may I serve you today, Sir?`,
-        { parseMode: 'Markdown' }
-      );
-      return;
-    }
-
-    await gateway.sendMessage(
-      chatId,
-      `⛔ *[ACCESS RESTRICTED — GUARDIAN PROTOCOL]*\n\n` +
-      `This channel is unauthorized. J.A.R.V.I.S. Mark II requires sovereign authentication.\n\n` +
-      `Please reply with your **Master Security PIN** to bind this Telegram channel to your neural substrate.`,
-      { parseMode: 'Markdown' }
+  // =========================================================================
+  // GUARDIAN PROTOCOL (DIRECTIVE 01): IMMUTABLE SENDER CRYPTOGRAPHIC SENTRY
+  // In MTProto, msg.from.id is an immutable 64-bit integer signed by Telegram.
+  // It is mathematically impossible to spoof across Telegram servers.
+  // =========================================================================
+  if (!senderId || String(senderId) !== String(ALLOWED_USER_ID)) {
+    console.warn(
+      `[GUARDIAN SENTRY] 🚨 Unauthorized packet discarded from unknown sender: ID=${senderId}, Name=${msg.from?.first_name || 'anon'}, Username=@${msg.from?.username || 'none'}`
     );
+    // GHOST SENTRY: Drop silently. Zero acknowledgment, zero error, zero reconnaissance.
     return;
   }
+
+  // Reject group chats — J.A.R.V.I.S. operates exclusively in private 1-on-1 sovereign channels
+  if (msg.chat.type !== 'private') {
+    console.warn(`[GUARDIAN SENTRY] 🚨 Rejected non-private chat type: ${msg.chat.type}`);
+    return;
+  }
+
+  console.log(`[Telegram Gateway] 🛡️ Verified Sovereign Directive from Sir (ID: ${senderId}): "${userText.substring(0, 50)}..."`);
 
   // SIR IS AUTHORIZED — DISPATCH DIRECTIVE TO CORE ENGINE
   await gateway.sendTypingAction(chatId);
