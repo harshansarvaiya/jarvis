@@ -33,6 +33,19 @@ export interface TelegramUpdate {
     date: number;
     text?: string;
     caption?: string;
+    photo?: Array<{
+      file_id: string;
+      file_unique_id: string;
+      width: number;
+      height: number;
+      file_size?: number;
+    }>;
+    document?: {
+      file_id: string;
+      file_name?: string;
+      mime_type?: string;
+      file_size?: number;
+    };
   };
 }
 
@@ -97,6 +110,44 @@ export class TelegramGateway {
         }),
       });
     } catch {}
+  }
+
+  /**
+   * Fetches file path from Telegram Bot API for a fileId
+   */
+  public async getFilePath(fileId: string): Promise<string | null> {
+    if (!this.isConfigured()) return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/getFile?file_id=${encodeURIComponent(fileId)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.result?.file_path || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Downloads a file from Telegram and converts it to a base64 Data URI
+   */
+  public async downloadFileAsBase64(fileId: string, defaultMime = 'image/jpeg'): Promise<string | null> {
+    if (!this.isConfigured()) return null;
+    try {
+      const filePath = await this.getFilePath(fileId);
+      if (!filePath) return null;
+
+      const fileUrl = `https://api.telegram.org/file/bot${this.token}/${filePath}`;
+      const res = await fetch(fileUrl);
+      if (!res.ok) return null;
+
+      const arrayBuffer = await res.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString('base64');
+      const mimeType = filePath.endsWith('.png') ? 'image/png' : filePath.endsWith('.webp') ? 'image/webp' : defaultMime;
+      return `data:${mimeType};base64,${base64}`;
+    } catch (err: any) {
+      console.warn('[Telegram] Failed to download file as base64:', err?.message);
+      return null;
+    }
   }
 
   /**

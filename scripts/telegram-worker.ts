@@ -40,11 +40,19 @@ const gateway = new TelegramGateway();
 
 async function handleIncomingMessage(update: TelegramUpdate) {
   const msg = update.message;
-  if (!msg || !msg.text) return;
+  if (!msg) return;
 
   const senderId = msg.from?.id;
   const chatId = msg.chat.id;
-  const userText = msg.text.trim();
+
+  const hasPhoto = Boolean(msg.photo && msg.photo.length > 0);
+  const hasDoc = Boolean(msg.document && msg.document.mime_type?.startsWith('image/'));
+  let userText = (msg.text || msg.caption || '').trim();
+
+  if (!userText && (hasPhoto || hasDoc)) {
+    userText = 'Please analyze this screenshot/image, Sir.';
+  }
+  if (!userText && !hasPhoto && !hasDoc) return;
 
   // =========================================================================
   // GUARDIAN PROTOCOL (DIRECTIVE 01): IMMUTABLE SENDER CRYPTOGRAPHIC SENTRY
@@ -65,10 +73,21 @@ async function handleIncomingMessage(update: TelegramUpdate) {
     return;
   }
 
-  console.log(`[Telegram Gateway] 🛡️ Verified Sovereign Directive from Sir (ID: ${senderId}): "${userText.substring(0, 50)}..."`);
+  console.log(`[Telegram Gateway] 🛡️ Verified Sovereign Directive from Sir (ID: ${senderId}): "${userText.substring(0, 50)}..."${hasPhoto ? ' [PHOTO ATTACHED]' : ''}`);
 
   // SIR IS AUTHORIZED — DISPATCH DIRECTIVE TO CORE ENGINE
   await gateway.sendTypingAction(chatId);
+
+  // Download multimodal visual media if attached
+  let base64Image: string | undefined = undefined;
+  if (hasPhoto && msg.photo) {
+    const largestPhoto = msg.photo[msg.photo.length - 1];
+    const b64 = await gateway.downloadFileAsBase64(largestPhoto.file_id);
+    if (b64) base64Image = b64;
+  } else if (hasDoc && msg.document) {
+    const b64 = await gateway.downloadFileAsBase64(msg.document.file_id, msg.document.mime_type);
+    if (b64) base64Image = b64;
+  }
 
   try {
     // 1. Retrieve Recent Universal Chat History for Cross-Device Continuity
@@ -85,13 +104,14 @@ async function handleIncomingMessage(update: TelegramUpdate) {
       id: `msg-${Date.now()}-u`,
       role: 'user',
       content: userText,
+      image: base64Image,
       timestamp: new Date().toISOString(),
     };
     contextMessages.push({
       id: userMsgRecord.id,
       role: userMsgRecord.role,
       content: userMsgRecord.content,
-      image: undefined,
+      image: base64Image,
     });
 
     // 2. Invoke J.A.R.V.I.S. Agent (Vertex AI Gemini 3.8 Flash with Extended Thinking)

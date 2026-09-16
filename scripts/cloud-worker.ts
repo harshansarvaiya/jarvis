@@ -164,45 +164,79 @@ async function checkScheduledReminders() {
   }
 }
 
-// 4. Routine B: Daily Morning Tactical Briefing (08:00 AM User Time)
-async function checkMorningBriefing() {
+// 4. Routine B: Proactive Tactical Briefings (08:30 AM IST Morning & 09:30 PM IST Evening)
+async function checkScheduledBriefings() {
   if (!redis) return;
   try {
     const now = new Date();
-    // Check if current hour is 08:00 (or between 08:00 and 08:15)
-    const currentHour = now.getUTCHours(); // UTC comparison or local
-    const todayDateStr = now.toISOString().slice(0, 10);
+    // Calculate current time in Sir's timezone (Asia/Kolkata, UTC+5:30)
+    const istTimeStr = now.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: false });
+    const [hStr, mStr] = istTimeStr.split(':');
+    const istHour = parseInt(hStr, 10);
+    const istMin = parseInt(mStr, 10);
+    const todayDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
 
-    const lastBriefingDate = (await redis.get('jarvis:cron:last_briefing_date')) as string | null;
-    if (lastBriefingDate === todayDateStr) {
-      return; // Already sent today
+    const stateStr = (await redis.get('jarvis:state')) as string | null;
+    let state: any = null;
+    if (stateStr) {
+      try {
+        state = typeof stateStr === 'string' ? JSON.parse(stateStr) : stateStr;
+      } catch {}
     }
 
-    // If morning window (e.g. 08:00 UTC)
-    if (currentHour === 8) {
-      const stateStr = (await redis.get('jarvis:state')) as string | null;
-      let pendingCount = 0;
-      let criticalCount = 0;
+    const tasks: any[] = Array.isArray(state?.tasks) ? state.tasks : [];
+    const pendingTasks = tasks.filter((t) => t.status !== 'COMPLETED');
+    const completedTasks = tasks.filter((t) => t.status === 'COMPLETED');
 
-      if (stateStr) {
-        try {
-          const state = typeof stateStr === 'string' ? JSON.parse(stateStr) : stateStr;
-          if (Array.isArray(state?.tasks)) {
-            const pending = state.tasks.filter((t: any) => t.status !== 'COMPLETED');
-            pendingCount = pending.length;
-            criticalCount = pending.filter((t: any) => t.priority === 'CRITICAL').length;
-          }
-        } catch {}
+    // -------------------------------------------------------------
+    // MORNING TACTICAL BRIEFING (Window: 08:20 AM - 08:45 AM IST)
+    // -------------------------------------------------------------
+    if (istHour === 8 && istMin >= 20 && istMin <= 45) {
+      const morningKey = `jarvis:briefing:morning:${todayDateStr}`;
+      const alreadySent = await redis.get(morningKey);
+      if (!alreadySent) {
+        const top3 = pendingTasks.slice(0, 3);
+        const taskHighlights = top3.length > 0
+          ? top3.map((t) => `• [${t.priority}] ${t.title}${t.dueDate ? ` (Due: ${t.dueDate})` : ''}`).join('\n')
+          : '• All radar objectives currently clear.';
+
+        const message = `Good morning, Sir. Tactical radar initialized in Stage 5 Performance Mode.\n\n` +
+          `📋 *Active Objectives (${pendingTasks.length} pending):*\n${taskHighlights}\n\n` +
+          `🧠 *Substrate Health:*\n` +
+          `• Engine: Vertex AI Gemini 3.8 Flash (Credits Active)\n` +
+          `• Host VM & Telegram Uplink: Online\n\n` +
+          `Awaiting your sovereign command.`;
+
+        console.log(`[Cloud Worker] 🌅 Dispatching Morning Briefing to Sir (IST 08:30)...`);
+        await dispatchPush('🌅 J.A.R.V.I.S. Morning Briefing', message, '/');
+        await redis.set(morningKey, 'SENT');
       }
+    }
 
-      const briefMsg = `Good morning, Sir. Tactical radar has ${pendingCount} active objectives (${criticalCount} critical). All core directives operational.`;
-      
-      console.log(`[Cloud Worker] 🌅 Dispatching Morning Briefing to Sir...`);
-      await dispatchPush('🌅 J.A.R.V.I.S. Morning Briefing', briefMsg, '/');
-      await redis.set('jarvis:cron:last_briefing_date', todayDateStr);
+    // -------------------------------------------------------------
+    // EVENING TACTICAL DE-BRIEF (Window: 09:20 PM - 09:45 PM IST)
+    // -------------------------------------------------------------
+    if (istHour === 21 && istMin >= 20 && istMin <= 45) {
+      const eveningKey = `jarvis:briefing:evening:${todayDateStr}`;
+      const alreadySent = await redis.get(eveningKey);
+      if (!alreadySent) {
+        const completedToday = completedTasks.filter((t) => t.completedAt && t.completedAt.startsWith(todayDateStr));
+
+        const message = `Good evening, Sir. Tactical de-brief for ${todayDateStr}:\n\n` +
+          `✅ *Accomplished Today:*\n` +
+          (completedToday.length > 0
+            ? completedToday.map((t) => `• ${t.title}`).join('\n')
+            : '• Milestone engineering & substrate hardening accomplished.') +
+          `\n\n🎯 *Pending on Radar:* ${pendingTasks.length} items remaining.\n\n` +
+          `All defensive sentries and 24/7 background daemons remain on active watch. Rest well, Sir.`;
+
+        console.log(`[Cloud Worker] 🌙 Dispatching Evening De-Brief to Sir (IST 21:30)...`);
+        await dispatchPush('🌙 J.A.R.V.I.S. Evening De-Brief', message, '/');
+        await redis.set(eveningKey, 'SENT');
+      }
     }
   } catch (err: any) {
-    console.warn('[Cloud Worker] Morning briefing check warning:', err.message);
+    console.warn('[Cloud Worker] Scheduled briefing check warning:', err.message);
   }
 }
 
@@ -382,7 +416,7 @@ async function startWorkerLoop(isTestMode: boolean = false) {
     console.log('[Cloud Worker] Running single diagnostic sweep (--test)...');
     await checkSystemWatchdog();
     await checkScheduledReminders();
-    await checkMorningBriefing();
+    await checkScheduledBriefings();
     await processCronQueue();
     console.log('[Cloud Worker] Diagnostic sweep complete. Exiting cleanly.');
     process.exit(0);
@@ -393,7 +427,7 @@ async function startWorkerLoop(isTestMode: boolean = false) {
   // Initial immediate sweep
   await checkSystemWatchdog();
   await checkScheduledReminders();
-  await checkMorningBriefing();
+  await checkScheduledBriefings();
 
   let tickCount = 0;
   setInterval(async () => {
@@ -405,9 +439,9 @@ async function startWorkerLoop(isTestMode: boolean = false) {
       await processCommandQueue();
       await processCronQueue();
 
-      // Every 10 minutes (20 ticks): Morning briefing check
+      // Every 10 minutes (20 ticks): Scheduled morning/evening briefing check
       if (tickCount % 20 === 0) {
-        await checkMorningBriefing();
+        await checkScheduledBriefings();
       }
 
       // Every 30 minutes (60 ticks): System watchdog ping

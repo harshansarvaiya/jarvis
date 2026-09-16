@@ -802,6 +802,33 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: 'synthesize_skill',
+    description: 'Synthesize or update a modular, reusable operational skill in the skills/ library (Hermes agentskills.io standard) for future autonomous execution.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Unique kebab-case name of the skill (e.g. "github-pr-audit", "dns-leak-check").',
+        },
+        description: {
+          type: 'string',
+          description: 'Clear description of what the skill accomplishes and when it should trigger.',
+        },
+        content: {
+          type: 'string',
+          description: 'The step-by-step markdown playbook, checklist, and terminal execution commands.',
+        },
+        triggers: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of prompt phrases or keywords that trigger this skill.',
+        },
+      },
+      required: ['name', 'description', 'content', 'triggers'],
+    },
+  },
 ];
 
 export async function executeJarvisTool(
@@ -1237,6 +1264,24 @@ export async function executeJarvisTool(
             },
           };
         }
+      }
+
+      case 'synthesize_skill': {
+        const { name, description, content, triggers } = args;
+        const { synthesizeSkill } = await import('./skills');
+        const res = synthesizeSkill({
+          name: name || 'unnamed-skill',
+          description: description || '',
+          content: content || '',
+          triggers: Array.isArray(triggers) ? triggers : [],
+        });
+        return {
+          success: res.success,
+          result: {
+            message: res.message,
+            filePath: res.filePath,
+          },
+        };
       }
 
       default:

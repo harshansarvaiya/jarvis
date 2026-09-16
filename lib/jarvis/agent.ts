@@ -178,6 +178,20 @@ export async function runJarvisAgent(
   const relevantMemories = getMemories().slice(0, 8);
   const motivePass = deconstructOperationalMotive(lastUserMessage.content);
 
+  // 3.5. Match Relevant Modular Skills (Hermes agentskills.io Engine)
+  let skillsContext = '';
+  try {
+    const { matchRelevantSkills, formatSkillCatalogPrompt } = await import('./skills');
+    const matched = matchRelevantSkills(lastUserMessage.content, 2);
+    if (matched.length > 0) {
+      skillsContext = `\n[ACTIVATED SKILL PLAYBOOKS]:\n${matched.map((s) => `### Skill: ${s.metadata.name}\n${s.content}`).join('\n\n')}\n`;
+    }
+    const catalog = formatSkillCatalogPrompt();
+    if (catalog) skillsContext += catalog;
+  } catch (skillsErr) {
+    console.warn('[Agent] Skills loading warning:', skillsErr);
+  }
+
   const contextPrompt = `
 [CURRENT TEMPORAL CONTEXT]: ${new Date().toISOString()} (Local time: ${new Date().toLocaleString()})
 [PRE-THOUGHT REASONING PASS & MOTIVE DECONSTRUCTION]:
@@ -195,6 +209,7 @@ ${completedTasks.map((t) => `- [COMPLETED] ${t.title} (ID: ${t.id}${t.completedA
 ${relevantMemories.map((m) => `- [${m.category}]: ${m.content}`).join('\n')}
 ${recalledContextPrompt}
 ${retrievedKnowledgeContext}
+${skillsContext}
 [DIRECTIVE ENFORCEMENT]:
 ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 `;
@@ -777,6 +792,30 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     }
 
     const latencyMs = Date.now() - startTime;
+
+    // Hermes Feature 4: Record Execution Trajectory for Fine-Tuning & Distillation
+    try {
+      const { recordExecutionTrajectory } = await import('./trajectory');
+      recordExecutionTrajectory({
+        id: `traj-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        userPrompt: lastUserMessage.content,
+        assistantReply: finalReply,
+        vocalSummary: extractCinematicVocalSummary(finalReply),
+        motiveAnalysis: motivePass.unstatedMotive,
+        internalThoughts,
+        toolCalls: toolCallsExecuted,
+        telemetry: {
+          engineUsed: isVertexEngine ? `Vertex AI ${selectedVertexModel}` : selectedModel,
+          model: isVertexEngine ? selectedVertexModel : selectedModel,
+          latencyMs,
+          provider: isVertexEngine ? 'vertex-ai' : 'google',
+        },
+      });
+    } catch (trajErr) {
+      console.warn('[Agent] Trajectory recording warning:', trajErr);
+    }
+
     return {
       reply: finalReply,
       vocalSummary: extractCinematicVocalSummary(finalReply),
