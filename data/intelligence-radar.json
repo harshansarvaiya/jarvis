@@ -111,5 +111,23 @@
       "Cross-Client JSON-RPC Gateway Transport"
     ],
     "addedAt": "2026-09-16T13:24:00Z"
+  },
+  {
+    "name": "punkpeye/awesome-mcp-servers",
+    "url": "https://github.com/punkpeye/awesome-mcp-servers",
+    "domain": "Macro MCP Catalog & Capability Index",
+    "status": "ACTIVE_CATALOG",
+    "extractedFeatures": [
+      "Exa Neural Search MCP (`mcp:exa`)",
+      "Vercel Deployment Management MCP (`mcp:vercel`)",
+      "Anthropic Knowledge Graph Memory MCP (`mcp:memory`)"
+    ],
+    "futureRoadmap": [
+      "Google Calendar / Workspace MCP Integration",
+      "Sentry Telemetry & Exception Auto-Healing MCP",
+      "Playwright / Stagehand Vision Actuation MCP",
+      "Cloudflare Workers & Edge DNS MCP"
+    ],
+    "addedAt": "2026-09-16T13:27:00Z"
   }
 ]
