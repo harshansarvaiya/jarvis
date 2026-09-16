@@ -175,6 +175,6 @@ export async function callVertexAIGenerate(options: VertexGenerateOptions): Prom
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(bodyPayload),
-    signal: options.signal || AbortSignal.timeout(25000),
+    signal: options.signal || AbortSignal.timeout(180000),
   });
 }

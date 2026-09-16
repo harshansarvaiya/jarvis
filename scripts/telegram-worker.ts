@@ -76,6 +76,9 @@ async function handleIncomingMessage(update: TelegramUpdate) {
   console.log(`[Telegram Gateway] 🛡️ Verified Sovereign Directive from Sir (ID: ${senderId}): "${userText.substring(0, 50)}..."${hasPhoto ? ' [PHOTO ATTACHED]' : ''}`);
 
   // SIR IS AUTHORIZED — DISPATCH DIRECTIVE TO CORE ENGINE
+  const typingPulse = setInterval(() => {
+    gateway.sendTypingAction(chatId).catch(() => {});
+  }, 4000);
   await gateway.sendTypingAction(chatId);
 
   // Download multimodal visual media if attached
@@ -163,6 +166,8 @@ async function handleIncomingMessage(update: TelegramUpdate) {
       `Sir, a temporary cognitive latency occurred while processing your directive: ${err.message}. State and safeguards remain nominal.`,
       { replyToMessageId: msg.message_id }
     );
+  } finally {
+    clearInterval(typingPulse);
   }
 }
 

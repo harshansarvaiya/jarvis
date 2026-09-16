@@ -460,7 +460,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
                 thinkingBudget: 2048,
               },
             },
-            signal: AbortSignal.timeout(60000),
+            signal: AbortSignal.timeout(180000),
           });
 
           if (vRes.ok) {
@@ -728,7 +728,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             systemInstruction,
             tools: geminiTools,
             generationConfig: toolGenerationConfig,
-            signal: AbortSignal.timeout(60000),
+            signal: AbortSignal.timeout(180000),
           });
         } else {
           response = await fetch(activeApiUrl, {
@@ -793,13 +793,47 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       candidate?.content?.parts?.find((p: any) => p.text);
 
     let finalReply = textPart?.text;
+    if (!finalReply && toolCallsExecuted.length > 0) {
+      try {
+        console.log('[Agent] No final text generated after tools. Forcing dedicated synthesis pass...');
+        const finalPrompt = [
+          ...contents,
+          {
+            role: 'user',
+            parts: [
+              {
+                text: 'Based on the tool results and actions above, please provide your complete, concise, natural response to Sir now explaining what you found, executed, or discovered.',
+              },
+            ],
+          },
+        ];
+        if (isVertexEngine) {
+          const synthRes = await callVertexAIGenerate({
+            model: selectedVertexModel,
+            contents: finalPrompt,
+            systemInstruction,
+            generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
+            signal: AbortSignal.timeout(90000),
+          });
+          if (synthRes.ok) {
+            const sData = await synthRes.json();
+            const sText = sData.candidates?.[0]?.content?.parts?.find((p: any) => p.text && !p.thought)?.text;
+            if (sText) finalReply = sText;
+          }
+        }
+      } catch (sErr) {
+        console.warn('[Agent] Synthesis fallback error:', sErr);
+      }
+    }
+
     if (!finalReply) {
       if (toolCallsExecuted.length > 0) {
         const summaries = toolCallsExecuted.map((tc) => {
           if (tc.result?.message) return tc.result.message;
-          return `${tc.name} executed successfully.`;
+          if (typeof tc.result === 'string') return tc.result;
+          return `${tc.name} executed.`;
         });
-        finalReply = `Sir, I have executed your instructions directly:\n\n${summaries.map((s) => `- ${s}`).join('\n')}\n\nAll directives remain fully online.`;
+        finalReply = `Sir, I completed the requested operations:\n\n${summaries.map((s) => `• ${s}`).join('\n')}`;
       } else {
         finalReply = 'Directives acknowledged and synchronized, Sir.';
       }
