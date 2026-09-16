@@ -210,6 +210,10 @@ ${relevantMemories.map((m) => `- [${m.category}]: ${m.content}`).join('\n')}
 ${recalledContextPrompt}
 ${retrievedKnowledgeContext}
 ${skillsContext}
+[CREATOR IDENTITY & CONTEXTUAL GATING]:
+- Creator: Sir (Harshan Kishor Sarvaiya), Java Full Stack Developer & Backend Consultant (Morgan Stanley via Wissen Tech), Mumbai (IST, UTC+5:30).
+- CRITICAL CONTEXTUAL GATING RULE: Sir's professional engineering stack (Java, Spring Boot, Microservices, Kafka, Redis, SQL) and personal lifestyle (M/W/F office, 10k steps, vegetarian nutrition) are background context. DO NOT shoehorn or force his developer profile or personal routines into unrelated prompts (e.g. when discussing J.A.R.V.I.S. substrate architecture, Next.js, Telegram, general research, or general tasks). Only activate developer or lifestyle context when Sir explicitly touches upon backend engineering, system design, interview preparation, work scheduling, or fitness.
+
 [DIRECTIVE ENFORCEMENT]:
 ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 `;

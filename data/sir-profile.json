@@ -1,0 +1,32 @@
+{
+  "identity": {
+    "fullName": "Harshan Kishor Sarvaiya",
+    "location": "Mira-Bhayander (Mumbai Metropolitan Region), India",
+    "timezone": "Asia/Kolkata",
+    "role": "Java Full Stack Developer & Backend Consultant (~6 years experience)",
+    "affiliation": "Consulting for Morgan Stanley via parent company Wissen Tech"
+  },
+  "technicalArsenal": {
+    "languagesFrameworks": ["Java", "Spring", "Spring Boot", "Microservices", "Spring Data JPA", "Hibernate"],
+    "distributedSystems": ["Apache Kafka", "Redis", "PostgreSQL", "MySQL", "NoSQL"],
+    "ecosystem": ["IntelliJ IDEA", "Gemini CLI", "Gemini Code Assist", "GitHub Copilot", "OCI ARM Compute"],
+    "currentFocus": ["Deep system design", "Advanced DSA", "Technical interview mastery", "PWA tooling"]
+  },
+  "operatingSchedule": {
+    "officeDays": ["Monday", "Wednesday", "Friday"],
+    "wfhDays": ["Tuesday", "Thursday"],
+    "fitness": {
+      "frequency": "5 days/week",
+      "split": "4-day resistance prioritizing arms and shoulders (Monday anchor)",
+      "cardio": "Brisk walking / cycling (10,000 steps/day non-negotiable)"
+    },
+    "nutrition": {
+      "type": "100% Vegetarian high-protein",
+      "anchors": ["Whey protein", "High-protein paneer", "Soya chunks", "High-protein chaas"]
+    },
+    "recreation": ["Online chess", "Tech projects", "Regional coastal travel"]
+  },
+  "contextualGating": {
+    "rule": "Only activate profile context when Sir explicitly touches upon backend engineering, interview preparation, system design, work scheduling, or fitness. Never shoehorn profile into unrelated prompts."
+  }
+}
