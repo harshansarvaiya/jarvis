@@ -15,7 +15,7 @@ Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, Sys
 $ApiUrl = "https://jarvis-iota-beige.vercel.app/api/jarvis/shortcut"
 $BearerToken = "sk_jarvis_mobile_sovereign_2026_apex"
 
-# 3. Clean XAML String Definition
+# 3. Clean XAML String Definition (100% ASCII)
 $xamlString = @'
 <Window
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -47,14 +47,14 @@ $xamlString = @'
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Grid.Column="0">
-                    <TextBlock Text="⚡ J.A.R.V.I.S. MARK II" Foreground="#00F0FF" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
-                    <TextBlock Text="  //  SOVEREIGN HUD" Foreground="#8B949E" FontSize="12" VerticalAlignment="Center"/>
+                    <TextBlock Text="[J.A.R.V.I.S. MARK II]" Foreground="#00F0FF" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                    <TextBlock Text="  //  SOVEREIGN WINDOWS HUD" Foreground="#8B949E" FontSize="12" VerticalAlignment="Center"/>
                     <Border Background="#052E16" CornerRadius="4" Padding="6,2" Margin="12,0,0,0">
-                        <TextBlock x:Name="StatusBadge" Text="● ONLINE" Foreground="#00FF9D" FontWeight="Bold" FontSize="10"/>
+                        <TextBlock x:Name="StatusBadge" Text="[ONLINE]" Foreground="#00FF9D" FontWeight="Bold" FontSize="10"/>
                     </Border>
                 </StackPanel>
                 <TextBlock Grid.Column="1" Text="[ESC] Close  |  [ENTER] Execute" Foreground="#8B949E" FontSize="11" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                <Button x:Name="BtnClose" Grid.Column="2" Content="✕" Width="24" Height="22" Background="#111927" Foreground="#E2E8F0" BorderBrush="#1F2D42" FontWeight="Bold" Cursor="Hand"/>
+                <Button x:Name="BtnClose" Grid.Column="2" Content="X" Width="24" Height="22" Background="#111927" Foreground="#E2E8F0" BorderBrush="#1F2D42" FontWeight="Bold" Cursor="Hand"/>
             </Grid>
 
             <!-- Row 1: Command Input Box -->
@@ -66,11 +66,11 @@ $xamlString = @'
 
             <!-- Row 2: Quick Action Pills -->
             <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,10">
-                <Button x:Name="BtnBriefing" Content="📊 Briefing" Height="26" Margin="0,0,6,0" Padding="10,0" Background="#111927" Foreground="#00F0FF" BorderBrush="#1F2D42" FontWeight="SemiBold" FontSize="11" Cursor="Hand"/>
-                <Button x:Name="BtnRadar" Content="🎯 Radar" Height="26" Margin="0,0,6,0" Padding="10,0" Background="#111927" Foreground="#00F0FF" BorderBrush="#1F2D42" FontWeight="SemiBold" FontSize="11" Cursor="Hand"/>
-                <Button x:Name="BtnAudit" Content="🛡️ Security Scan" Height="26" Margin="0,0,6,0" Padding="10,0" Background="#111927" Foreground="#00F0FF" BorderBrush="#1F2D42" FontWeight="SemiBold" FontSize="11" Cursor="Hand"/>
-                <Button x:Name="BtnGroq" Content="⚡ Groq 120B" Height="26" Margin="0,0,6,0" Padding="10,0" Background="#111927" Foreground="#00F0FF" BorderBrush="#1F2D42" FontWeight="SemiBold" FontSize="11" Cursor="Hand"/>
-                <Button x:Name="BtnClipboard" Content="📋 Analyze Clipboard" Height="26" Margin="0,0,6,0" Padding="10,0" Background="#111927" Foreground="#00F0FF" BorderBrush="#1F2D42" FontWeight="SemiBold" FontSize="11" Cursor="Hand"/>
+                <Button x:Name="BtnBriefing" Content="Briefing" Height="26" Margin="0,0,6,0" Padding="12,0" Background="#111927" Foreground="#00F0FF" BorderBrush="#1F2D42" FontWeight="SemiBold" FontSize="11" Cursor="Hand"/>
+                <Button x:Name="BtnRadar" Content="Radar" Height="26" Margin="0,0,6,0" Padding="12,0" Background="#111927" Foreground="#00F0FF" BorderBrush="#1F2D42" FontWeight="SemiBold" FontSize="11" Cursor="Hand"/>
+                <Button x:Name="BtnAudit" Content="Security Scan" Height="26" Margin="0,0,6,0" Padding="12,0" Background="#111927" Foreground="#00F0FF" BorderBrush="#1F2D42" FontWeight="SemiBold" FontSize="11" Cursor="Hand"/>
+                <Button x:Name="BtnGroq" Content="Groq 120B" Height="26" Margin="0,0,6,0" Padding="12,0" Background="#111927" Foreground="#00F0FF" BorderBrush="#1F2D42" FontWeight="SemiBold" FontSize="11" Cursor="Hand"/>
+                <Button x:Name="BtnClipboard" Content="Analyze Clipboard" Height="26" Margin="0,0,6,0" Padding="12,0" Background="#111927" Foreground="#00F0FF" BorderBrush="#1F2D42" FontWeight="SemiBold" FontSize="11" Cursor="Hand"/>
             </StackPanel>
 
             <!-- Row 3: Response Output Display Area -->
@@ -85,7 +85,7 @@ $xamlString = @'
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="TelemetryLabel" Grid.Column="0" Text="Substrate: Standby  |  Zero-Install Office Mode" Foreground="#8B949E" FontSize="10" VerticalAlignment="Center"/>
-                <Button x:Name="BtnCopy" Grid.Column="1" Content="📋 Copy Output" Height="24" Padding="10,0" Background="#1B2537" Foreground="#E2E8F0" BorderBrush="#1F2D42" FontSize="10" FontWeight="Bold" Cursor="Hand"/>
+                <Button x:Name="BtnCopy" Grid.Column="1" Content="Copy Output" Height="24" Padding="10,0" Background="#1B2537" Foreground="#E2E8F0" BorderBrush="#1F2D42" FontSize="10" FontWeight="Bold" Cursor="Hand"/>
             </Grid>
         </Grid>
     </Border>
@@ -117,7 +117,7 @@ $BtnCopy = $window.FindName("BtnCopy")
 $BtnClose = $window.FindName("BtnClose")
 
 # Initial greeting
-$OutputBox.Text = "J.A.R.V.I.S. Windows Sovereign HUD Initialized.`r`nReady for directives on your workstation, Sir.`r`n`r`nType a prompt above or click an action pill."
+$OutputBox.Text = "J.A.R.V.I.S. Windows Sovereign HUD Initialized.`r`nReady for directives on your workstation, Sir.`r`n`r`nType a prompt above or click an action button."
 
 # Window Dragging
 $window.Add_MouseLeftButtonDown({
@@ -133,9 +133,9 @@ $BtnClose.Add_Click({
 function Dispatch-JarvisDirective($prompt) {
     if ([string]::IsNullOrWhiteSpace($prompt)) { return }
     
-    $StatusBadge.Text = "● THINKING..."
+    $StatusBadge.Text = "[THINKING...]"
     $StatusBadge.Foreground = [System.Windows.Media.Brushes]::Cyan
-    $OutputBox.Text = '⚡ Executing directive: "' + $prompt + '"...' + "`r`nTransmitting to J.A.R.V.I.S. Cloud Edge...`r`n"
+    $OutputBox.Text = 'Executing directive: "' + $prompt + '"...' + "`r`nTransmitting to J.A.R.V.I.S. Cloud Edge...`r`n"
 
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
@@ -174,7 +174,7 @@ function Dispatch-JarvisDirective($prompt) {
             $powershell.Dispose()
             $runspace.Close()
 
-            $StatusBadge.Text = "● ONLINE"
+            $StatusBadge.Text = "[ONLINE]"
             $StatusBadge.Foreground = [System.Windows.Media.Brushes]::SpringGreen
 
             if ($result.Success) {
@@ -183,7 +183,7 @@ function Dispatch-JarvisDirective($prompt) {
                 $engine = if ($data.telemetry) { $data.telemetry.engineUsed } else { "Cloud Engine" }
                 $TelemetryLabel.Text = "Latency: $($stopwatch.ElapsedMilliseconds)ms  |  Engine: $engine"
             } else {
-                $OutputBox.Text = '🚨 Communication Error: ' + $result.Error + "`r`n`r`nPlease check network connectivity or sovereign token."
+                $OutputBox.Text = '[ERROR]: ' + $result.Error + "`r`n`r`nPlease check network connectivity or sovereign token."
                 $TelemetryLabel.Text = "Status: Transmission Failed"
             }
         }
@@ -245,11 +245,11 @@ $BtnClipboard.Add_Click({
 $BtnCopy.Add_Click({
     if ($OutputBox.Text) {
         [System.Windows.Forms.Clipboard]::SetText($OutputBox.Text)
-        $BtnCopy.Content = "✅ Copied!"
+        $BtnCopy.Content = "Copied!"
         $resetTimer = New-Object System.Windows.Threading.DispatcherTimer
         $resetTimer.Interval = [TimeSpan]::FromMilliseconds(1500)
         $resetTimer.Add_Tick({
-            $BtnCopy.Content = "📋 Copy Output"
+            $BtnCopy.Content = "Copy Output"
             $resetTimer.Stop()
         })
         $resetTimer.Start()
