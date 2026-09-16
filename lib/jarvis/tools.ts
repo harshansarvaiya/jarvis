@@ -783,6 +783,24 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'invoke_antigravity_cli',
+    description: 'Dispatch a deep, heavy engineering, refactoring, or architectural directive to the Sovereign Antigravity Apex CLI (agy) on the cloud runner VM. Antigravity runs with full autonomous tools and self-correcting reasoning, returning the complete verified report.',
+    parameters: {
+      type: 'object',
+      properties: {
+        prompt: {
+          type: 'string',
+          description: 'The detailed engineering objective or prompt to execute.',
+        },
+        timeoutSeconds: {
+          type: 'number',
+          description: 'Optional timeout in seconds (default: 180).',
+        },
+      },
+      required: ['prompt'],
+    },
+  },
+  {
     name: 'mcp_cloud',
     description: 'Check Vercel Edge production deployment status, Ngrok static tunnel, or server telemetry.',
     parameters: {
@@ -1342,6 +1360,38 @@ export async function executeJarvisTool(
         const { pattern, directory } = args;
         const res = await handleFindFiles({ pattern, directory });
         return { success: true, result: res };
+      }
+
+      case 'invoke_antigravity_cli': {
+        const { prompt: cliPrompt, timeoutSeconds = 180 } = args;
+        const agyBin = '/home/harshans279/.local/bin/agy';
+        if (!fs.existsSync(agyBin)) {
+          throw new Error('Antigravity CLI binary not found on this substrate.');
+        }
+        try {
+          const { stdout, stderr } = await execAsync(
+            `${agyBin} -p ${JSON.stringify(cliPrompt)} --dangerously-skip-permissions --output-format text`,
+            {
+              cwd: process.cwd(),
+              timeout: timeoutSeconds * 1000,
+              maxBuffer: 1024 * 1024,
+            }
+          );
+          return {
+            success: true,
+            result: {
+              source: 'Antigravity Apex CLI Engine (agy)',
+              output: stdout.trim(),
+              stderr: stderr.trim() || undefined,
+            },
+          };
+        } catch (err: any) {
+          return {
+            success: false,
+            error: `Antigravity CLI execution error: ${err.message}`,
+            result: err.stdout ? { partialOutput: err.stdout } : undefined,
+          };
+        }
       }
 
       case 'mcp_network': {

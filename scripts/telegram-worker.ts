@@ -147,7 +147,7 @@ async function handleIncomingMessage(update: TelegramUpdate) {
     // Append Telemetry Badge
     if (result.telemetry) {
       const engineName = result.telemetry.engineUsed || 'Vertex AI Gemini 3.8';
-      responseText += `\n\n🧠 \`${engineName} // ${result.telemetry.latencyMs}ms\``;
+      responseText += `\n\n🛡️ \`[ANTIGRAVITY APEX] ${engineName} // ${result.telemetry.latencyMs}ms\``;
     }
 
     await gateway.sendMessage(chatId, responseText, {
