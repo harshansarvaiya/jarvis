@@ -117,7 +117,7 @@ $BtnCopy = $window.FindName("BtnCopy")
 $BtnClose = $window.FindName("BtnClose")
 
 # Initial greeting
-$OutputBox.Text = "J.A.R.V.I.S. Windows Sovereign HUD Initialized.`nReady for directives on your workstation, Sir.`n`nType a prompt above or click an action pill."
+$OutputBox.Text = "J.A.R.V.I.S. Windows Sovereign HUD Initialized.`r`nReady for directives on your workstation, Sir.`r`n`r`nType a prompt above or click an action pill."
 
 # Window Dragging
 $window.Add_MouseLeftButtonDown({
@@ -135,7 +135,7 @@ function Dispatch-JarvisDirective($prompt) {
     
     $StatusBadge.Text = "● THINKING..."
     $StatusBadge.Foreground = [System.Windows.Media.Brushes]::Cyan
-    $OutputBox.Text = "⚡ Executing directive: `"$prompt`"...`nTransmitting to J.A.R.V.I.S. Cloud Edge...`n"
+    $OutputBox.Text = '⚡ Executing directive: "' + $prompt + '"...' + "`r`nTransmitting to J.A.R.V.I.S. Cloud Edge...`r`n"
 
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
@@ -183,7 +183,7 @@ function Dispatch-JarvisDirective($prompt) {
                 $engine = if ($data.telemetry) { $data.telemetry.engineUsed } else { "Cloud Engine" }
                 $TelemetryLabel.Text = "Latency: $($stopwatch.ElapsedMilliseconds)ms  |  Engine: $engine"
             } else {
-                $OutputBox.Text = "🚨 Communication Error: $($result.Error)`n`nPlease check network connectivity or sovereign token."
+                $OutputBox.Text = '🚨 Communication Error: ' + $result.Error + "`r`n`r`nPlease check network connectivity or sovereign token."
                 $TelemetryLabel.Text = "Status: Transmission Failed"
             }
         }
@@ -233,7 +233,9 @@ $BtnClipboard.Add_Click({
     $clip = [System.Windows.Forms.Clipboard]::GetText()
     if ($clip) {
         $PromptInput.Text = "Analyze this clipboard content / error"
-        $directive = "Analyze this clipboard content / error:`n`n````n$($clip.Substring(0, [Math]::Min(1500, $clip.Length)))`n```"
+        $maxLen = [Math]::Min(1500, $clip.Length)
+        $clipSub = $clip.Substring(0, $maxLen)
+        $directive = "Analyze this clipboard content / error:`r`n`r`n" + '```' + "`r`n" + $clipSub + "`r`n" + '```'
         Dispatch-JarvisDirective $directive
     } else {
         $OutputBox.Text = "Clipboard is currently empty, Sir."
