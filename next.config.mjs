@@ -4,6 +4,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  experimental: {
+    serverComponentsExternalPackages: ['playwright-chromium', 'playwright-core'],
+  },
   allowedDevOrigins: [
     'washbasin-penpal-muppet.ngrok-free.dev',
     '*.ngrok-free.dev',
