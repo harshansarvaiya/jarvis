@@ -26,12 +26,14 @@ import {
   File,
   Check,
   ChevronDown,
+  Globe,
 } from 'lucide-react';
 import { ArcReactorOrb } from '@/components/ArcReactorOrb';
 import { DirectiveBadge } from '@/components/DirectiveBadge';
 import { TaskMatrix } from '@/components/TaskMatrix';
 import { MemoryVault } from '@/components/MemoryVault';
 import { SystemHealthMatrix } from '@/components/SystemHealthMatrix';
+import { HolographicOrbitalRadar } from '@/components/HolographicOrbitalRadar';
 import { SettingsModal } from '@/components/SettingsModal';
 import { SecurityGateModal } from '@/components/SecurityGateModal';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
@@ -158,8 +160,8 @@ export default function JarvisDashboard() {
   const [isUnlocked, setIsUnlocked] = useState(false);
 
   // Tab State: Separate mobile tabs from desktop view
-  const [mobileTab, setMobileTab] = useState<'COMMS' | 'TASKS' | 'MEMORY' | 'DIRECTIVES' | 'SYSTEM'>('COMMS');
-  const [desktopTab, setDesktopTab] = useState<'TASKS' | 'MEMORY' | 'REACTOR' | 'SYSTEM'>('TASKS');
+  const [mobileTab, setMobileTab] = useState<'COMMS' | 'TASKS' | 'MEMORY' | 'DIRECTIVES' | 'SYSTEM' | 'RADAR'>('COMMS');
+  const [desktopTab, setDesktopTab] = useState<'TASKS' | 'MEMORY' | 'REACTOR' | 'SYSTEM' | 'RADAR'>('TASKS');
   const [isReactorExpanded, setIsReactorExpanded] = useState(false);
 
   // Quick Action Prompts for horizontal ribbons
@@ -1394,6 +1396,13 @@ export default function JarvisDashboard() {
             <SystemHealthMatrix />
           </div>
         )}
+
+        {/* MOBILE TAB 6: RADAR (God's Eye View Orbital Hologram) */}
+        {mobileTab === 'RADAR' && (
+          <div className="flex-1 flex flex-col space-y-4 animate-fadeIn pb-24 min-h-[500px]">
+            <HolographicOrbitalRadar />
+          </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -1735,6 +1744,15 @@ export default function JarvisDashboard() {
               <Activity className="w-3.5 h-3.5" />
               <span>SYSTEM</span>
             </button>
+            <button
+              onClick={() => setDesktopTab('RADAR')}
+              className={`flex-1 py-1.5 rounded transition-colors flex items-center justify-center space-x-1 ${
+                desktopTab === 'RADAR' ? 'bg-cyan-500 text-black font-bold' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5 text-cyan-300" />
+              <span>RADAR</span>
+            </button>
           </div>
 
           <div className={`flex-1 min-h-0 ${desktopTab === 'TASKS' ? 'flex flex-col' : 'hidden'}`}>
@@ -1759,6 +1777,11 @@ export default function JarvisDashboard() {
           {/* System Health Matrix Telemetry Tab */}
           <div className={`flex-1 min-h-0 overflow-y-auto ${desktopTab === 'SYSTEM' ? 'flex flex-col' : 'hidden'}`}>
             <SystemHealthMatrix />
+          </div>
+
+          {/* God's Eye View: Holographic Orbital Radar Mode */}
+          <div className={`flex-1 min-h-0 ${desktopTab === 'RADAR' ? 'flex flex-col' : 'hidden'}`}>
+            <HolographicOrbitalRadar />
           </div>
 
           {/* Full Cinematic Arc Reactor in Right Column Tab */}
@@ -1859,6 +1882,18 @@ export default function JarvisDashboard() {
         >
           <Activity className="w-5 h-5 mb-0.5" />
           <span className="text-[10px] font-mono tracking-wider font-bold">SYSTEM</span>
+        </button>
+
+        <button
+          onClick={() => setMobileTab('RADAR')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+            mobileTab === 'RADAR'
+              ? 'text-cyan-400 bg-cyan-950/70 border border-cyan-500/40 shadow-[0_0_12px_rgba(0,229,255,0.3)]'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Globe className="w-5 h-5 mb-0.5 text-cyan-300" />
+          <span className="text-[10px] font-mono tracking-wider font-bold">RADAR</span>
         </button>
       </nav>
 
