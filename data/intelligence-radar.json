@@ -147,5 +147,25 @@
       "Home Assistant MQTT / Matter Ingress Adapter"
     ],
     "addedAt": "2026-09-16T15:52:00Z"
+  },
+  {
+    "name": "bilawalsidhu/gods-eye-view",
+    "url": "https://github.com/bilawalsidhu/gods-eye-view",
+    "domain": "Geospatial 3D Digital Twin & Orbital Radar",
+    "status": "ACTIVE_EXTRACTION",
+    "extractedFeatures": [
+      "God’s Eye View 3D Geospatial & Orbital MCP Engine (`mcp:gods_eye`)",
+      "Live ADS-B Flight Transponder Tracker via OpenSky Network (`track_flights`)",
+      "Real-time ISS & Satellite Orbital Ephemeris Ingress (`track_satellites`)",
+      "Real-time Meteorological Surface Radar Telemetry (`weather_radar`)",
+      "3D Cesium/Google Map Tiles Camera Flyover Vector Matrix (`camera_flyover_vector`)",
+      "Unified Telemetry Ingress Endpoint (`/api/gods-eye/radar`)"
+    ],
+    "futureRoadmap": [
+      "CesiumJS / Google Photorealistic 3D Tiles Holographic Globe PWA Viewport",
+      "Maritime AIS Live Vessel Layer Ingress",
+      "OSINT Global Live Camera & CCTV Feed Ingress"
+    ],
+    "addedAt": "2026-09-16T15:56:00Z"
   }
 ]

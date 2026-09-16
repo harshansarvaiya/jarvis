@@ -1645,3 +1645,266 @@ export async function executePlaywrightMCP(
     };
   }
 }
+
+// ============================================================================
+// 11. GOD'S EYE VIEW 3D GEOSPATIAL & ORBITAL TELEMETRY MCP ENGINE
+// (Inspired by bilawalsidhu/gods-eye-view & Tony Stark Holographic Orbital Globe)
+// Ingests real-time ADS-B flight transponders, satellite orbital ephemerides,
+// live meteorological radars, and computes 3D camera flyover trajectories.
+// ============================================================================
+
+export interface FlightTelemetry {
+  icao24: string;
+  callsign: string;
+  originCountry: string;
+  longitude: number;
+  latitude: number;
+  altitudeMeters: number;
+  velocityKmh: number;
+  headingDegrees: number;
+  verticalRateMs: number;
+  onGround: boolean;
+}
+
+export interface SatelliteTelemetry {
+  name: string;
+  id: number;
+  latitude: number;
+  longitude: number;
+  altitudeKm: number;
+  velocityKmh: number;
+  visibility: 'daylight' | 'eclipsed';
+  timestamp: string;
+}
+
+export async function executeGodsEyeMCP(
+  action:
+    | 'track_flights'
+    | 'track_satellites'
+    | 'geocoding_lookup'
+    | 'weather_radar'
+    | 'camera_flyover_vector',
+  params: Record<string, any> = {}
+): Promise<MCPExecutionResult> {
+  const startTime = Date.now();
+
+  try {
+    switch (action) {
+      case 'track_flights': {
+        const { bbox, limit = 15, country } = params;
+        // OpenSky Network live ADS-B state vectors
+        let url = 'https://opensky-network.org/api/states/all';
+        if (bbox && typeof bbox === 'object') {
+          const { minLat, minLon, maxLat, maxLon } = bbox;
+          if (minLat !== undefined && minLon !== undefined && maxLat !== undefined && maxLon !== undefined) {
+            url += `?lamin=${minLat}&lomin=${minLon}&lamax=${maxLat}&lomax=${maxLon}`;
+          }
+        }
+
+        const res = await fetch(url, {
+          headers: { 'User-Agent': 'JARVIS-GodsEyeView-Substrate' },
+          signal: AbortSignal.timeout(8000),
+        });
+
+        if (!res.ok) {
+          throw new Error(`OpenSky Network API responded with HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        const rawStates: any[][] = data.states || [];
+
+        let flights: FlightTelemetry[] = rawStates
+          .filter((s) => s[5] !== null && s[6] !== null) // must have valid coordinates
+          .map((s) => ({
+            icao24: s[0],
+            callsign: (s[1] || '').trim() || 'ANONYMOUS',
+            originCountry: s[2] || 'Unknown',
+            longitude: s[5],
+            latitude: s[6],
+            altitudeMeters: Math.round(s[7] || s[13] || 0),
+            velocityKmh: Math.round((s[9] || 0) * 3.6),
+            headingDegrees: Math.round(s[10] || 0),
+            verticalRateMs: Math.round(s[11] || 0),
+            onGround: Boolean(s[8]),
+          }));
+
+        if (country) {
+          const cLower = country.toLowerCase();
+          flights = flights.filter((f) => f.originCountry.toLowerCase().includes(cLower));
+        }
+
+        const selected = flights.slice(0, limit);
+
+        return {
+          success: true,
+          server: 'mcp:gods_eye',
+          action,
+          output: {
+            timestamp: new Date(data.time * 1000).toISOString(),
+            totalActiveTransponders: rawStates.length,
+            filteredCount: selected.length,
+            flights: selected,
+          },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'track_satellites': {
+        const target = params.target || 'ISS';
+        // Query live International Space Station (NORAD ID: 25544)
+        const res = await fetch('https://api.wheretheiss.at/v1/satellites/25544', {
+          signal: AbortSignal.timeout(6000),
+        });
+
+        if (!res.ok) {
+          throw new Error(`Satellite tracking API responded with HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        const iss: SatelliteTelemetry = {
+          name: 'International Space Station (ISS / ZARYA)',
+          id: 25544,
+          latitude: Number(data.latitude.toFixed(4)),
+          longitude: Number(data.longitude.toFixed(4)),
+          altitudeKm: Number(data.altitude.toFixed(2)),
+          velocityKmh: Math.round(data.velocity),
+          visibility: data.visibility || 'daylight',
+          timestamp: new Date(data.timestamp * 1000).toISOString(),
+        };
+
+        return {
+          success: true,
+          server: 'mcp:gods_eye',
+          action,
+          output: {
+            target,
+            satellite: iss,
+            footprintKm: Number(data.footprint?.toFixed(1) || 0),
+            orbitalPeriodMinutes: 92.68,
+          },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'geocoding_lookup': {
+        const { query } = params;
+        if (!query) throw new Error('Parameter "query" is required for geocoding_lookup');
+
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=3&addressdetails=1`;
+        const res = await fetch(url, {
+          headers: { 'User-Agent': 'JARVIS-GodsEyeView/2.0' },
+          signal: AbortSignal.timeout(6000),
+        });
+
+        if (!res.ok) throw new Error(`Geocoding lookup failed: HTTP ${res.status}`);
+        const results = await res.json();
+
+        const formatted = (results || []).map((r: any) => ({
+          name: r.display_name,
+          latitude: parseFloat(r.lat),
+          longitude: parseFloat(r.lon),
+          type: r.type,
+          class: r.class,
+          boundingBox: r.boundingbox ? {
+            minLat: parseFloat(r.boundingbox[0]),
+            maxLat: parseFloat(r.boundingbox[1]),
+            minLon: parseFloat(r.boundingbox[2]),
+            maxLon: parseFloat(r.boundingbox[3]),
+          } : undefined,
+        }));
+
+        return {
+          success: true,
+          server: 'mcp:gods_eye',
+          action,
+          output: { query, count: formatted.length, results: formatted },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'weather_radar': {
+        const { latitude, longitude } = params;
+        if (latitude === undefined || longitude === undefined) {
+          throw new Error('Parameters "latitude" and "longitude" are required for weather_radar');
+        }
+
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+
+        if (!res.ok) throw new Error(`Weather telemetry failed: HTTP ${res.status}`);
+        const data = await res.json();
+        const cur = data.current || {};
+
+        return {
+          success: true,
+          server: 'mcp:gods_eye',
+          action,
+          output: {
+            coordinates: { latitude, longitude },
+            elevation: data.elevation,
+            temperatureCelsius: cur.temperature_2m,
+            feelsLikeCelsius: cur.apparent_temperature,
+            relativeHumidity: cur.relative_humidity_2m,
+            precipitationMm: cur.precipitation,
+            cloudCoverPercent: cur.cloud_cover,
+            windSpeedKmh: cur.wind_speed_10m,
+            windDirectionDeg: cur.wind_direction_10m,
+            weatherCode: cur.weather_code,
+            time: cur.time,
+          },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'camera_flyover_vector': {
+        const { targetLat, targetLon, targetAltitude = 1200, rangeMeters = 3000, pitchDegrees = -35, headingDegrees = 0 } = params;
+        if (targetLat === undefined || targetLon === undefined) {
+          throw new Error('Parameters "targetLat" and "targetLon" are required for camera_flyover_vector');
+        }
+
+        const flyoverConfig = {
+          destination: {
+            latitude: Number(targetLat),
+            longitude: Number(targetLon),
+            heightMeters: Number(targetAltitude),
+          },
+          orientation: {
+            headingDegrees: Number(headingDegrees),
+            pitchDegrees: Number(pitchDegrees),
+            rollDegrees: 0,
+          },
+          rangeMeters: Number(rangeMeters),
+          recommendedDurationSeconds: 4.5,
+          cesiumFlyToParams: {
+            destination: `Cartesian3.fromDegrees(${targetLon}, ${targetLat}, ${targetAltitude})`,
+            orientation: {
+              heading: `Cesium.Math.toRadians(${headingDegrees})`,
+              pitch: `Cesium.Math.toRadians(${pitchDegrees})`,
+              roll: 0.0,
+            },
+          },
+        };
+
+        return {
+          success: true,
+          server: 'mcp:gods_eye',
+          action,
+          output: flyoverConfig,
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      default:
+        throw new Error(`Unsupported God's Eye action: ${action}`);
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      server: 'mcp:gods_eye',
+      action,
+      output: null,
+      error: error.message || 'Gods Eye MCP execution failure',
+      latencyMs: Date.now() - startTime,
+    };
+  }
+}
