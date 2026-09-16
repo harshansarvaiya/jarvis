@@ -23,7 +23,6 @@ import {
   executeMemoryMCP,
   executeGoogleCalendarMCP,
   executePlaywrightMCP,
-  executeGodsEyeMCP,
 } from './mcp';
 import {
   queryKnowledgeBase,
@@ -1418,37 +1417,6 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['action', 'url'],
     },
   },
-  {
-    name: 'mcp_gods_eye',
-    description: 'God’s Eye View 3D Geospatial & Orbital Telemetry MCP Engine — Ingest live worldwide flights (ADS-B via OpenSky), real-time satellite orbital positions (ISS/Starlink), high-precision geocoding, real-time meteorological radar data, and compute 3D Cesium/Google Map Tiles camera flyover trajectory vectors.',
-    parameters: {
-      type: 'object',
-      properties: {
-        action: {
-          type: 'string',
-          enum: ['track_flights', 'track_satellites', 'geocoding_lookup', 'weather_radar', 'camera_flyover_vector'],
-          description: 'track_flights: live aircraft ADS-B transponders | track_satellites: ISS/orbital positions | geocoding_lookup: GPS coordinates for city/landmark | weather_radar: real-time atmospheric radar | camera_flyover_vector: 3D camera flight path',
-        },
-        bbox: {
-          type: 'object',
-          description: 'Bounding box for flight tracking: { minLat, minLon, maxLat, maxLon }',
-        },
-        country: { type: 'string', description: 'Country filter for flight tracking (e.g. "India", "United States").' },
-        limit: { type: 'number', description: 'Maximum flights/items to return (default: 15).' },
-        target: { type: 'string', description: 'Satellite target name (defaults to "ISS").' },
-        query: { type: 'string', description: 'Geographic place or address query for geocoding_lookup.' },
-        latitude: { type: 'number', description: 'Latitude coordinate for weather_radar.' },
-        longitude: { type: 'number', description: 'Longitude coordinate for weather_radar.' },
-        targetLat: { type: 'number', description: 'Destination latitude for camera_flyover_vector.' },
-        targetLon: { type: 'number', description: 'Destination longitude for camera_flyover_vector.' },
-        targetAltitude: { type: 'number', description: 'Camera altitude in meters (default: 1200).' },
-        pitchDegrees: { type: 'number', description: 'Camera pitch angle (-90 straight down, default: -35).' },
-        headingDegrees: { type: 'number', description: 'Compass heading angle in degrees (0 = North, default: 0).' },
-        rangeMeters: { type: 'number', description: 'Distance from target in meters (default: 3000).' },
-      },
-      required: ['action'],
-    },
-  },
 ];
 
 export async function executeJarvisTool(
@@ -2017,12 +1985,6 @@ export async function executeJarvisTool(
       case 'mcp_playwright': {
         const { action, ...params } = args;
         const res = await executePlaywrightMCP(action, params);
-        return { success: res.success, result: res.output, error: res.error };
-      }
-
-      case 'mcp_gods_eye': {
-        const { action, ...params } = args;
-        const res = await executeGodsEyeMCP(action, params);
         return { success: res.success, result: res.output, error: res.error };
       }
 
