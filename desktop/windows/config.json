@@ -1,0 +1,11 @@
+{
+  "api_url": "https://jarvis-iota-beige.vercel.app/api/jarvis/shortcut",
+  "auth_token": "sk_jarvis_mobile_sovereign_2026_apex",
+  "global_hotkey": "ctrl+space",
+  "friday_hotkey": "ctrl+shift+f",
+  "auto_copy_clipboard": true,
+  "theme": "hud-cyan",
+  "window_width": 720,
+  "window_height": 520,
+  "always_on_top": true
+}
