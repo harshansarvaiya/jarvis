@@ -342,7 +342,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
   if (requestedModel.startsWith('nvidia/') || requestedModel.startsWith('nim/') || options.provider === 'nvidia' || options.orchestrationMode === 'nvidia') {
     if (nvidiaKey) {
       const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
-      const nimModel = requestedModel.replace(/^(nvidia\/|nim\/)/, '') || 'meta/llama-3.3-70b-instruct';
+      const nimModel = requestedModel.replace(/^(nvidia\/|nim\/)/, '') || 'meta/llama-3.2-90b-vision-instruct';
       const nimResult = await runOpenAICompatibleAgent(messages, {
         endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
         apiKey: nvidiaKey,
