@@ -5,19 +5,23 @@
     Directive 01 & 04 Compliant.
 #>
 
+[CmdletBinding()]
+param()
+
+# 1. Load Required Windows Assemblies
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Drawing, System.Windows.Forms
 
-# 1. Configuration & Sovereign Token
+# 2. Configuration & Sovereign Token
 $ApiUrl = "https://jarvis-iota-beige.vercel.app/api/jarvis/shortcut"
 $BearerToken = "sk_jarvis_mobile_sovereign_2026_apex"
 
-# 2. XAML Cyberpunk HUD Layout
-[xml]$xaml = @"
+# 3. Clean XAML String Definition
+$xamlString = @'
 <Window
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="J.A.R.V.I.S. HUD"
-    Height="520" Width="720"
+    Height="540" Width="740"
     WindowStartupLocation="CenterScreen"
     WindowStyle="None"
     AllowsTransparency="True"
@@ -26,9 +30,6 @@ $BearerToken = "sk_jarvis_mobile_sovereign_2026_apex"
     ShowInTaskbar="True">
     
     <Border Background="#0A0E17" CornerRadius="12" BorderBrush="#00F0FF" BorderThickness="1.5">
-        <Border.Effect>
-            <DropShadowEffect Color="#00F0FF" BlurRadius="20" ShadowDepth="0" Opacity="0.4"/>
-        </Border.Effect>
         <Grid Margin="16">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -43,15 +44,17 @@ $BearerToken = "sk_jarvis_mobile_sovereign_2026_apex"
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Grid.Column="0">
                     <TextBlock Text="⚡ J.A.R.V.I.S. MARK II" Foreground="#00F0FF" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
-                    <TextBlock Text="  //  SOVEREIGN WINDOWS HUD" Foreground="#8B949E" FontSize="12" VerticalAlignment="Center"/>
+                    <TextBlock Text="  //  SOVEREIGN HUD" Foreground="#8B949E" FontSize="12" VerticalAlignment="Center"/>
                     <Border Background="#052E16" CornerRadius="4" Padding="6,2" Margin="12,0,0,0">
                         <TextBlock x:Name="StatusBadge" Text="● ONLINE" Foreground="#00FF9D" FontWeight="Bold" FontSize="10"/>
                     </Border>
                 </StackPanel>
-                <TextBlock Grid.Column="1" Text="[ESC] Hide  |  [ENTER] Execute" Foreground="#8B949E" FontSize="11" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="[ESC] Close  |  [ENTER] Execute" Foreground="#8B949E" FontSize="11" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <Button x:Name="BtnClose" Grid.Column="2" Content="✕" Width="24" Height="22" Background="#111927" Foreground="#E2E8F0" BorderBrush="#1F2D42" FontWeight="Bold" Cursor="Hand"/>
             </Grid>
 
             <!-- Row 1: Command Input Box -->
@@ -87,12 +90,20 @@ $BearerToken = "sk_jarvis_mobile_sovereign_2026_apex"
         </Grid>
     </Border>
 </Window>
-"@
+'@
 
-# 3. Load UI Elements from XAML
-$reader = (New-Object System.Xml.XmlNodeReader $xaml)
-$window = [System.Windows.Markup.XamlReader]::Load($reader)
+# 4. Safe XAML Deserialization
+try {
+    $stringReader = New-Object System.IO.StringReader($xamlString)
+    $xmlReader = [System.Xml.XmlReader]::Create($stringReader)
+    $window = [System.Windows.Markup.XamlReader]::Load($xmlReader)
+} catch {
+    Write-Error "Failed to load XAML interface: $_"
+    Read-Host "Press Enter to exit..."
+    exit 1
+}
 
+# 5. Extract Named Controls
 $PromptInput = $window.FindName("PromptInput")
 $OutputBox = $window.FindName("OutputBox")
 $StatusBadge = $window.FindName("StatusBadge")
@@ -103,16 +114,22 @@ $BtnAudit = $window.FindName("BtnAudit")
 $BtnGroq = $window.FindName("BtnGroq")
 $BtnClipboard = $window.FindName("BtnClipboard")
 $BtnCopy = $window.FindName("BtnCopy")
+$BtnClose = $window.FindName("BtnClose")
 
 # Initial greeting
 $OutputBox.Text = "J.A.R.V.I.S. Windows Sovereign HUD Initialized.`nReady for directives on your workstation, Sir.`n`nType a prompt above or click an action pill."
 
-# Enable window drag
+# Window Dragging
 $window.Add_MouseLeftButtonDown({
     $window.DragMove()
 })
 
-# 4. Asynchronous API Dispatch Helper
+# Close Button
+$BtnClose.Add_Click({
+    $window.Close()
+})
+
+# 6. Synchronous/Async Dispatch Helper
 function Dispatch-JarvisDirective($prompt) {
     if ([string]::IsNullOrWhiteSpace($prompt)) { return }
     
@@ -147,7 +164,6 @@ function Dispatch-JarvisDirective($prompt) {
     $powershell.Runspace = $runspace
     $asyncResult = $powershell.BeginInvoke()
 
-    # Poll for completion without locking UI
     $timer = New-Object System.Windows.Threading.DispatcherTimer
     $timer.Interval = [TimeSpan]::FromMilliseconds(100)
     $timer.Add_Tick({
@@ -175,7 +191,7 @@ function Dispatch-JarvisDirective($prompt) {
     $timer.Start()
 }
 
-# 5. Event Handlers
+# 7. Event Bindings
 $PromptInput.Add_KeyDown({
     param($sender, $e)
     if ($e.Key -eq [System.Windows.Input.Key]::Enter) {
@@ -189,7 +205,7 @@ $PromptInput.Add_KeyDown({
 $window.Add_KeyDown({
     param($sender, $e)
     if ($e.Key -eq [System.Windows.Input.Key]::Escape) {
-        $window.Hide()
+        $window.Close()
     }
 })
 
@@ -238,8 +254,6 @@ $BtnCopy.Add_Click({
     }
 })
 
-# Show and focus input
-$window.Show()
+# 8. Show Dialog (Starts Native WPF Event Pump)
 $PromptInput.Focus()
-
-[System.Windows.Threading.Dispatcher]::Run()
+$null = $window.ShowDialog()
