@@ -6,7 +6,7 @@ import {
   ChatMessageRecord,
 } from '@/lib/jarvis/storage';
 import { transcribeAudioBuffer } from '@/lib/jarvis/audio';
-import { verifyMasterKey } from '@/lib/jarvis/auth';
+import { verifyMobileBearerToken } from '@/lib/jarvis/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, x-master-pin, authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-jarvis-auth, x-master-pin',
   };
 }
 
@@ -26,11 +26,42 @@ export async function OPTIONS() {
 }
 
 /**
- * Universal Mobile Hardware & Siri Bridge (GET & POST)
- * 
- * Supports zero-friction iOS Shortcuts, Action Button, Back Tap, and Siri queries.
+ * Extracts and validates authentication strictly from encrypted HTTP Headers (Directive 01).
+ * Plaintext query string credentials are permanently rejected to prevent leakages.
  */
-async function handleShortcutDirective(userPrompt: string, pin: string, isVoice = false) {
+function authenticateMobileRequest(req: NextRequest): { authenticated: boolean; error?: string } {
+  const { searchParams } = req.nextUrl;
+
+  // HARD DEFENSE: Reject any attempt to pass secrets in URL parameters
+  if (searchParams.has('pin') || searchParams.has('key') || searchParams.has('secret') || searchParams.has('token')) {
+    return {
+      authenticated: false,
+      error: 'SECURITY VIOLATION [Directive 01]: Credentials in URL query parameters are strictly forbidden. Use encrypted HTTP Headers.',
+    };
+  }
+
+  // Extract from HTTP Headers exclusively
+  const authHeader =
+    req.headers.get('authorization') ||
+    req.headers.get('x-jarvis-auth') ||
+    req.headers.get('x-master-pin') ||
+    '';
+
+  const isValid = verifyMobileBearerToken(authHeader);
+  if (!isValid) {
+    return {
+      authenticated: false,
+      error: 'ACCESS DENIED [Directive 01]: Invalid or missing Cryptographic Device Secret.',
+    };
+  }
+
+  return { authenticated: true };
+}
+
+/**
+ * Universal Mobile Hardware & Siri Bridge
+ */
+async function handleShortcutDirective(userPrompt: string, isVoice = false) {
   if (!userPrompt) {
     return NextResponse.json(
       {
@@ -39,18 +70,6 @@ async function handleShortcutDirective(userPrompt: string, pin: string, isVoice 
         error: 'Missing prompt',
       },
       { status: 400, headers: corsHeaders() }
-    );
-  }
-
-  // Guardian Sentry: Verify Master PIN if provided
-  if (pin && !verifyMasterKey(pin)) {
-    return NextResponse.json(
-      {
-        spokenText: 'Authentication failure. Access denied.',
-        reply: 'Guardian Protocol: Invalid Master PIN.',
-        error: 'Unauthorized',
-      },
-      { status: 401, headers: corsHeaders() }
     );
   }
 
@@ -126,17 +145,27 @@ async function handleShortcutDirective(userPrompt: string, pin: string, isVoice 
 }
 
 /**
- * GET Handler — Zero-Config Apple Shortcut Pipeline
- * URL format: https://jarvis-iota-beige.vercel.app/api/jarvis/shortcut?prompt=hello&pin=1010
+ * GET Handler (Header-Authenticated)
  */
 export async function GET(req: NextRequest) {
   try {
+    const authCheck = authenticateMobileRequest(req);
+    if (!authCheck.authenticated) {
+      return NextResponse.json(
+        {
+          spokenText: 'Authentication failure. Access denied.',
+          reply: authCheck.error,
+          error: 'Unauthorized',
+        },
+        { status: 401, headers: corsHeaders() }
+      );
+    }
+
     const { searchParams } = req.nextUrl;
     const prompt = searchParams.get('prompt') || searchParams.get('text') || searchParams.get('q') || '';
-    const pin = searchParams.get('pin') || req.headers.get('x-master-pin') || '';
     const isVoice = searchParams.get('voice') !== 'false';
 
-    return await handleShortcutDirective(prompt.trim(), pin.trim(), isVoice);
+    return await handleShortcutDirective(prompt.trim(), isVoice);
   } catch (err: any) {
     console.error('[Shortcut GET Error]:', err);
     return NextResponse.json(
@@ -151,19 +180,29 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST Handler — Structured JSON / Multimodal Form-Data
+ * POST Handler (Header-Authenticated)
  */
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = authenticateMobileRequest(req);
+    if (!authCheck.authenticated) {
+      return NextResponse.json(
+        {
+          spokenText: 'Authentication failure. Access denied.',
+          reply: authCheck.error,
+          error: 'Unauthorized',
+        },
+        { status: 401, headers: corsHeaders() }
+      );
+    }
+
     const contentType = req.headers.get('content-type') || '';
     let userPrompt = '';
     let isVoice = true;
-    let pinHeader = req.headers.get('x-master-pin') || '';
 
     if (contentType.includes('application/json')) {
       const body = await req.json();
       userPrompt = (body.prompt || body.text || body.query || '').trim();
-      if (body.pin) pinHeader = body.pin;
       if (typeof body.isVoice === 'boolean') isVoice = body.isVoice;
 
       if (body.audioBase64) {
@@ -178,8 +217,6 @@ export async function POST(req: NextRequest) {
       const formData = await req.formData();
       const text = formData.get('text') as string;
       const file = formData.get('file') as Blob;
-      const pin = formData.get('pin') as string;
-      if (pin) pinHeader = pin;
 
       if (file) {
         const arrayBuffer = await file.arrayBuffer();
@@ -196,7 +233,7 @@ export async function POST(req: NextRequest) {
       userPrompt = (await req.text()).trim();
     }
 
-    return await handleShortcutDirective(userPrompt, pinHeader, isVoice);
+    return await handleShortcutDirective(userPrompt, isVoice);
   } catch (err: any) {
     console.error('[Shortcut POST Error]:', err);
     return NextResponse.json(
