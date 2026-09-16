@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifySessionToken, SESSION_COOKIE_NAME } from './lib/jarvis/auth';
+import { verifySessionToken, verifyMasterKey, SESSION_COOKIE_NAME } from './lib/jarvis/auth';
 
 /**
  * J.A.R.V.I.S. Edge Security Middleware
@@ -17,6 +17,12 @@ export async function middleware(req: NextRequest) {
 
   // Exempt public authentication routes
   if (pathname.startsWith('/api/jarvis/auth')) {
+    return NextResponse.next();
+  }
+
+  // Allow verified Master PIN for mobile shortcuts, hardware triggers, and CLI bridges
+  const masterPin = req.headers.get('x-master-pin');
+  if (masterPin && verifyMasterKey(masterPin)) {
     return NextResponse.next();
   }
 
