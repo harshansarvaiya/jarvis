@@ -35,13 +35,16 @@ export interface JarvisAgentOptions {
   stream?: boolean;
   groqApiKey?: string;
   githubToken?: string;
-  provider?: 'google' | 'groq' | 'github-models' | 'auto';
-  orchestrationMode?: 'auto' | 'groq' | 'gemini' | 'manual';
+  nvidiaApiKey?: string;
+  openrouterApiKey?: string;
+  provider?: 'google' | 'groq' | 'github-models' | 'nvidia' | 'openrouter' | 'auto';
+  orchestrationMode?: 'auto' | 'groq' | 'gemini' | 'nvidia' | 'openrouter' | 'manual';
 }
 
 export function normalizeModel(m?: string): string {
   if (!m) return 'gemini-3.7-flash';
   const clean = m.trim().toLowerCase();
+  if (clean.startsWith('nvidia/') || clean.startsWith('nim/') || clean.startsWith('openrouter/')) return clean;
   if (clean.includes('120b') || clean.includes('gpt-oss-120b')) return 'openai/gpt-oss-120b';
   if (clean.includes('20b') || clean.includes('gpt-oss-20b')) return 'openai/gpt-oss-20b';
   if (clean.includes('compound-mini')) return 'groq/compound-mini';
@@ -84,8 +87,6 @@ export function getModelFallbackHierarchy(requestedModel: string): string[] {
   const startIndex = masterHierarchy.indexOf(primary);
 
   if (startIndex !== -1) {
-    // Wrap-around rotation: try requested model first, then cycle through ALL remaining
-    // e.g. if user requests 3.8-flash (index 5): [3.8, 3.7, lite-latest, 3.1-lite, 3.5-lite, preview]
     const rotated = [
       ...masterHierarchy.slice(startIndex),
       ...masterHierarchy.slice(0, startIndex),
@@ -113,6 +114,8 @@ export async function runJarvisAgent(
   const apiKey = options.apiKey || process.env.GEMINI_API_KEY || '';
   const groqKey = options.groqApiKey || process.env.GROQ_API_KEY || '';
   const githubKey = options.githubToken || process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_TOKEN || '';
+  const nvidiaKey = options.nvidiaApiKey || process.env.NVIDIA_NIM_API_KEY || process.env.NVIDIA_API_KEY || '';
+  const openrouterKey = options.openrouterApiKey || process.env.OPENROUTER_API_KEY || '';
   const requestedModel = normalizeModel(options.model || 'gemini-3.7-flash');
   const orchestrationMode = options.orchestrationMode || 'auto';
 
@@ -321,8 +324,82 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           toolCallsExecuted: ghResult.toolCallsExecuted,
           telemetry: {
             engineUsed: 'GitHub Models (Azure)',
-            provider: 'google', // external
+            provider: 'github-models',
             model: 'gpt-4o',
+            latencyMs,
+            archetype,
+            failoverOccurred: false,
+            recalledEpisodesCount: recalledEpisodes.length,
+          },
+        };
+      }
+    }
+  }
+
+  // =========================================================================
+  // ROUTE B.2: NVIDIA NIM (Enterprise H100 GPU Microservices)
+  // =========================================================================
+  if (requestedModel.startsWith('nvidia/') || requestedModel.startsWith('nim/') || options.provider === 'nvidia' || options.orchestrationMode === 'nvidia') {
+    if (nvidiaKey) {
+      const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+      const nimModel = requestedModel.replace(/^(nvidia\/|nim\/)/, '') || 'meta/llama-3.3-70b-instruct';
+      const nimResult = await runOpenAICompatibleAgent(messages, {
+        endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
+        apiKey: nvidiaKey,
+        model: nimModel,
+        systemPrompt: fullSystemPrompt,
+      });
+
+      if (!nimResult.error && nimResult.reply) {
+        const latencyMs = Date.now() - startTime;
+        return {
+          reply: nimResult.reply,
+          vocalSummary: extractCinematicVocalSummary(nimResult.reply),
+          tacticalActions: generateTacticalNextActions(lastUserMessage.content, nimResult.reply, nimResult.toolCallsExecuted),
+          toolCallsExecuted: nimResult.toolCallsExecuted,
+          telemetry: {
+            engineUsed: `NVIDIA NIM (${nimModel})`,
+            provider: 'groq', // open-weights
+            model: nimModel,
+            latencyMs,
+            archetype,
+            failoverOccurred: false,
+            recalledEpisodesCount: recalledEpisodes.length,
+          },
+        };
+      }
+    }
+  }
+
+  // =========================================================================
+  // ROUTE B.3: OPENROUTER (Universal Global API Gateway & Free Tier Pool)
+  // =========================================================================
+  if (requestedModel.startsWith('openrouter/') || options.provider === 'openrouter' || options.orchestrationMode === 'openrouter') {
+    if (openrouterKey) {
+      const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+      const routerModel = requestedModel.replace(/^openrouter\//, '') || 'meta-llama/llama-3.3-70b-instruct:free';
+      const routerResult = await runOpenAICompatibleAgent(messages, {
+        endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+        apiKey: openrouterKey,
+        model: routerModel,
+        systemPrompt: fullSystemPrompt,
+        extraHeaders: {
+          'HTTP-Referer': 'https://github.com/harshansarvaiya/jarvis',
+          'X-Title': 'J.A.R.V.I.S. Mark II',
+        },
+      });
+
+      if (!routerResult.error && routerResult.reply) {
+        const latencyMs = Date.now() - startTime;
+        return {
+          reply: routerResult.reply,
+          vocalSummary: extractCinematicVocalSummary(routerResult.reply),
+          tacticalActions: generateTacticalNextActions(lastUserMessage.content, routerResult.reply, routerResult.toolCallsExecuted),
+          toolCallsExecuted: routerResult.toolCallsExecuted,
+          telemetry: {
+            engineUsed: `OpenRouter (${routerModel})`,
+            provider: 'groq',
+            model: routerModel,
             latencyMs,
             archetype,
             failoverOccurred: false,
