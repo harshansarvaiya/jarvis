@@ -422,37 +422,47 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 
     // Tier 1 Primary: Google Cloud Vertex AI (Draws 100% from ₹33,435+ GCP Credits)
     if (isVertexAIAvailable()) {
-      const { model: vertexCandidate } = mapToVertexModel(requestedModel);
-      try {
-        console.log(`[Vertex AI] Invoking enterprise endpoint for model: ${vertexCandidate}...`);
-        const vRes = await callVertexAIGenerate({
-          model: vertexCandidate,
-          contents,
-          systemInstruction,
-          tools: geminiTools,
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 4096,
-            thinkingConfig: {
-              includeThoughts: true,
-              thinkingBudget: 1024,
-            },
-          },
-          signal: AbortSignal.timeout(45000),
-        });
+      const primaryCandidate = mapToVertexModel(requestedModel).model;
+      const vertexCandidates = [
+        primaryCandidate,
+        'gemini-3.7-flash',
+        'gemini-2.5-pro',
+        'gemini-2.5-flash',
+      ].filter((v, i, a) => a.indexOf(v) === i);
 
-        if (vRes.ok) {
-          response = vRes;
-          isVertexEngine = true;
-          selectedVertexModel = vertexCandidate;
-          selectedModel = vertexCandidate;
-          console.log(`[Vertex AI] Success with ${vertexCandidate} (GCP Credits active)`);
-        } else {
-          const errText = await vRes.text();
-          console.warn(`[Vertex AI] Call failed (${vRes.status}):`, errText.slice(0, 150));
+      for (const vertexCandidate of vertexCandidates) {
+        try {
+          console.log(`[Vertex AI] Invoking enterprise endpoint for model: ${vertexCandidate}...`);
+          const vRes = await callVertexAIGenerate({
+            model: vertexCandidate,
+            contents,
+            systemInstruction,
+            tools: geminiTools,
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 4096,
+              thinkingConfig: {
+                includeThoughts: true,
+                thinkingBudget: 1024,
+              },
+            },
+            signal: AbortSignal.timeout(60000),
+          });
+
+          if (vRes.ok) {
+            response = vRes;
+            isVertexEngine = true;
+            selectedVertexModel = vertexCandidate;
+            selectedModel = vertexCandidate;
+            console.log(`[Vertex AI] Success with ${vertexCandidate} (GCP Credits active)`);
+            break;
+          } else {
+            const errText = await vRes.text();
+            console.warn(`[Vertex AI] Call failed for ${vertexCandidate} (${vRes.status}):`, errText.slice(0, 150));
+          }
+        } catch (vErr: any) {
+          console.warn(`[Vertex AI] Execution error for ${vertexCandidate}:`, vErr?.message);
         }
-      } catch (vErr: any) {
-        console.warn('[Vertex AI] Execution error, cascading to standard AI Studio / Groq:', vErr?.message);
       }
     }
 
@@ -704,7 +714,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             systemInstruction,
             tools: geminiTools,
             generationConfig: toolGenerationConfig,
-            signal: AbortSignal.timeout(45000),
+            signal: AbortSignal.timeout(60000),
           });
         } else {
           response = await fetch(activeApiUrl, {
