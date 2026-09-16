@@ -188,10 +188,30 @@ async function handleIncomingMessage(update: TelegramUpdate) {
     // 4. Format Output for Telegram
     let responseText = result.reply;
 
-    // Append Tool Action Indicators if tools were executed
+    // Append Tool Execution Summaries & Empirical Outputs if tools were executed
     if (result.toolCallsExecuted && result.toolCallsExecuted.length > 0) {
-      const toolSummaries = result.toolCallsExecuted.map((tc) => `⚡ \`${tc.name}\``).join('  ');
-      responseText += `\n\n_${toolSummaries}_`;
+      const toolBlocks: string[] = [];
+      for (const tc of result.toolCallsExecuted) {
+        let block = `⚡ \`${tc.name}\``;
+        const res = tc.result;
+        let rawOutput = '';
+        if (res) {
+          if (typeof res === 'string') {
+            rawOutput = res;
+          } else if (typeof res === 'object') {
+            rawOutput = res.stdout || res.output || res.result || '';
+          }
+        }
+        if (rawOutput && typeof rawOutput === 'string' && rawOutput.trim()) {
+          const cleanOut = rawOutput.trim();
+          if (!responseText.includes(cleanOut.slice(0, 30))) {
+            const truncatedOut = cleanOut.length > 400 ? cleanOut.slice(0, 400) + '...' : cleanOut;
+            block += `\n\`\`\`\n${truncatedOut}\n\`\`\``;
+          }
+        }
+        toolBlocks.push(block);
+      }
+      responseText += `\n\n${toolBlocks.join('\n\n')}`;
     }
 
     // Append Telemetry Badge (F.R.I.D.A.Y. vs J.A.R.V.I.S.)
