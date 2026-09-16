@@ -1,0 +1,15 @@
+[Unit]
+Description=J.A.R.V.I.S. Telegram Sovereign Gateway Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=harshans279
+WorkingDirectory=/home/harshans279/jarvis
+ExecStart=/usr/bin/npx tsx scripts/telegram-worker.ts
+Restart=always
+RestartSec=5s
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

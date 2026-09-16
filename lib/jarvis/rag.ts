@@ -109,7 +109,7 @@ function generateHeuristicEmbedding(text: string, dimensions = 768): number[] {
  * Generates dense 768-dimensional vector embedding using Google Gemini text-embedding-004
  */
 export async function generateEmbedding(text: string, customApiKey?: string): Promise<number[]> {
-  const apiKey = customApiKey || process.env.GEMINI_API_KEY;
+  const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_STUDIO_KEY;
   if (!apiKey) {
     return generateHeuristicEmbedding(text);
   }
@@ -127,24 +127,20 @@ export async function generateEmbedding(text: string, customApiKey?: string): Pr
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(4000),
     });
 
-    if (!res.ok) {
-      console.warn(`[RAG:Embedding] Google Gemini returned HTTP ${res.status}; using fallback embedding.`);
-      return generateHeuristicEmbedding(text);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.embedding?.values && Array.isArray(data.embedding.values)) {
+        return data.embedding.values;
+      }
     }
-
-    const data = await res.json();
-    if (data.embedding?.values && Array.isArray(data.embedding.values)) {
-      return data.embedding.values;
-    }
-
-    return generateHeuristicEmbedding(text);
-  } catch (err) {
-    console.warn('[RAG:Embedding] API error, using heuristic fallback:', err);
-    return generateHeuristicEmbedding(text);
+  } catch {
+    // Silent fallback to 768-dim heuristic embedding
   }
+
+  return generateHeuristicEmbedding(text);
 }
 
 // =========================================================================

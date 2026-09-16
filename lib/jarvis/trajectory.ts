@@ -28,6 +28,7 @@ export interface TrajectoryRecord {
     model: string;
     latencyMs: number;
     provider: string;
+    persona?: string;
   };
 }
 

@@ -14,6 +14,7 @@ import {
   detectActivePersona,
   ActivePersona,
 } from './orchestrator';
+import { appendUniversalChatMessage } from './storage';
 
 export interface ChatMessage {
   id?: string;
@@ -909,11 +910,16 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     if (!finalReply) {
       if (toolCallsExecuted.length > 0) {
         const summaries = toolCallsExecuted.map((tc) => {
-          if (tc.result?.message) return tc.result.message;
-          if (typeof tc.result === 'string') return tc.result;
-          return `${tc.name} executed.`;
+          const res = tc.result;
+          if (res) {
+            if (typeof res === 'string' && res.trim()) return res.trim();
+            if (res.stdout && typeof res.stdout === 'string' && res.stdout.trim()) return res.stdout.trim();
+            if (res.output && typeof res.output === 'string' && res.output.trim()) return res.output.trim();
+            if (res.message && typeof res.message === 'string' && res.message.trim()) return res.message.trim();
+          }
+          return `${tc.name} executed successfully.`;
         });
-        finalReply = `Sir, I completed the requested operations:\n\n${summaries.map((s) => `• ${s}`).join('\n')}`;
+        finalReply = `Sir, executed ${toolCallsExecuted.length} operational tool(s):\n\n${summaries.map((s) => `\`\`\`\n${s.length > 500 ? s.slice(0, 500) + '...' : s}\n\`\`\``).join('\n\n')}`;
       } else {
         finalReply = 'All systems green, Sir. What would you like to focus on next?';
       }
@@ -948,8 +954,23 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           model: isVertexEngine ? selectedVertexModel : selectedModel,
           latencyMs,
           provider: isVertexEngine ? 'vertex-ai' : 'google',
+          persona,
         },
       });
+
+      await appendUniversalChatMessage({
+        id: `msg-${Date.now()}-a`,
+        role: 'assistant',
+        content: finalReply,
+        vocalSummary: extractCinematicVocalSummary(finalReply),
+        toolCalls: toolCallsExecuted,
+        timestamp: new Date().toISOString(),
+        telemetry: {
+          engineUsed: isVertexEngine ? `Vertex AI ${selectedVertexModel}` : selectedModel,
+          model: isVertexEngine ? selectedVertexModel : selectedModel,
+          persona,
+        },
+      }).catch(() => {});
     } catch (trajErr) {
       console.warn('[Agent] Trajectory recording warning:', trajErr);
     }
