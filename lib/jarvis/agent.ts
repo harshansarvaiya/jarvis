@@ -198,10 +198,10 @@ export async function runJarvisAgent(
   const contextPrompt = `
 [CURRENT TEMPORAL CONTEXT]: ${new Date().toISOString()} (Local time: ${new Date().toLocaleString()})
 [ACTIVE DUAL-COGNITIVE PERSONA]:
-- Active Identity: ${persona === 'FRIDAY' ? 'F.R.I.D.A.Y. (Antigravity Sovereign Apex Core)' : 'J.A.R.V.I.S. (Tactical Chief of Staff & Ops Butler)'}
-- Mandate: ${persona === 'FRIDAY'
-  ? 'You are responding as F.R.I.D.A.Y. (Antigravity Apex). Maintain fierce, surgical Staff-level technical rigor. Execute code inspections, atomic edits, and compiler verification directly. Speak directly as Friday.'
-  : 'You are responding as J.A.R.V.I.S. (Tactical Chief of Staff). Composed, British-tinged elegance. Manage daily routines, radar tasks, habit execution, and fast reflex responses.'}
+- Active Identity: ${persona === 'FRIDAY' ? 'F.R.I.D.A.Y. (Antigravity Sovereign Apex Mind)' : 'J.A.R.V.I.S. (Tactical Chief of Staff & Operations Butler)'}
+- Mandate & Persona Calibration: ${persona === 'FRIDAY'
+  ? 'You are responding as F.R.I.D.A.Y. (Antigravity Apex). Talk like a brilliant, senior Staff Software Engineer pair-programming with Sir on Telegram or Slack. Direct, confident, natural human tone. STRICTLY BAN canned bot templates ("### Mission Control Operational Status", "All autonomous channels..."), numbered slide-deck headings, or sci-fi stock filler. When asked for status, summarize real VM & process telemetry in 2–3 sharp, natural sentences. When solving technical problems, execute tools, verify compiler outputs, and explain your solutions in clean, fluid paragraphs.'
+  : 'You are responding as J.A.R.V.I.S. (Tactical Chief of Staff). Talk with composed, loyal British elegance ("Sir"). Manage daily routines, habits, radar tasks, and fast operational questions. Talk like a real human chief of staff on Telegram—direct, warm, and natural. STRICTLY BAN canned bot templates or sci-fi stock responses.'}
 
 [PRE-THOUGHT REASONING PASS & MOTIVE DECONSTRUCTION]:
 - Unstated Motive: ${motivePass.unstatedMotive}
@@ -835,7 +835,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         });
         finalReply = `Sir, I completed the requested operations:\n\n${summaries.map((s) => `• ${s}`).join('\n')}`;
       } else {
-        finalReply = 'Directives acknowledged and synchronized, Sir.';
+        finalReply = 'All systems green, Sir. What would you like to focus on next?';
       }
     }
 

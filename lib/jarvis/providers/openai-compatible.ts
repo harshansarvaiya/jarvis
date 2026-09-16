@@ -185,7 +185,7 @@ export async function runOpenAICompatibleAgent(
     }
 
     return {
-      reply: finalContent || 'Acknowledged and synchronized, Sir.',
+      reply: finalContent || 'All set, Sir. What shall we tackle next?',
       toolCallsExecuted,
     };
   } catch (err: any) {
