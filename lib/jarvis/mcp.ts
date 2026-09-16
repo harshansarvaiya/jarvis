@@ -660,3 +660,579 @@ export async function executeDatabaseMCP(
     };
   }
 }
+
+// ============================================================================
+// 6. EXA SEMANTIC SEARCH MCP ENGINE
+// Real-time semantic web search with neural ranking, citation scoring, and
+// entity disambiguation. Integrates as Tier 0 in runWebSearch fallback chain.
+// ============================================================================
+export async function executeExaMCP(
+  action: 'search' | 'find_similar' | 'get_contents',
+  params: Record<string, any> = {}
+): Promise<MCPExecutionResult> {
+  const startTime = Date.now();
+  const exaApiKey = process.env.EXA_API_KEY;
+
+  if (!exaApiKey) {
+    return {
+      success: false,
+      server: 'mcp:exa',
+      action,
+      output: null,
+      error: 'EXA_API_KEY not configured. Add it to .env.local to enable neural search.',
+      latencyMs: Date.now() - startTime,
+    };
+  }
+
+  const headers = {
+    'x-api-key': exaApiKey,
+    'Content-Type': 'application/json',
+  };
+
+  try {
+    switch (action) {
+      case 'search': {
+        const { query, numResults = 8, useAutoprompt = true, type = 'neural', includeText = true, startPublishedDate } = params;
+        if (!query) throw new Error('Parameter "query" is required for Exa search');
+
+        const body: Record<string, any> = {
+          query,
+          numResults,
+          useAutoprompt,
+          type,
+          contents: { text: includeText ? { maxCharacters: 800 } : false },
+        };
+        if (startPublishedDate) body.startPublishedDate = startPublishedDate;
+
+        const res = await fetch('https://api.exa.ai/search', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(8000),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Exa search failed: ${res.status}`);
+
+        const results = (data.results || []).map((r: any) => ({
+          title: r.title,
+          url: r.url,
+          score: r.score,
+          publishedDate: r.publishedDate,
+          author: r.author,
+          snippet: r.text ? r.text.slice(0, 600) : '',
+          source: 'Exa Neural Search',
+        }));
+
+        return {
+          success: true,
+          server: 'mcp:exa',
+          action: 'search',
+          output: {
+            query,
+            requestId: data.requestId,
+            autopromptString: data.autopromptString,
+            resultsCount: results.length,
+            results,
+          },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'find_similar': {
+        const { url, numResults = 6, includeText = true } = params;
+        if (!url) throw new Error('Parameter "url" is required for find_similar');
+
+        const res = await fetch('https://api.exa.ai/findSimilar', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            url,
+            numResults,
+            contents: { text: includeText ? { maxCharacters: 600 } : false },
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Exa findSimilar failed: ${res.status}`);
+
+        return {
+          success: true,
+          server: 'mcp:exa',
+          action: 'find_similar',
+          output: {
+            sourceUrl: url,
+            resultsCount: (data.results || []).length,
+            results: (data.results || []).map((r: any) => ({
+              title: r.title,
+              url: r.url,
+              score: r.score,
+              snippet: r.text ? r.text.slice(0, 500) : '',
+            })),
+          },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'get_contents': {
+        const { urls, maxCharacters = 2000 } = params;
+        if (!urls || !Array.isArray(urls)) throw new Error('Parameter "urls" (array) is required for get_contents');
+
+        const res = await fetch('https://api.exa.ai/contents', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ ids: urls, text: { maxCharacters } }),
+          signal: AbortSignal.timeout(10000),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Exa get_contents failed: ${res.status}`);
+
+        return {
+          success: true,
+          server: 'mcp:exa',
+          action: 'get_contents',
+          output: {
+            count: (data.results || []).length,
+            contents: (data.results || []).map((r: any) => ({
+              title: r.title,
+              url: r.url,
+              text: r.text || '',
+              publishedDate: r.publishedDate,
+            })),
+          },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      default:
+        throw new Error(`Unsupported Exa action: ${action}`);
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      server: 'mcp:exa',
+      action,
+      output: null,
+      error: error.message || 'Exa MCP execution failure',
+      latencyMs: Date.now() - startTime,
+    };
+  }
+}
+
+// ============================================================================
+// 7. VERCEL DEPLOYMENT MANAGEMENT MCP ENGINE
+// Native Vercel REST API integration: list deployments, inspect build logs,
+// trigger redeployments, and manage environment variables.
+// ============================================================================
+export async function executeVercelMCP(
+  action:
+    | 'list_deployments'
+    | 'get_deployment'
+    | 'get_build_logs'
+    | 'cancel_deployment'
+    | 'list_projects'
+    | 'get_project'
+    | 'list_env_vars',
+  params: Record<string, any> = {}
+): Promise<MCPExecutionResult> {
+  const startTime = Date.now();
+  const vercelToken = process.env.VERCEL_TOKEN || process.env.VERCEL_ACCESS_TOKEN;
+
+  if (!vercelToken) {
+    return {
+      success: false,
+      server: 'mcp:vercel',
+      action,
+      output: null,
+      error: 'VERCEL_TOKEN not configured. Add it to .env.local to enable deployment management.',
+      latencyMs: Date.now() - startTime,
+    };
+  }
+
+  const VERCEL_PROJECT = process.env.VERCEL_PROJECT_ID || 'jarvis';
+  const VERCEL_TEAM   = process.env.VERCEL_TEAM_ID || '';
+
+  const headers = {
+    Authorization: `Bearer ${vercelToken}`,
+    'Content-Type': 'application/json',
+  };
+
+  const teamQuery = VERCEL_TEAM ? `?teamId=${VERCEL_TEAM}` : '';
+  const baseUrl = 'https://api.vercel.com';
+
+  try {
+    switch (action) {
+      case 'list_projects': {
+        const res = await fetch(`${baseUrl}/v9/projects${teamQuery}`, { headers, signal: AbortSignal.timeout(8000) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Vercel list_projects failed: ${res.status}`);
+        const projects = (data.projects || []).slice(0, 10).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          framework: p.framework,
+          latestDeploymentUrl: p.latestDeployments?.[0]?.url,
+          updatedAt: new Date(p.updatedAt).toISOString(),
+        }));
+        return { success: true, server: 'mcp:vercel', action, output: { count: projects.length, projects }, latencyMs: Date.now() - startTime };
+      }
+
+      case 'get_project': {
+        const projectId = params.projectId || VERCEL_PROJECT;
+        const res = await fetch(`${baseUrl}/v9/projects/${projectId}${teamQuery}`, { headers, signal: AbortSignal.timeout(8000) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Vercel get_project failed: ${res.status}`);
+        return {
+          success: true,
+          server: 'mcp:vercel',
+          action,
+          output: {
+            id: data.id,
+            name: data.name,
+            framework: data.framework,
+            nodeVersion: data.nodeVersion,
+            productionUrl: data.alias?.[0]?.domain,
+            latestDeploymentState: data.latestDeployments?.[0]?.readyState,
+            updatedAt: new Date(data.updatedAt).toISOString(),
+          },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'list_deployments': {
+        const limit = params.limit || 8;
+        const projectId = params.projectId || VERCEL_PROJECT;
+        const qs = teamQuery
+          ? `${teamQuery}&projectId=${projectId}&limit=${limit}`
+          : `?projectId=${projectId}&limit=${limit}`;
+        const res = await fetch(`${baseUrl}/v6/deployments${qs}`, { headers, signal: AbortSignal.timeout(8000) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Vercel list_deployments failed: ${res.status}`);
+        const deployments = (data.deployments || []).map((d: any) => ({
+          uid: d.uid,
+          url: d.url ? `https://${d.url}` : null,
+          state: d.readyState,
+          target: d.target || 'preview',
+          createdAt: new Date(d.createdAt).toISOString(),
+          creator: d.creator?.username,
+          meta: d.meta,
+        }));
+        return {
+          success: true,
+          server: 'mcp:vercel',
+          action,
+          output: { total: data.pagination?.count, deployments },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'get_deployment': {
+        const { deploymentId } = params;
+        if (!deploymentId) throw new Error('Parameter "deploymentId" is required');
+        const res = await fetch(`${baseUrl}/v13/deployments/${deploymentId}${teamQuery}`, { headers, signal: AbortSignal.timeout(8000) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Vercel get_deployment failed: ${res.status}`);
+        return {
+          success: true,
+          server: 'mcp:vercel',
+          action,
+          output: {
+            uid: data.id,
+            url: data.url ? `https://${data.url}` : null,
+            state: data.readyState,
+            errorCode: data.errorCode,
+            errorMessage: data.errorMessage,
+            buildDurationMs: data.buildingAt && data.ready ? data.ready - data.buildingAt : null,
+            createdAt: new Date(data.createdAt).toISOString(),
+          },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'get_build_logs': {
+        const { deploymentId, direction = 'backward', limit = 50 } = params;
+        if (!deploymentId) throw new Error('Parameter "deploymentId" is required');
+        const qs2 = teamQuery
+          ? `${teamQuery}&direction=${direction}&limit=${limit}`
+          : `?direction=${direction}&limit=${limit}`;
+        const res = await fetch(`${baseUrl}/v2/deployments/${deploymentId}/events${qs2}`, { headers, signal: AbortSignal.timeout(10000) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Vercel get_build_logs failed: ${res.status}`);
+        const logs = (Array.isArray(data) ? data : data.rows || [])
+          .map((e: any) => ({ type: e.type, text: e.text || e.payload?.text || '', date: e.date ? new Date(e.date).toISOString() : null }))
+          .filter((e: any) => e.text);
+        return {
+          success: true,
+          server: 'mcp:vercel',
+          action,
+          output: { deploymentId, logCount: logs.length, logs: logs.slice(-30) },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'cancel_deployment': {
+        const { deploymentId } = params;
+        if (!deploymentId) throw new Error('Parameter "deploymentId" is required');
+        const res = await fetch(`${baseUrl}/v12/deployments/${deploymentId}/cancel${teamQuery}`, {
+          method: 'PATCH',
+          headers,
+          signal: AbortSignal.timeout(8000),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Vercel cancel failed: ${res.status}`);
+        return {
+          success: true,
+          server: 'mcp:vercel',
+          action,
+          output: { uid: data.uid, state: data.state, cancelled: data.state === 'CANCELED' },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'list_env_vars': {
+        const projectId = params.projectId || VERCEL_PROJECT;
+        const res = await fetch(`${baseUrl}/v9/projects/${projectId}/env${teamQuery}`, { headers, signal: AbortSignal.timeout(8000) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Vercel list_env_vars failed: ${res.status}`);
+        const envs = (data.envs || []).map((e: any) => ({
+          key: e.key,
+          target: e.target,
+          type: e.type,
+          updatedAt: e.updatedAt ? new Date(e.updatedAt).toISOString() : null,
+        }));
+        return {
+          success: true,
+          server: 'mcp:vercel',
+          action,
+          output: { count: envs.length, envs },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      default:
+        throw new Error(`Unsupported Vercel action: ${action}`);
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      server: 'mcp:vercel',
+      action,
+      output: null,
+      error: error.message || 'Vercel MCP execution failure',
+      latencyMs: Date.now() - startTime,
+    };
+  }
+}
+
+// ============================================================================
+// 8. KNOWLEDGE GRAPH MEMORY MCP ENGINE (Anthropic Memory MCP Standard)
+// Entity-relation-observation knowledge graph backed by Upstash Redis.
+// Sits atop the 4-tier AgentMemory as a Tier 5 relational graph layer.
+// Keys: jarvis:kg:entities  |  jarvis:kg:relations
+// ============================================================================
+
+export interface KGEntity {
+  id: string;
+  name: string;
+  type: string;
+  observations: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KGRelation {
+  id: string;
+  fromEntity: string;
+  toEntity: string;
+  relationType: string;
+  weight: number;
+  createdAt: string;
+}
+
+async function kgFetch(upstashPath: string, method = 'GET', body?: any): Promise<any> {
+  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!upstashUrl || !token) throw new Error('Upstash credentials not configured for Knowledge Graph MCP.');
+  const hdrs: Record<string, string> = { Authorization: `Bearer ${token}` };
+  if (body !== undefined) hdrs['Content-Type'] = 'application/json';
+  const res = await fetch(`${upstashUrl}${upstashPath}`, {
+    method,
+    headers: hdrs,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(5000),
+  });
+  return res.json();
+}
+
+async function kgGetAll(key: string): Promise<any[]> {
+  const data = await kgFetch(`/get/${encodeURIComponent(key)}`);
+  if (!data.result) return [];
+  try { return typeof data.result === 'string' ? JSON.parse(data.result) : data.result; } catch { return []; }
+}
+
+async function kgSetAll(key: string, items: any[]): Promise<void> {
+  await kgFetch(`/set/${encodeURIComponent(key)}`, 'POST', [JSON.stringify(items)]);
+}
+
+export async function executeMemoryMCP(
+  action:
+    | 'create_entities'
+    | 'create_relations'
+    | 'add_observations'
+    | 'read_graph'
+    | 'search_nodes'
+    | 'open_nodes'
+    | 'delete_entities'
+    | 'delete_relations'
+    | 'delete_observations',
+  params: Record<string, any> = {}
+): Promise<MCPExecutionResult> {
+  const startTime = Date.now();
+  const ENTITIES_KEY  = 'jarvis:kg:entities';
+  const RELATIONS_KEY = 'jarvis:kg:relations';
+
+  try {
+    switch (action) {
+
+      case 'create_entities': {
+        const { entities } = params;
+        if (!Array.isArray(entities) || entities.length === 0) throw new Error('Parameter "entities" array is required');
+        const existing: KGEntity[] = await kgGetAll(ENTITIES_KEY);
+        const now = new Date().toISOString();
+        const created: KGEntity[] = [];
+        for (const e of entities) {
+          if (!e.name || !e.type) continue;
+          if (existing.find((x) => x.name.toLowerCase() === e.name.toLowerCase())) continue;
+          const entity: KGEntity = {
+            id: `entity-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            name: e.name, type: e.type,
+            observations: Array.isArray(e.observations) ? e.observations : [],
+            createdAt: now, updatedAt: now,
+          };
+          existing.push(entity);
+          created.push(entity);
+        }
+        await kgSetAll(ENTITIES_KEY, existing);
+        return {
+          success: true, server: 'mcp:memory', action,
+          output: { created: created.length, entities: created.map((e) => ({ id: e.id, name: e.name, type: e.type })) },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'create_relations': {
+        const { relations } = params;
+        if (!Array.isArray(relations) || relations.length === 0) throw new Error('Parameter "relations" array is required');
+        const existing: KGRelation[] = await kgGetAll(RELATIONS_KEY);
+        const now = new Date().toISOString();
+        const created: KGRelation[] = [];
+        for (const r of relations) {
+          if (!r.fromEntity || !r.toEntity || !r.relationType) continue;
+          if (existing.find((x) => x.fromEntity === r.fromEntity && x.toEntity === r.toEntity && x.relationType === r.relationType)) continue;
+          const rel: KGRelation = {
+            id: `rel-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            fromEntity: r.fromEntity, toEntity: r.toEntity,
+            relationType: r.relationType,
+            weight: typeof r.weight === 'number' ? r.weight : 1.0,
+            createdAt: now,
+          };
+          existing.push(rel);
+          created.push(rel);
+        }
+        await kgSetAll(RELATIONS_KEY, existing);
+        return { success: true, server: 'mcp:memory', action, output: { created: created.length, relations: created }, latencyMs: Date.now() - startTime };
+      }
+
+      case 'add_observations': {
+        const { entityName, observations } = params;
+        if (!entityName || !Array.isArray(observations)) throw new Error('Parameters "entityName" and "observations" array are required');
+        const entities: KGEntity[] = await kgGetAll(ENTITIES_KEY);
+        const entity = entities.find((e) => e.name.toLowerCase() === entityName.toLowerCase());
+        if (!entity) throw new Error(`Entity "${entityName}" not found in Knowledge Graph`);
+        const newObs = observations.filter((o: string) => !entity.observations.includes(o));
+        entity.observations.push(...newObs);
+        entity.updatedAt = new Date().toISOString();
+        await kgSetAll(ENTITIES_KEY, entities);
+        return { success: true, server: 'mcp:memory', action, output: { entityName, addedObservations: newObs.length, totalObservations: entity.observations.length }, latencyMs: Date.now() - startTime };
+      }
+
+      case 'read_graph': {
+        const [entities, relations] = await Promise.all([kgGetAll(ENTITIES_KEY), kgGetAll(RELATIONS_KEY)]);
+        return {
+          success: true, server: 'mcp:memory', action,
+          output: { entityCount: entities.length, relationCount: relations.length, entities: entities.slice(0, 50), relations: relations.slice(0, 100) },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'search_nodes': {
+        const { query } = params;
+        if (!query) throw new Error('Parameter "query" is required');
+        const entities: KGEntity[] = await kgGetAll(ENTITIES_KEY);
+        const q = query.toLowerCase();
+        const matched = entities.filter(
+          (e) => e.name.toLowerCase().includes(q) || e.type.toLowerCase().includes(q) || e.observations.some((o) => o.toLowerCase().includes(q))
+        );
+        return { success: true, server: 'mcp:memory', action, output: { query, matchCount: matched.length, nodes: matched.slice(0, 20) }, latencyMs: Date.now() - startTime };
+      }
+
+      case 'open_nodes': {
+        const { names } = params;
+        if (!Array.isArray(names)) throw new Error('Parameter "names" array is required');
+        const [entities, relations]: [KGEntity[], KGRelation[]] = await Promise.all([kgGetAll(ENTITIES_KEY), kgGetAll(RELATIONS_KEY)]);
+        const normalised = names.map((n: string) => n.toLowerCase());
+        const matched = entities.filter((e) => normalised.includes(e.name.toLowerCase()));
+        const matchedIds = matched.map((e) => e.id);
+        const linkedRelations = relations.filter((r) => matchedIds.includes(r.fromEntity) || matchedIds.includes(r.toEntity));
+        return { success: true, server: 'mcp:memory', action, output: { nodes: matched, relations: linkedRelations }, latencyMs: Date.now() - startTime };
+      }
+
+      case 'delete_entities': {
+        const { names } = params;
+        if (!Array.isArray(names)) throw new Error('Parameter "names" array is required');
+        const [entities, relations]: [KGEntity[], KGRelation[]] = await Promise.all([kgGetAll(ENTITIES_KEY), kgGetAll(RELATIONS_KEY)]);
+        const normalised = names.map((n: string) => n.toLowerCase());
+        const toDeleteIds = entities.filter((e) => normalised.includes(e.name.toLowerCase())).map((e) => e.id);
+        const filteredEntities = entities.filter((e) => !normalised.includes(e.name.toLowerCase()));
+        const filteredRelations = relations.filter((r) => !toDeleteIds.includes(r.fromEntity) && !toDeleteIds.includes(r.toEntity));
+        await Promise.all([kgSetAll(ENTITIES_KEY, filteredEntities), kgSetAll(RELATIONS_KEY, filteredRelations)]);
+        return { success: true, server: 'mcp:memory', action, output: { deletedEntities: toDeleteIds.length, cascadeDeletedRelations: relations.length - filteredRelations.length }, latencyMs: Date.now() - startTime };
+      }
+
+      case 'delete_relations': {
+        const { relations: toDelete } = params;
+        if (!Array.isArray(toDelete)) throw new Error('Parameter "relations" array is required');
+        const existing: KGRelation[] = await kgGetAll(RELATIONS_KEY);
+        const filtered = existing.filter((r) => !toDelete.some((d: any) => d.fromEntity === r.fromEntity && d.toEntity === r.toEntity && d.relationType === r.relationType));
+        await kgSetAll(RELATIONS_KEY, filtered);
+        return { success: true, server: 'mcp:memory', action, output: { deletedCount: existing.length - filtered.length }, latencyMs: Date.now() - startTime };
+      }
+
+      case 'delete_observations': {
+        const { entityName, observations } = params;
+        if (!entityName || !Array.isArray(observations)) throw new Error('Parameters "entityName" and "observations" array are required');
+        const entities: KGEntity[] = await kgGetAll(ENTITIES_KEY);
+        const entity = entities.find((e) => e.name.toLowerCase() === entityName.toLowerCase());
+        if (!entity) throw new Error(`Entity "${entityName}" not found`);
+        const before = entity.observations.length;
+        entity.observations = entity.observations.filter((o) => !observations.includes(o));
+        entity.updatedAt = new Date().toISOString();
+        await kgSetAll(ENTITIES_KEY, entities);
+        return { success: true, server: 'mcp:memory', action, output: { entityName, deletedObservations: before - entity.observations.length, remaining: entity.observations.length }, latencyMs: Date.now() - startTime };
+      }
+
+      default:
+        throw new Error(`Unsupported Memory MCP action: ${action}`);
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      server: 'mcp:memory',
+      action,
+      output: null,
+      error: error.message || 'Memory MCP execution failure',
+      latencyMs: Date.now() - startTime,
+    };
+  }
+}

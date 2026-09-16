@@ -18,6 +18,9 @@ import {
   executeCloudMCP,
   executeNetworkMCP,
   executeDatabaseMCP,
+  executeExaMCP,
+  executeVercelMCP,
+  executeMemoryMCP,
 } from './mcp';
 import {
   queryKnowledgeBase,
@@ -66,6 +69,20 @@ async function runDirectShellCommand(command: string): Promise<{ stdout: string;
 
 async function runWebSearch(query: string): Promise<any> {
   const results: Array<{ title: string; snippet: string; url: string; source?: string }> = [];
+
+  // Tier 0: Exa Neural Search (highest quality — semantic + citation ranking)
+  const exaKey = process.env.EXA_API_KEY;
+  if (exaKey) {
+    try {
+      const exaRes = await executeExaMCP('search', { query, numResults: 6, useAutoprompt: true, type: 'neural', includeText: true });
+      if (exaRes.success && Array.isArray(exaRes.output?.results) && exaRes.output.results.length > 0) {
+        for (const r of exaRes.output.results) {
+          results.push({ title: r.title || query, snippet: r.snippet || '', url: r.url, source: 'Exa Neural Search' });
+        }
+        return { query, resultsCount: results.length, results, engine: 'Exa Neural Search' };
+      }
+    } catch {}
+  }
 
   // Tier 0A: Serper.dev Google Search Engine (If configured)
   const serperKey = process.env.SERPER_API_KEY;
@@ -1244,6 +1261,76 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['name', 'description', 'content', 'triggers'],
     },
   },
+  {
+    name: 'mcp_exa',
+    description: 'Exa Neural Web Search MCP — semantic search with neural ranking, citation scores, and full page text extraction. Superior to DuckDuckGo for research, technical queries, and real-time news. Supports: search, find_similar, get_contents.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['search', 'find_similar', 'get_contents'],
+          description: 'search: neural web search | find_similar: find URLs related to a given URL | get_contents: fetch full text from specific URLs',
+        },
+        query: { type: 'string', description: 'Search query (required for "search" action).' },
+        url: { type: 'string', description: 'Source URL (required for "find_similar" action).' },
+        urls: { type: 'array', items: { type: 'string' }, description: 'Array of URLs to fetch full text from (required for "get_contents" action).' },
+        numResults: { type: 'number', description: 'Number of search results to return (default: 8).' },
+        type: { type: 'string', enum: ['neural', 'keyword', 'magic'], description: 'Search type. Default: neural.' },
+        useAutoprompt: { type: 'boolean', description: 'Whether to use Exa autoprompt rewriting for better results (default: true).' },
+        startPublishedDate: { type: 'string', description: 'Optional ISO date filter (e.g. "2024-01-01") for recency filtering.' },
+        maxCharacters: { type: 'number', description: 'Max characters per result text (for get_contents, default: 2000).' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'mcp_vercel',
+    description: 'Vercel Deployment Management MCP — native Vercel REST API access to inspect deployments, monitor build health, read logs, cancel broken builds, and audit environment variables. Requires VERCEL_TOKEN env var.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['list_projects', 'get_project', 'list_deployments', 'get_deployment', 'get_build_logs', 'cancel_deployment', 'list_env_vars'],
+          description: 'list_projects: all Vercel projects | get_project: project details | list_deployments: recent deployments | get_deployment: single deployment status | get_build_logs: build output | cancel_deployment: abort a running build | list_env_vars: show configured env keys (values redacted)',
+        },
+        projectId: { type: 'string', description: 'Vercel project ID or name. Defaults to "jarvis" project.' },
+        deploymentId: { type: 'string', description: 'Deployment UID (required for get_deployment, get_build_logs, cancel_deployment).' },
+        limit: { type: 'number', description: 'Number of deployments to return (default: 8).' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'mcp_memory',
+    description: 'Knowledge Graph Memory MCP (Anthropic Memory MCP standard) — manage a persistent entity-relation-observation graph stored in Upstash Redis. Creates semantic relationships between people, projects, tools, concepts, and events. Enables structured relational recall beyond flat vector search.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['create_entities', 'create_relations', 'add_observations', 'read_graph', 'search_nodes', 'open_nodes', 'delete_entities', 'delete_relations', 'delete_observations'],
+          description: 'create_entities: add new nodes | create_relations: link two entities | add_observations: append facts to an entity | read_graph: dump full graph | search_nodes: fuzzy search entities | open_nodes: fetch specific entities and their relations | delete_entities/relations/observations: remove graph data',
+        },
+        entities: {
+          type: 'array',
+          description: 'Array of entities for create_entities. Each: { name: string, type: string, observations?: string[] }',
+          items: { type: 'object' },
+        },
+        relations: {
+          type: 'array',
+          description: 'Array of relations for create_relations or delete_relations. Each: { fromEntity: string, toEntity: string, relationType: string, weight?: number }',
+          items: { type: 'object' },
+        },
+        entityName: { type: 'string', description: 'Entity name for add_observations or delete_observations.' },
+        observations: { type: 'array', items: { type: 'string' }, description: 'List of observation strings to add or delete.' },
+        names: { type: 'array', items: { type: 'string' }, description: 'List of entity names for open_nodes or delete_entities.' },
+        query: { type: 'string', description: 'Search query for search_nodes.' },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 export async function executeJarvisTool(
@@ -1783,6 +1870,24 @@ export async function executeJarvisTool(
             filePath: res.filePath,
           },
         };
+      }
+
+      case 'mcp_exa': {
+        const { action, ...params } = args;
+        const res = await executeExaMCP(action, params);
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'mcp_vercel': {
+        const { action, ...params } = args;
+        const res = await executeVercelMCP(action, params);
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'mcp_memory': {
+        const { action, ...params } = args;
+        const res = await executeMemoryMCP(action, params);
+        return { success: res.success, result: res.output, error: res.error };
       }
 
       default:

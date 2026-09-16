@@ -12,10 +12,13 @@ import {
   executeCloudMCP,
   executeNetworkMCP,
   executeDatabaseMCP,
+  executeExaMCP,
+  executeVercelMCP,
+  executeMemoryMCP,
   MCPExecutionResult,
 } from './mcp';
 
-export type MCPServerId = 'github' | 'filesystem' | 'cloud' | 'network' | 'database';
+export type MCPServerId = 'github' | 'filesystem' | 'cloud' | 'network' | 'database' | 'exa' | 'vercel' | 'memory';
 
 export interface MCPClientRequest {
   server: MCPServerId;
@@ -55,6 +58,15 @@ export class JarvisMCPClient {
 
       case 'database':
         return await executeDatabaseMCP(action as any, params);
+
+      case 'exa':
+        return await executeExaMCP(action as any, params);
+
+      case 'vercel':
+        return await executeVercelMCP(action as any, params);
+
+      case 'memory':
+        return await executeMemoryMCP(action as any, params);
 
       default:
         return {
