@@ -94,5 +94,22 @@
       "Headless Residential Proxy Tunneling via Apify Actors"
     ],
     "addedAt": "2026-09-16T13:13:00Z"
+  },
+  {
+    "name": "openai/codex-harness-app-server",
+    "url": "https://openai.com/index/unlocking-the-codex-harness/",
+    "domain": "Agent Harness & Session Lifecycle",
+    "status": "ACTIVE_EXTRACTION",
+    "extractedFeatures": [
+      "3-Tier Codex Primitives (Threads, Turns, Atomic Items)",
+      "Thread Forking & Branching for Sandboxed Exploration (`forkThread`)",
+      "Standardized Turn Event Stream with Upstash Persistence (`recordTurnItem`)"
+    ],
+    "futureRoadmap": [
+      "Bidirectional Interactive Client Approval Protocol (Telegram/PWA Buttons)",
+      "Streaming AST Workspace Diff Event Framing",
+      "Cross-Client JSON-RPC Gateway Transport"
+    ],
+    "addedAt": "2026-09-16T13:24:00Z"
   }
 ]
