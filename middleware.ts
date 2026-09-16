@@ -15,12 +15,12 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Exempt public authentication routes
-  if (pathname.startsWith('/api/jarvis/auth')) {
+  // Exempt public authentication routes and dedicated hardware shortcut bridge
+  if (pathname.startsWith('/api/jarvis/auth') || pathname === '/api/jarvis/shortcut') {
     return NextResponse.next();
   }
 
-  // Allow verified Master PIN for mobile shortcuts, hardware triggers, and CLI bridges
+  // Allow verified Master PIN for other mobile/CLI bridges
   const masterPin = req.headers.get('x-master-pin');
   if (masterPin && verifyMasterKey(masterPin)) {
     return NextResponse.next();
