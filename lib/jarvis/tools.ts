@@ -55,6 +55,9 @@ const HARD_DENY_PATTERNS = [
   { pattern: /git\s+push\s+.*-f\s+origin\s+(main|master)/, label: 'force-push to protected branch (-f)' },
   { pattern: /truncate\s+.*--size\s+0\s+.*\.(sql|db|sqlite)/, label: 'database file truncation' },
   { pattern: /DROP\s+TABLE\s+IF\s+EXISTS|DROP\s+DATABASE/i, label: 'SQL DROP TABLE/DATABASE' },
+  // Directive 06 — Zero-Thrashing Infrastructure Integrity
+  { pattern: /apt(-get)?\s+install.*(docker|containerd|podman|k3s|kubernetes)/i, label: 'Directive 06: Heavy container engine installation (Docker/Podman)' },
+  { pattern: /(npm|pip|uv)\s+(install|add).*(kokoro|onnxruntime-node|usestrix|torch|tensorflow)/i, label: 'Directive 06: Heavy native ML / sandbox installation' },
 ];
 
 const SOFT_WARN_PATTERNS = [
