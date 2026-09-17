@@ -27,12 +27,26 @@ export async function transcribeAudioBuffer(
     };
   }
 
+  // Normalize Telegram .oga / custom extensions to Groq-supported format (.ogg / .wav / .mp3)
+  let cleanFilename = filename.split('/').pop() || 'audio.ogg';
+  if (cleanFilename.endsWith('.oga')) {
+    cleanFilename = cleanFilename.replace(/\.oga$/i, '.ogg');
+  }
+  if (!cleanFilename.match(/\.(flac|mp3|mp4|mpeg|mpga|m4a|ogg|opus|wav|webm)$/i)) {
+    cleanFilename = `${cleanFilename}.ogg`;
+  }
+
+  let cleanMime = mimeType;
+  if (!cleanMime || cleanMime === 'application/octet-stream' || cleanMime === 'audio/oga') {
+    cleanMime = 'audio/ogg';
+  }
+
   try {
     const uint8 = new Uint8Array(buffer);
-    const blob = new Blob([uint8], { type: mimeType });
+    const blob = new Blob([uint8], { type: cleanMime });
 
     const formData = new FormData();
-    formData.append('file', blob, filename);
+    formData.append('file', blob, cleanFilename);
     formData.append('model', 'whisper-large-v3-turbo');
     formData.append('response_format', 'verbose_json');
     formData.append('temperature', '0.0');
@@ -51,8 +65,8 @@ export async function transcribeAudioBuffer(
       console.warn(`[Audio] Groq Whisper turbo returned HTTP ${res.status}:`, errText);
       // Fallback to standard whisper-large-v3
       const fallbackFormData = new FormData();
-      const fallbackBlob = new Blob([uint8], { type: mimeType });
-      fallbackFormData.append('file', fallbackBlob, filename);
+      const fallbackBlob = new Blob([uint8], { type: cleanMime });
+      fallbackFormData.append('file', fallbackBlob, cleanFilename);
       fallbackFormData.append('model', 'whisper-large-v3');
 
       const retryRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
