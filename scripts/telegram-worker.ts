@@ -318,23 +318,24 @@ async function processDirective(
       replyMarkup: actionMarkup,
     });
 
-    // 5. Kokoro-82M Zero-Cost Neural Voice Synthesis (Voice memo responses & vocal requests)
+    // 5. Kokoro-82M Zero-Cost Neural Voice Synthesis (On-Demand only to protect VM CPU credits)
     const wantsVoice =
-      isVoiceInput ||
+      cleanUserText.toLowerCase().startsWith('/voice') ||
+      cleanUserText.toLowerCase().startsWith('/speak') ||
       cleanUserText.toLowerCase().includes('voice note') ||
       cleanUserText.toLowerCase().includes('voice briefing') ||
       cleanUserText.toLowerCase().includes('speak to me') ||
-      cleanUserText.toLowerCase().startsWith('/voice');
+      cleanUserText.toLowerCase().includes('send audio');
 
     if (wantsVoice) {
-      // Execute synthesis asynchronously to ensure the gateway event loop remains ultra-responsive
+      // Execute synthesis asynchronously so gateway event loop never blocks
       (async () => {
         try {
           const rawVocal = result.vocalSummary || result.reply;
-          // Concise 1-2 sentence speech summary (capped at 200 chars for sub-2s CPU synthesis)
-          const vocalContent = rawVocal.length > 200 ? rawVocal.slice(0, 197) + '...' : rawVocal;
+          // Concise 1-2 sentence speech summary (capped at 160 chars)
+          const vocalContent = rawVocal.length > 160 ? rawVocal.slice(0, 157) + '...' : rawVocal;
           const persona = result.telemetry?.persona === 'FRIDAY' ? 'friday' : 'jarvis';
-          console.log(`[Kokoro-82M] Synthesizing voice note for Sir (${persona}): "${vocalContent.slice(0, 50)}..."`);
+          console.log(`[Kokoro-82M] Synthesizing on-demand voice note for Sir (${persona})...`);
           const audioBuf = await synthesizeSpeech(vocalContent, { persona });
           await gateway.sendVoice(chatId, audioBuf, {
             caption: `🗣️ Voice Memo // ${persona.toUpperCase()} (Kokoro-82M)`,
@@ -520,11 +521,6 @@ async function startTelegramGateway() {
   }
 
   console.log('[Telegram Gateway] 🚀 Long-polling active with Voice + Callback support. Ready for directives...');
-
-  // Pre-warm Kokoro-82M ONNX model asynchronously in background
-  getKokoroInstance().catch((err) => {
-    console.warn('[Telegram Gateway] Kokoro background warm-up warning:', err?.message);
-  });
 
   let offset: number | undefined = undefined;
 
