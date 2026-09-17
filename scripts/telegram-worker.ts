@@ -22,7 +22,6 @@ import {
   appendAgentChatMessage,
   ChatMessageRecord,
 } from '../lib/jarvis/storage';
-import { synthesizeSpeech, getKokoroInstance } from '../lib/jarvis/kokoro';
 import {
   getPersonaConfig,
   updatePersonaConfig,
@@ -317,36 +316,6 @@ async function processDirective(
       replyToMessageId,
       replyMarkup: actionMarkup,
     });
-
-    // 5. Kokoro-82M Zero-Cost Neural Voice Synthesis (On-Demand only to protect VM CPU credits)
-    const wantsVoice =
-      cleanUserText.toLowerCase().startsWith('/voice') ||
-      cleanUserText.toLowerCase().startsWith('/speak') ||
-      cleanUserText.toLowerCase().includes('voice note') ||
-      cleanUserText.toLowerCase().includes('voice briefing') ||
-      cleanUserText.toLowerCase().includes('speak to me') ||
-      cleanUserText.toLowerCase().includes('send audio');
-
-    if (wantsVoice) {
-      // Execute synthesis asynchronously so gateway event loop never blocks
-      (async () => {
-        try {
-          const rawVocal = result.vocalSummary || result.reply;
-          // Concise 1-2 sentence speech summary (capped at 160 chars)
-          const vocalContent = rawVocal.length > 160 ? rawVocal.slice(0, 157) + '...' : rawVocal;
-          const persona = result.telemetry?.persona === 'FRIDAY' ? 'friday' : 'jarvis';
-          console.log(`[Kokoro-82M] Synthesizing on-demand voice note for Sir (${persona})...`);
-          const audioBuf = await synthesizeSpeech(vocalContent, { persona });
-          await gateway.sendVoice(chatId, audioBuf, {
-            caption: `🗣️ Voice Memo // ${persona.toUpperCase()} (Kokoro-82M)`,
-            replyToMessageId,
-          });
-          console.log(`[Kokoro-82M] Voice memo dispatched successfully to Chat ID ${chatId}.`);
-        } catch (voiceErr: any) {
-          console.warn('[Telegram Gateway] Voice note generation warning:', voiceErr?.message);
-        }
-      })().catch(() => {});
-    }
   } catch (err: any) {
     console.error('[Telegram Gateway] Processing error:', err);
     await gateway.sendMessage(
