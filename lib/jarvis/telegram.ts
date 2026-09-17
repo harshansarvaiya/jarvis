@@ -306,6 +306,50 @@ export class TelegramGateway {
   }
 
   /**
+   * Sends a native Telegram voice memo (.wav/.ogg audio buffer)
+   */
+  public async sendVoice(
+    chatId: number | string,
+    voiceBuffer: Buffer,
+    options?: {
+      caption?: string;
+      replyToMessageId?: number;
+      duration?: number;
+    }
+  ): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    try {
+      const formData = new FormData();
+      formData.append('chat_id', String(chatId));
+      formData.append('voice', new Blob([new Uint8Array(voiceBuffer)], { type: 'audio/wav' }), 'voice.wav');
+      if (options?.caption) {
+        formData.append('caption', options.caption.slice(0, 1024));
+      }
+      if (options?.replyToMessageId) {
+        formData.append('reply_to_message_id', String(options.replyToMessageId));
+      }
+      if (options?.duration) {
+        formData.append('duration', String(options.duration));
+      }
+
+      const res = await fetch(`${this.baseUrl}/sendVoice`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.warn(`[Telegram] sendVoice returned HTTP ${res.status}:`, errText);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('[Telegram] Failed to send voice memo:', err);
+      return false;
+    }
+  }
+
+  /**
    * Responds to an inline callback query (e.g., button press acknowledgment)
    */
   public async answerCallbackQuery(

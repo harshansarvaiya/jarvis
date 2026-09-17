@@ -22,6 +22,7 @@ import {
   appendAgentChatMessage,
   ChatMessageRecord,
 } from '../lib/jarvis/storage';
+import { synthesizeSpeech, getKokoroInstance } from '../lib/jarvis/kokoro';
 import {
   getPersonaConfig,
   updatePersonaConfig,
@@ -316,6 +317,30 @@ async function processDirective(
       replyToMessageId,
       replyMarkup: actionMarkup,
     });
+
+    // 5. Kokoro-82M Zero-Cost Neural Voice Synthesis (Voice memo responses & vocal requests)
+    const wantsVoice =
+      isVoiceInput ||
+      cleanUserText.toLowerCase().includes('voice note') ||
+      cleanUserText.toLowerCase().includes('voice briefing') ||
+      cleanUserText.toLowerCase().includes('speak to me') ||
+      cleanUserText.toLowerCase().startsWith('/voice');
+
+    if (wantsVoice) {
+      try {
+        const vocalContent = result.vocalSummary || result.reply.slice(0, 350);
+        const persona = result.telemetry?.persona === 'FRIDAY' ? 'friday' : 'jarvis';
+        console.log(`[Kokoro-82M] Synthesizing voice note for Sir (${persona})...`);
+        const audioBuf = await synthesizeSpeech(vocalContent, { persona });
+        await gateway.sendVoice(chatId, audioBuf, {
+          caption: `🗣️ Voice Memo // ${persona.toUpperCase()} (Kokoro-82M)`,
+          replyToMessageId,
+        });
+        console.log(`[Kokoro-82M] Voice memo dispatched successfully to Chat ID ${chatId}.`);
+      } catch (voiceErr: any) {
+        console.warn('[Telegram Gateway] Voice note generation warning:', voiceErr?.message);
+      }
+    }
   } catch (err: any) {
     console.error('[Telegram Gateway] Processing error:', err);
     await gateway.sendMessage(
@@ -490,6 +515,11 @@ async function startTelegramGateway() {
   }
 
   console.log('[Telegram Gateway] 🚀 Long-polling active with Voice + Callback support. Ready for directives...');
+
+  // Pre-warm Kokoro-82M ONNX model asynchronously in background
+  getKokoroInstance().catch((err) => {
+    console.warn('[Telegram Gateway] Kokoro background warm-up warning:', err?.message);
+  });
 
   let offset: number | undefined = undefined;
 
