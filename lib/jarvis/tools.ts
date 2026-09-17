@@ -1258,6 +1258,62 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'scan_cve_threats',
+    description: 'Query live CVE security advisories and zero-day vulnerabilities across tech stacks (Spring Boot, Next.js, Redis, Kafka, TypeScript, Linux, OpenSSH, etc.) via OSV.dev and GitHub Security Advisory.',
+    parameters: {
+      type: 'object',
+      properties: {
+        keyword: {
+          type: 'string',
+          description: 'The package, dependency, or technology name to scan (e.g. "spring-boot", "next", "redis", "openssh", "axios").',
+        },
+        ecosystem: {
+          type: 'string',
+          enum: ['npm', 'Maven', 'PyPI', 'Go', 'Linux', 'crates.io'],
+          description: 'Optional package ecosystem filter.',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of vulnerability records to return (default: 5).',
+        },
+      },
+      required: ['keyword'],
+    },
+  },
+  {
+    name: 'trace_crypto_sanctions',
+    description: 'Investigate Bitcoin / Ethereum wallet addresses, balances, and transaction volume while simultaneously cross-checking against the US OFAC SDN, EU, and UN Global Sanctions Lists (OpenSanctions).',
+    parameters: {
+      type: 'object',
+      properties: {
+        addressOrName: {
+          type: 'string',
+          description: 'BTC/ETH wallet address or entity name to trace and screen against sanctions.',
+        },
+        asset: {
+          type: 'string',
+          enum: ['BTC', 'ETH', 'AUTO'],
+          description: 'Target crypto asset network (default: AUTO).',
+        },
+      },
+      required: ['addressOrName'],
+    },
+  },
+  {
+    name: 'inspect_ip_recon',
+    description: 'Perform OSINT reconnaissance on an IP address or domain: resolves DNS over HTTPS, queries RDAP/GeoIP, detects VPN/Proxy/Tor exit nodes, and identifies ASN / ISP organization.',
+    parameters: {
+      type: 'object',
+      properties: {
+        target: {
+          type: 'string',
+          description: 'IP address or domain name to investigate (e.g. "1.1.1.1", "api.github.com").',
+        },
+      },
+      required: ['target'],
+    },
+  },
+  {
     name: 'rag_search_knowledge',
     description: 'Perform semantic vector search on the J.A.R.V.I.S. Knowledge Base using dense vector embeddings (Gemini 004). Returns relevant chunks with similarity confidence.',
     parameters: {
@@ -2414,6 +2470,33 @@ export async function executeJarvisTool(
             config: updated,
           },
         };
+      }
+
+      case 'scan_cve_threats': {
+        const { scanCveThreats } = await import('./osint');
+        const report = await scanCveThreats({
+          keyword: args.keyword,
+          ecosystem: args.ecosystem,
+          limit: args.limit,
+        });
+        return { success: true, result: report };
+      }
+
+      case 'trace_crypto_sanctions': {
+        const { traceCryptoSanctions } = await import('./osint');
+        const report = await traceCryptoSanctions({
+          addressOrName: args.addressOrName,
+          asset: args.asset,
+        });
+        return { success: true, result: report };
+      }
+
+      case 'inspect_ip_recon': {
+        const { inspectIpRecon } = await import('./osint');
+        const report = await inspectIpRecon({
+          target: args.target,
+        });
+        return { success: true, result: report };
       }
 
       default:
