@@ -129,9 +129,9 @@ export function TacticalRadar() {
   }, [earthquakes]);
 
   return (
-    <div className="flex-1 flex flex-col space-y-3 min-h-0 font-mono text-xs">
+    <div className="flex-1 flex flex-col space-y-3 min-h-0 font-mono text-xs pb-4">
       {/* 1. TOP HEADER & TELEMETRY STRIP */}
-      <div className="border border-cyan-500/30 bg-hud-glass rounded-xl p-3 shadow-lg flex flex-wrap items-center justify-between gap-2">
+      <div className="border border-cyan-500/30 bg-hud-glass rounded-xl p-3 shadow-lg flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div className="flex items-center space-x-2">
           <div className="relative flex items-center justify-center">
             <Radio className="w-4 h-4 text-cyan-400 animate-pulse" />
@@ -217,7 +217,7 @@ export function TacticalRadar() {
       </div>
 
       {/* 3. 2D VECTOR RADAR MAP PROJECTION */}
-      <div className="relative w-full h-44 sm:h-52 bg-slate-950/95 border border-cyan-500/30 rounded-xl overflow-hidden shadow-inner flex flex-col justify-between p-2">
+      <div className="relative w-full h-36 sm:h-44 bg-slate-950/95 border border-cyan-500/30 rounded-xl overflow-hidden shadow-inner flex flex-col justify-between p-2 shrink-0">
         {/* Radar Background Grid Lines */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#00e5ff0a_1px,transparent_1px),linear-gradient(to_bottom,#00e5ff0a_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
         
@@ -317,13 +317,13 @@ export function TacticalRadar() {
       </div>
 
       {/* 4. DYNAMIC FEED PANEL & OSINT CONSOLE */}
-      <div className="border border-cyan-500/20 bg-hud-glass rounded-xl p-3 shadow-lg flex-1 min-h-0 flex flex-col space-y-2 overflow-hidden">
+      <div className="border border-cyan-500/20 bg-hud-glass rounded-xl p-3 shadow-lg flex-1 min-h-[280px] flex flex-col space-y-2">
         {/* ======================= */}
         {/* VIEW A: SEISMIC FEED    */}
         {/* ======================= */}
         {activeLayer === 'SEISMIC' && (
           <div className="flex-1 min-h-0 flex flex-col">
-            <div className="text-[11px] font-bold text-cyan-300 mb-2 flex items-center justify-between">
+            <div className="text-[11px] font-bold text-cyan-300 mb-2 flex items-center justify-between shrink-0">
               <span>LIVE USGS SEISMIC ACTIVITY (LAST 24 HOURS)</span>
               <span className="text-slate-400 text-[10px]">{earthquakes.length} Events Detected</span>
             </div>
@@ -373,7 +373,7 @@ export function TacticalRadar() {
         {/* ======================= */}
         {activeLayer === 'SPACE' && (
           <div className="flex-1 min-h-0 flex flex-col">
-            <div className="text-[11px] font-bold text-cyan-300 mb-2 flex items-center justify-between">
+            <div className="text-[11px] font-bold text-cyan-300 mb-2 flex items-center justify-between shrink-0">
               <span>NOAA SPACE WEATHER PREDICTION CENTER (SWPC)</span>
               <span className="text-slate-400 text-[10px]">{spaceAlerts.length} Active Bulletins</span>
             </div>
@@ -396,7 +396,7 @@ export function TacticalRadar() {
         {/* =========================== */}
         {activeLayer === 'MARITIME' && (
           <div className="flex-1 min-h-0 flex flex-col">
-            <div className="text-[11px] font-bold text-cyan-300 mb-2 flex items-center justify-between">
+            <div className="text-[11px] font-bold text-cyan-300 mb-2 flex items-center justify-between shrink-0">
               <span>STRATEGIC NAVAL & MARITIME CHOKEPOINTS</span>
               <span className="text-slate-400 text-[10px]">Global Trade Gateways</span>
             </div>
@@ -441,9 +441,9 @@ export function TacticalRadar() {
         {/* ================================ */}
         {activeLayer === 'OSINT_RECON' && (
           <div className="flex-1 min-h-0 flex flex-col space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between shrink-0">
               <span className="text-[11px] font-bold text-amber-300">OSIRIS RECON INVESTIGATION CONSOLE</span>
-              <div className="flex gap-1">
+              <div className="flex gap-1 shrink-0">
                 {(['CVE', 'CRYPTO', 'IP'] as const).map((t) => (
                   <button
                     key={t}
@@ -463,7 +463,7 @@ export function TacticalRadar() {
             </div>
 
             {/* Search Input Bar */}
-            <form onSubmit={handleRunOsint} className="flex gap-1.5">
+            <form onSubmit={handleRunOsint} className="flex gap-1.5 shrink-0">
               <input
                 type="text"
                 value={osintQuery}
@@ -480,7 +480,7 @@ export function TacticalRadar() {
               <button
                 type="submit"
                 disabled={osintLoading}
-                className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs flex items-center space-x-1 disabled:opacity-50 transition-all"
+                className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs flex items-center space-x-1 disabled:opacity-50 transition-all shrink-0"
               >
                 {osintLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
                 <span>AUDIT</span>

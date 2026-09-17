@@ -1864,7 +1864,7 @@ export default function JarvisDashboard() {
           </div>
 
           {/* Tactical Situational Radar OSINT Tab */}
-          <div className={`flex-1 min-h-0 overflow-y-auto ${desktopTab === 'RADAR' ? 'flex flex-col' : 'hidden'}`}>
+          <div className={`flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar ${desktopTab === 'RADAR' ? 'flex flex-col' : 'hidden'}`}>
             <TacticalRadar />
           </div>
 
