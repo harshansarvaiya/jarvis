@@ -48,6 +48,8 @@ export async function transcribeAudioBuffer(
     const formData = new FormData();
     formData.append('file', blob, cleanFilename);
     formData.append('model', 'whisper-large-v3-turbo');
+    formData.append('language', 'en');
+    formData.append('prompt', 'J.A.R.V.I.S., F.R.I.D.A.Y., Harshan, Sir, system health, radar, directives, code, deployment');
     formData.append('response_format', 'verbose_json');
     formData.append('temperature', '0.0');
 
@@ -68,6 +70,8 @@ export async function transcribeAudioBuffer(
       const fallbackBlob = new Blob([uint8], { type: cleanMime });
       fallbackFormData.append('file', fallbackBlob, cleanFilename);
       fallbackFormData.append('model', 'whisper-large-v3');
+      fallbackFormData.append('language', 'en');
+      fallbackFormData.append('prompt', 'J.A.R.V.I.S., F.R.I.D.A.Y., Harshan, Sir, system health, radar, directives, code, deployment');
 
       const retryRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
         method: 'POST',

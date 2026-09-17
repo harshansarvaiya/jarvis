@@ -327,19 +327,24 @@ async function processDirective(
       cleanUserText.toLowerCase().startsWith('/voice');
 
     if (wantsVoice) {
-      try {
-        const vocalContent = result.vocalSummary || result.reply.slice(0, 350);
-        const persona = result.telemetry?.persona === 'FRIDAY' ? 'friday' : 'jarvis';
-        console.log(`[Kokoro-82M] Synthesizing voice note for Sir (${persona})...`);
-        const audioBuf = await synthesizeSpeech(vocalContent, { persona });
-        await gateway.sendVoice(chatId, audioBuf, {
-          caption: `🗣️ Voice Memo // ${persona.toUpperCase()} (Kokoro-82M)`,
-          replyToMessageId,
-        });
-        console.log(`[Kokoro-82M] Voice memo dispatched successfully to Chat ID ${chatId}.`);
-      } catch (voiceErr: any) {
-        console.warn('[Telegram Gateway] Voice note generation warning:', voiceErr?.message);
-      }
+      // Execute synthesis asynchronously to ensure the gateway event loop remains ultra-responsive
+      (async () => {
+        try {
+          const rawVocal = result.vocalSummary || result.reply;
+          // Concise 1-2 sentence speech summary (capped at 200 chars for sub-2s CPU synthesis)
+          const vocalContent = rawVocal.length > 200 ? rawVocal.slice(0, 197) + '...' : rawVocal;
+          const persona = result.telemetry?.persona === 'FRIDAY' ? 'friday' : 'jarvis';
+          console.log(`[Kokoro-82M] Synthesizing voice note for Sir (${persona}): "${vocalContent.slice(0, 50)}..."`);
+          const audioBuf = await synthesizeSpeech(vocalContent, { persona });
+          await gateway.sendVoice(chatId, audioBuf, {
+            caption: `🗣️ Voice Memo // ${persona.toUpperCase()} (Kokoro-82M)`,
+            replyToMessageId,
+          });
+          console.log(`[Kokoro-82M] Voice memo dispatched successfully to Chat ID ${chatId}.`);
+        } catch (voiceErr: any) {
+          console.warn('[Telegram Gateway] Voice note generation warning:', voiceErr?.message);
+        }
+      })().catch(() => {});
     }
   } catch (err: any) {
     console.error('[Telegram Gateway] Processing error:', err);

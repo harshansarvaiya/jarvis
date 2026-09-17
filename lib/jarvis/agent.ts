@@ -275,13 +275,18 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         // NOTE: groq/compound-mini EXCISED — no tool call support
       ].filter((v, i, a) => a.indexOf(v) === i);
 
+      // Prepare lean reflex prompt for Groq (strictly enforcing <3,000 tokens to protect 8,000 TPM limit)
+      const groqSystemPrompt = fullSystemPrompt.length > 3500
+        ? `${JARVIS_SYSTEM_PROMPT.slice(0, 1500)}\n\n${personaPromptBlock}\n[CURRENT TIME]: ${new Date().toISOString()}\n[ACTIVE DIRECTIVES]: Protect Sir at all costs. Concise high-signal execution.`
+        : fullSystemPrompt;
+
       for (const groqModel of groqCandidates) {
         try {
-          const groqResult = await runOpenAICompatibleAgent(messages, {
+          const groqResult = await runOpenAICompatibleAgent(messages.slice(-4), {
             endpoint: 'https://api.groq.com/openai/v1/chat/completions',
             apiKey: groqKey,
             model: groqModel,
-            systemPrompt: fullSystemPrompt,
+            systemPrompt: groqSystemPrompt,
             maxTokens: 1024,
           });
 
