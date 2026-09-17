@@ -794,6 +794,33 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'run_codeact_action',
+    description: 'Execute an OpenHands-inspired CodeAct Action (Bash command sequence, Python script, or code mutation) with closed-loop compiler verification (npx tsc --noEmit) and structured event-stream observations.',
+    parameters: {
+      type: 'object',
+      properties: {
+        intent: {
+          type: 'string',
+          description: 'Clear intent / objective of this CodeAct action step.',
+        },
+        code: {
+          type: 'string',
+          description: 'Executable Bash command sequence or Python script to run.',
+        },
+        type: {
+          type: 'string',
+          enum: ['SHELL', 'PYTHON', 'MUTATION', 'VERIFY'],
+          description: 'Action type (SHELL, PYTHON, MUTATION, or VERIFY).',
+        },
+        verifyCompiler: {
+          type: 'boolean',
+          description: 'Set true to trigger closed-loop npx tsc --noEmit compiler verification after execution.',
+        },
+      },
+      required: ['intent', 'code'],
+    },
+  },
+  {
     name: 'store_memory',
     description: 'Permanently assimilate a preference, principle, insight, decision, procedural rule, workflow recipe, or correction into long-term memory across 4 cognitive tiers (Working, Episodic, Semantic, Procedural).',
     parameters: {
@@ -1985,6 +2012,27 @@ export async function executeJarvisTool(
           branch: branch || 'main',
         });
         return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'run_codeact_action': {
+        const { runCodeActStep } = await import('./codeact');
+        const step = await runCodeActStep(args.intent, args.code, {
+          type: args.type,
+          verifyCompiler: args.verifyCompiler !== false,
+        });
+        return {
+          success: step.observation.verified,
+          result: {
+            actionId: step.action.id,
+            intent: step.action.intent,
+            exitCode: step.observation.exitCode,
+            verified: step.observation.verified,
+            compilerClean: step.observation.compilerClean,
+            stdout: step.observation.stdout,
+            stderr: step.observation.stderr,
+            executionMs: step.observation.executionMs,
+          },
+        };
       }
 
       case 'cloud_execute_command': {
