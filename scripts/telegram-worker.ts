@@ -22,6 +22,14 @@ import {
   appendAgentChatMessage,
   ChatMessageRecord,
 } from '../lib/jarvis/storage';
+import {
+  getPersonaConfig,
+  updatePersonaConfig,
+  DEFAULT_PERSONA_CONFIG,
+  PersonaTone,
+  VerbosityLevel,
+  SparringIntensity,
+} from '../lib/jarvis/persona';
 
 // 1. Load Local Environment
 function loadEnv() {
@@ -144,6 +152,70 @@ async function processDirective(
       if (match) {
         requestedModel = match[1];
         cleanUserText = match[2].trim();
+      }
+    } else if (cleanUserText.startsWith('/persona')) {
+      const personaArgs = cleanUserText.replace(/^\/persona\s*/i, '').trim();
+      if (personaArgs === 'reset') {
+        const config = await updatePersonaConfig(DEFAULT_PERSONA_CONFIG);
+        await gateway.sendMessage(
+          chatId,
+          `⚡ **Persona Reset to Sovereign Defaults, Sir.**\n\n- **Tone**: \`${config.tone}\`\n- **Verbosity**: \`${config.verbosity}\`\n- **Sparring**: \`${config.sparringLevel}\`\n- **Anti-Generic Bot**: \`${config.banGenericListicles}\``,
+          { replyToMessageId }
+        );
+        return;
+      } else if (personaArgs.startsWith('tone ')) {
+        const toneVal = personaArgs.replace(/^tone\s+/i, '').trim() as PersonaTone;
+        const config = await updatePersonaConfig({ tone: toneVal });
+        await gateway.sendMessage(
+          chatId,
+          `🎭 **Persona Tone Updated:** \`${config.tone}\`\nActive Sparring: \`${config.sparringLevel}\` | Verbosity: \`${config.verbosity}\``,
+          { replyToMessageId }
+        );
+        return;
+      } else if (personaArgs.startsWith('verbosity ')) {
+        const verbVal = personaArgs.replace(/^verbosity\s+/i, '').trim() as VerbosityLevel;
+        const config = await updatePersonaConfig({ verbosity: verbVal });
+        await gateway.sendMessage(
+          chatId,
+          `📏 **Verbosity Updated:** \`${config.verbosity}\`\nActive Tone: \`${config.tone}\``,
+          { replyToMessageId }
+        );
+        return;
+      } else if (personaArgs.startsWith('sparring ') || personaArgs.startsWith('spar ')) {
+        const sparVal = personaArgs.replace(/^spar(ring)?\s+/i, '').trim() as SparringIntensity;
+        const config = await updatePersonaConfig({ sparringLevel: sparVal });
+        await gateway.sendMessage(
+          chatId,
+          `🥊 **Sparring Level Updated:** \`${config.sparringLevel}\`\nActive Tone: \`${config.tone}\``,
+          { replyToMessageId }
+        );
+        return;
+      } else if (personaArgs === '' || personaArgs === 'status') {
+        const config = await getPersonaConfig();
+        const customRulesStr = config.customDirectives.length > 0
+          ? `\n\n**Custom Directives:**\n${config.customDirectives.map((d, i) => `${i + 1}. _${d}_`).join('\n')}`
+          : '';
+        const keyboard: TelegramInlineKeyboardMarkup = {
+          inline_keyboard: [
+            [
+              { text: '🥊 Max Sparring', callback_data: 'persona:sparring:maximum' },
+              { text: '⚡ Ultra-Concise', callback_data: 'persona:verbosity:ultra-concise' },
+            ],
+            [
+              { text: '🛡️ Staff Engineer', callback_data: 'persona:tone:staff-engineer' },
+              { text: '👔 British Butler', callback_data: 'persona:tone:british-butler' },
+            ],
+            [
+              { text: '🔄 Reset Defaults', callback_data: 'persona:reset' },
+            ],
+          ],
+        };
+        await gateway.sendMessage(
+          chatId,
+          `🎭 **J.A.R.V.I.S. / F.R.I.D.A.Y. Persona Matrix**\n\n- **Active Tone**: \`${config.tone}\`\n- **Verbosity**: \`${config.verbosity}\`\n- **Sparring Level**: \`${config.sparringLevel}\`\n- **Anti-Generic Bot**: \`${config.banGenericListicles ? 'ENFORCED' : 'OFF'}\`\n- **Strict Deference**: \`${config.strictDeference ? 'Sir / British' : 'Standard'}\`${customRulesStr}\n\n_Tap below or use \`/persona tone [name]\` to tune dynamically:_`,
+          { replyToMessageId, replyMarkup: keyboard }
+        );
+        return;
       }
     }
 
@@ -289,6 +361,22 @@ async function handleIncomingMessage(update: TelegramUpdate) {
       directiveText = '/flash Report status and confirm Gemini 3.7 Strategic Tier active.';
     } else if (cq.data === 'cmd:nim') {
       directiveText = '/nim Report status and confirm NVIDIA NIM Llama 3.3 H100 tier active.';
+    } else if (cq.data.startsWith('persona:')) {
+      const parts = cq.data.split(':');
+      if (parts[1] === 'reset') {
+        const config = await updatePersonaConfig(DEFAULT_PERSONA_CONFIG);
+        await gateway.sendMessage(chatId, `⚡ Persona reset to defaults: Tone=\`${config.tone}\`, Sparring=\`${config.sparringLevel}\`, Verbosity=\`${config.verbosity}\`.`);
+      } else if (parts[1] === 'sparring' && parts[2]) {
+        const config = await updatePersonaConfig({ sparringLevel: parts[2] as SparringIntensity });
+        await gateway.sendMessage(chatId, `🥊 Sparring level updated to: \`${config.sparringLevel}\``);
+      } else if (parts[1] === 'verbosity' && parts[2]) {
+        const config = await updatePersonaConfig({ verbosity: parts[2] as VerbosityLevel });
+        await gateway.sendMessage(chatId, `📏 Verbosity updated to: \`${config.verbosity}\``);
+      } else if (parts[1] === 'tone' && parts[2]) {
+        const config = await updatePersonaConfig({ tone: parts[2] as PersonaTone });
+        await gateway.sendMessage(chatId, `🎭 Persona tone updated to: \`${config.tone}\``);
+      }
+      return;
     } else if (cq.data.startsWith('act:')) {
       const parts = cq.data.split(':');
       directiveText = parts.slice(2).join(':') || parts[1] || 'Execute tactical action';

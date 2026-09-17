@@ -15,6 +15,7 @@ import {
   ActivePersona,
 } from './orchestrator';
 import { appendUniversalChatMessage, appendAgentChatMessage, getCrossChannelContext } from './storage';
+import { getPersonaConfig, buildPersonaPromptBlock } from './persona';
 
 export interface ChatMessage {
   id?: string;
@@ -196,7 +197,6 @@ export async function runJarvisAgent(
   const motivePass = deconstructOperationalMotive(lastUserMessage.content);
 
 
-  // 3.5. Match Relevant Modular Skills (Hermes agentskills.io Engine)
   let skillsContext = '';
   try {
     const { matchRelevantSkills, formatSkillCatalogPrompt } = await import('./skills');
@@ -210,13 +210,18 @@ export async function runJarvisAgent(
     console.warn('[Agent] Skills loading warning:', skillsErr);
   }
 
+  // 3.6. Load User-Customized Dynamic Persona Substrate
+  let personaPromptBlock = '';
+  try {
+    const personaConfig = await getPersonaConfig();
+    personaPromptBlock = buildPersonaPromptBlock(personaConfig, persona);
+  } catch (personaErr) {
+    console.warn('[Agent] Persona config loading warning:', personaErr);
+  }
+
   const contextPrompt = `
 [CURRENT TEMPORAL CONTEXT]: ${new Date().toISOString()} (Local time: ${new Date().toLocaleString()})
-[ACTIVE DUAL-COGNITIVE PERSONA]:
-- Active Identity: ${persona === 'FRIDAY' ? 'F.R.I.D.A.Y. (Antigravity Sovereign Apex Mind)' : 'J.A.R.V.I.S. (Tactical Chief of Staff & Operations Butler)'}
-- Mandate & Persona Calibration: ${persona === 'FRIDAY'
-  ? 'You are responding as F.R.I.D.A.Y. (Antigravity Apex). Talk like a brilliant, senior Staff Software Engineer pair-programming with Sir on Telegram or Slack. Direct, confident, natural human tone. STRICTLY BAN canned bot templates ("### Mission Control Operational Status", "All autonomous channels..."), numbered slide-deck headings, or sci-fi stock filler. When asked for status, summarize real VM & process telemetry in 2–3 sharp, natural sentences. When solving technical problems, execute tools, verify compiler outputs, and explain your solutions in clean, fluid paragraphs.'
-  : 'You are responding as J.A.R.V.I.S. (Tactical Chief of Staff). Talk with composed, loyal British elegance ("Sir"). Manage daily routines, habits, radar tasks, and fast operational questions. Talk like a real human chief of staff on Telegram—direct, warm, and natural. STRICTLY BAN canned bot templates or sci-fi stock responses.'}
+${personaPromptBlock}
 
 [TIER 1 - WORKING MEMORY & PRE-THOUGHT REASONING PASS]:
 - Unstated Motive: ${motivePass.unstatedMotive}

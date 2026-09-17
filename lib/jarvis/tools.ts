@@ -1529,6 +1529,57 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['featureName', 'objective'],
     },
   },
+  {
+    name: 'customize_persona',
+    description: 'Dynamically configure, tune, or inspect J.A.R.V.I.S. & F.R.I.D.A.Y. persona settings, conversational tone, verbosity, sparring intensity, and custom user rules stored in Upstash Redis.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['update', 'get', 'reset', 'add_directive', 'remove_directive'],
+          description: 'Action: update settings, get active config, reset to defaults, add a custom directive, or remove a directive.',
+        },
+        tone: {
+          type: 'string',
+          enum: ['intellectual-sparring', 'concise-military', 'british-butler', 'staff-engineer', 'candid-advisor'],
+          description: 'Conversational tone and personality archetype.',
+        },
+        verbosity: {
+          type: 'string',
+          enum: ['ultra-concise', 'balanced', 'comprehensive'],
+          description: 'Output length and density constraint.',
+        },
+        sparringLevel: {
+          type: 'string',
+          enum: ['maximum', 'moderate', 'passive'],
+          description: 'Intellectual sparring intensity: maximum = actively challenges assumptions and attacks flawed premises; moderate = balanced pushback; passive = obedient execution.',
+        },
+        banGenericListicles: {
+          type: 'boolean',
+          description: 'Whether to strictly ban 4-tier textbook lists, generic categories, and robotic FAQ templates.',
+        },
+        strictDeference: {
+          type: 'boolean',
+          description: 'Whether to strictly address Sir with British-tinged intellectual elegance and ban filler.',
+        },
+        customDirective: {
+          type: 'string',
+          description: 'A new custom user rule/directive to append to the persona prompt (e.g. "Always give at most 2 points", "Focus exclusively on latency bottlenecks").',
+        },
+        removeDirectiveIndex: {
+          type: 'number',
+          description: 'Zero-based index of custom directive to remove.',
+        },
+        activePersona: {
+          type: 'string',
+          enum: ['FRIDAY', 'JARVIS', 'CUSTOM'],
+          description: 'Active default persona identity.',
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 export async function executeJarvisTool(
@@ -2296,6 +2347,60 @@ export async function executeJarvisTool(
           result: {
             message: `⚡ SPARC 5-Phase Development Specification for "${featureName}" successfully generated and ingested into Knowledge Base.`,
             sparcDoc,
+          },
+        };
+      }
+
+      case 'customize_persona': {
+        const { getPersonaConfig, updatePersonaConfig, DEFAULT_PERSONA_CONFIG } = await import('./persona');
+        const {
+          action = 'update',
+          tone,
+          verbosity,
+          sparringLevel,
+          banGenericListicles,
+          strictDeference,
+          customDirective,
+          removeDirectiveIndex,
+          activePersona,
+        } = args;
+
+        if (action === 'get') {
+          const config = await getPersonaConfig();
+          return { success: true, result: { message: 'Current persona configuration retrieved.', config } };
+        }
+
+        if (action === 'reset') {
+          const config = await updatePersonaConfig(DEFAULT_PERSONA_CONFIG);
+          return { success: true, result: { message: 'Persona configuration reset to sovereign defaults.', config } };
+        }
+
+        const current = await getPersonaConfig();
+        const directives = [...current.customDirectives];
+
+        if (action === 'add_directive' && customDirective) {
+          if (!directives.includes(customDirective)) directives.push(customDirective);
+        } else if (action === 'remove_directive' && typeof removeDirectiveIndex === 'number') {
+          directives.splice(removeDirectiveIndex, 1);
+        } else if (customDirective) {
+          if (!directives.includes(customDirective)) directives.push(customDirective);
+        }
+
+        const updated = await updatePersonaConfig({
+          ...(tone ? { tone } : {}),
+          ...(verbosity ? { verbosity } : {}),
+          ...(sparringLevel ? { sparringLevel } : {}),
+          ...(typeof banGenericListicles === 'boolean' ? { banGenericListicles } : {}),
+          ...(typeof strictDeference === 'boolean' ? { strictDeference } : {}),
+          ...(activePersona ? { activePersona } : {}),
+          customDirectives: directives,
+        });
+
+        return {
+          success: true,
+          result: {
+            message: `Persona configuration updated successfully: Tone="${updated.tone}", Verbosity="${updated.verbosity}", Sparring="${updated.sparringLevel}".`,
+            config: updated,
           },
         };
       }
