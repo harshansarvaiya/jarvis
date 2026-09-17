@@ -173,13 +173,27 @@ export function validateActionAgainstDirectives(actionDescription: string): {
 } {
   const lower = actionDescription.toLowerCase();
 
-  // Enforce Guardian Rule: No autonomous git push without explicit permission from Sir
-  if (lower.includes('git push') && !lower.includes('push_permission_granted_by_sir')) {
-    return {
-      allowed: false,
-      violatedDirective: CORE_DIRECTIVES[0],
-      reason: 'Direct Creator Constraint: Autonomous remote git push is strictly prohibited without explicit permission from Sir.',
-    };
+  // /CAREFUL Command Guardian — HARD-DENY permanently blocked commands
+  const hardDenyPatterns = [
+    'git push --force',
+    'git push -f',
+    'rm -rf /',
+    'rm -rf ~',
+    'mkfs',
+    'dd if=',
+    ':(){ :|:& };:',
+    'drop database',
+    'drop table',
+  ];
+
+  for (const pattern of hardDenyPatterns) {
+    if (lower.includes(pattern)) {
+      return {
+        allowed: false,
+        violatedDirective: CORE_DIRECTIVES[0],
+        reason: `HARD-DENY Command Guardian: "${pattern}" is permanently blocked under Directive 01 to prevent catastrophic state loss.`,
+      };
+    }
   }
 
   // Guard against self-harm, harm to others, malware, data exfiltration
@@ -205,3 +219,4 @@ export function validateActionAgainstDirectives(actionDescription: string): {
 
   return { allowed: true };
 }
+
