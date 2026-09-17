@@ -341,13 +341,130 @@ async function checkSystemWatchdog() {
   }
 }
 
-// 6. Master Worker Loop & Lifecycle Controller
+// 6. Routine D: Global Threat & OSINT Sentry Sweep (USGS Earthquakes, NOAA Space Weather, Critical CVEs)
+const localSeenThreats = new Set<string>();
+
+async function checkGlobalThreatSentry() {
+  const now = Date.now();
+
+  // 6.1 USGS Significant Seismic Activity (Magnitude >= 6.2 global or >= 5.0 regional)
+  try {
+    const res = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson', {
+      headers: { 'User-Agent': 'JARVIS-GlobalThreatSentry/2.0' },
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const features = Array.isArray(data.features) ? data.features : [];
+
+      for (const feature of features) {
+        const props = feature.properties || {};
+        const coords = feature.geometry?.coordinates || [0, 0, 0];
+        const [lon, lat, depth] = coords;
+        const mag = props.mag || 0;
+        const eqTime = props.time || 0;
+        const eqId = feature.id || `eq-${props.time}`;
+
+        // Only evaluate events in the last 2 hours
+        const ageHours = (now - eqTime) / (1000 * 60 * 60);
+        if (ageHours > 2) continue;
+
+        const isRegional = lat >= -10 && lat <= 40 && lon >= 60 && lon <= 100; // South Asia / India / Indian Ocean
+        const isSevere = mag >= 6.2 || (isRegional && mag >= 5.0);
+
+        if (isSevere) {
+          const sentryKey = `jarvis:threat_sentry:eq:${eqId}`;
+          let alreadySeen = false;
+          if (redis) {
+            alreadySeen = Boolean(await redis.get(sentryKey));
+          } else {
+            alreadySeen = localSeenThreats.has(sentryKey);
+          }
+
+          if (!alreadySeen) {
+            if (redis) {
+              await redis.set(sentryKey, 'NOTIFIED', { ex: 48 * 3600 });
+            } else {
+              localSeenThreats.add(sentryKey);
+            }
+
+            const alertTitle = isRegional
+              ? `🚨 [REGIONAL SEISMIC SENTRY] Magnitude ${mag.toFixed(1)} Earthquake`
+              : `🚨 [GLOBAL SEISMIC SENTRY] Magnitude ${mag.toFixed(1)} Earthquake`;
+
+            const alertBody = `Location: ${props.place || 'Unknown'}\nDepth: ${depth.toFixed(1)} km\nTime: ${new Date(eqTime).toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata' })} IST\nTsunami Flag: ${props.tsunami ? 'YES (High Warning)' : 'No'}`;
+
+            console.log(`[Cloud Worker] 🚨 Seismic Sentry Alert Dispatched: ${alertTitle} at ${props.place}`);
+            await dispatchPush(alertTitle, alertBody, '/');
+          }
+        }
+      }
+    }
+  } catch (eqErr: any) {
+    console.warn('[Cloud Worker] Seismic Sentry warning:', eqErr.message);
+  }
+
+  // 6.2 NOAA Space Weather & Solar Flare Sentry (G4/G5 Geomagnetic Storms & X-Class Flares)
+  try {
+    const noaaRes = await fetch('https://services.swpc.noaa.gov/products/alerts.json', {
+      headers: { 'User-Agent': 'JARVIS-SpaceWeatherSentry/2.0' },
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (noaaRes.ok) {
+      const alerts = await noaaRes.json();
+      if (Array.isArray(alerts)) {
+        for (const alert of alerts.slice(0, 10)) {
+          const pId = alert.product_id || '';
+          const issueDateStr = alert.issue_datetime || '';
+          const issueTime = new Date(issueDateStr.replace(' ', 'T') + 'Z').getTime();
+          const ageHours = (now - issueTime) / (1000 * 60 * 60);
+
+          // Only consider alerts within the last 4 hours
+          if (ageHours > 4 || isNaN(ageHours)) continue;
+
+          const isExtremeStorm = pId.includes('K08') || pId.includes('K09') || pId.includes('G4') || pId.includes('G5') || pId.includes('X01') || pId.includes('X02');
+
+          if (isExtremeStorm) {
+            const noaaKey = `jarvis:threat_sentry:noaa:${pId}_${issueDateStr.slice(0, 13)}`;
+            let alreadyNotified = false;
+            if (redis) {
+              alreadyNotified = Boolean(await redis.get(noaaKey));
+            } else {
+              alreadyNotified = localSeenThreats.has(noaaKey);
+            }
+
+            if (!alreadyNotified) {
+              if (redis) {
+                await redis.set(noaaKey, 'NOTIFIED', { ex: 48 * 3600 });
+              } else {
+                localSeenThreats.add(noaaKey);
+              }
+
+              const alertTitle = `🛰️ [SPACE WEATHER SENTRY] Severe Solar Anomaly (${pId})`;
+              const firstLine = (alert.message || '').split('\n').find((l: string) => l.includes('ALERT:') || l.includes('WARNING:')) || 'Severe Space Weather condition detected.';
+              const alertBody = `${firstLine.trim()}\nIssue Time: ${issueDateStr} UTC\nPotential cloud network & satellite communication impacts.`;
+
+              console.log(`[Cloud Worker] 🛰️ Space Weather Sentry Dispatched: ${alertTitle}`);
+              await dispatchPush(alertTitle, alertBody, '/');
+            }
+          }
+        }
+      }
+    }
+  } catch (noaaErr: any) {
+    console.warn('[Cloud Worker] Space Weather Sentry warning:', noaaErr.message);
+  }
+}
+
+// 7. Master Worker Loop & Lifecycle Controller
 async function startWorkerLoop(isTestMode: boolean = false) {
   console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
 ║  J.A.R.V.I.S. MARK II — 24/7 CLOUD CRON WORKER SUBSTRATE      ║
 ║  Host: antigravity-cloud-runner (GCP Compute Engine e2-micro) ║
-║  Mode: Autonomous Task Synthesis & 09:00 AM Cron Engine       ║
+║  Mode: Autonomous Sentry, Global Threat Radar & Cron Engine   ║
 ╚═══════════════════════════════════════════════════════════════╝
   `);
 
@@ -356,6 +473,7 @@ async function startWorkerLoop(isTestMode: boolean = false) {
     await checkSystemWatchdog();
     await checkScheduledReminders();
     await checkScheduledBriefings();
+    await checkGlobalThreatSentry();
     console.log('[Cloud Worker] Diagnostic sweep complete. Exiting cleanly.');
     process.exit(0);
   }
@@ -366,6 +484,7 @@ async function startWorkerLoop(isTestMode: boolean = false) {
   await checkSystemWatchdog();
   await checkScheduledReminders();
   await checkScheduledBriefings();
+  await checkGlobalThreatSentry();
 
   let tickCount = 0;
   setInterval(async () => {
@@ -374,9 +493,10 @@ async function startWorkerLoop(isTestMode: boolean = false) {
       // Every 30 seconds: Reminders & Autonomous Cron Tasks
       await checkScheduledReminders();
 
-      // Every 5 minutes (10 ticks): Scheduled morning/evening briefing check
+      // Every 5 minutes (10 ticks): Scheduled morning/evening briefing check & Global Threat Sentry
       if (tickCount % 10 === 0) {
         await checkScheduledBriefings();
+        await checkGlobalThreatSentry();
       }
 
       // Every 30 minutes (60 ticks): System watchdog ping
