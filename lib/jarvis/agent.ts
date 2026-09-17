@@ -482,10 +482,12 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     ];
 
     const contents: any[] = [];
+    const generationTemperature = archetype === 'DEEP_SYNTHESIS' ? 0.6 : 0.5;
+
     const systemInstruction = {
       parts: [
         {
-          text: `${JARVIS_SYSTEM_PROMPT}\n\n${contextPrompt}`,
+          text: `${personaPromptBlock}\n\n${JARVIS_SYSTEM_PROMPT}\n\n${contextPrompt}\n\n[MANDATORY FINAL ANCHOR]: Speak directly to Sir as ${persona}. Fluid natural paragraphs. Strictly ban textbook listicles and newsletter headings.`,
         },
       ],
     };
@@ -545,7 +547,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             systemInstruction,
             tools: geminiTools,
             generationConfig: {
-              temperature: 0.3,
+              temperature: generationTemperature,
               maxOutputTokens: 4096,
               thinkingConfig: {
                 includeThoughts: true,
@@ -585,7 +587,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       attemptsCount++;
 
       const generationConfig = {
-        temperature: 0.3,
+        temperature: generationTemperature,
         maxOutputTokens: 4096,
       };
 
