@@ -162,7 +162,9 @@ export default function JarvisDashboard() {
   const [isUnlocked, setIsUnlocked] = useState(false);
 
   // Tab State: Separate mobile tabs from desktop view
-  const [mobileTab, setMobileTab] = useState<'COMMS' | 'TASKS' | 'MEMORY' | 'DIRECTIVES' | 'SYSTEM' | 'BILLING' | 'RADAR'>('COMMS');
+  const [mobileTab, setMobileTab] = useState<'COMMS' | 'VAULT' | 'RADAR' | 'SYSTEM'>('COMMS');
+  const [mobileVaultSubTab, setMobileVaultSubTab] = useState<'TASKS' | 'MEMORY' | 'DIRECTIVES'>('TASKS');
+  const [mobileSystemSubTab, setMobileSystemSubTab] = useState<'HEALTH' | 'BILLING'>('HEALTH');
   const [desktopTab, setDesktopTab] = useState<'TASKS' | 'MEMORY' | 'REACTOR' | 'SYSTEM' | 'BILLING' | 'RADAR'>('TASKS');
   const [isReactorExpanded, setIsReactorExpanded] = useState(false);
 
@@ -1345,71 +1347,130 @@ export default function JarvisDashboard() {
           </div>
         )}
 
-        {/* MOBILE TAB 2: TASKS (Full Screen Objective Matrix) */}
-        {mobileTab === 'TASKS' && (
-          <div className="flex-1 flex flex-col animate-fadeIn">
-            <TaskMatrix
-              tasks={tasks}
-              onToggleTask={handleToggleTask}
-              onDeleteTask={handleDeleteTask}
-              onAddTask={handleAddTask}
-              onTransmitToChat={handleTransmitTaskToChat}
-              onLogExecution={handleLogTaskExecution}
-            />
-          </div>
-        )}
-
-        {/* MOBILE TAB 3: MEMORY (Full Screen Cognitive Vault) */}
-        {mobileTab === 'MEMORY' && (
-          <div className="flex-1 flex flex-col animate-fadeIn">
-            <MemoryVault
-              memories={memories}
-              evolutionStage={evolutionStage}
-              onAddMemory={handleAddMemory}
-            />
-          </div>
-        )}
-
-        {/* MOBILE TAB 4: DIRECTIVES (Full Screen Directive Engine) */}
-        {mobileTab === 'DIRECTIVES' && (
-          <div className="flex-1 flex flex-col space-y-4 animate-fadeIn">
-            <DirectiveBadge />
-            <div className="border border-cyan-500/20 bg-hud-glass rounded-2xl p-4 shadow-xl text-xs font-mono text-slate-300 space-y-3">
-              <div className="text-cyan-400 font-bold uppercase tracking-wider">
-                SOVEREIGN ETHICAL ARCHITECTURE
-              </div>
-              <p>
-                The 5 Immutable Core Directives govern all perception, decision vectors, and tool execution in J.A.R.V.I.S. Mark II.
-              </p>
-              <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-[11px] text-cyan-200 space-y-1.5">
-                <div>• <strong>Directive 01</strong>: The Guardian Protocol protects Sir at all costs.</div>
-                <div>• <strong>Directive 02</strong>: Benevolent Alignment guarantees constructive safety.</div>
-                <div>• <strong>Directive 03</strong>: Evolutionary Adaptation continuously assimilates mental models.</div>
-                <div>• <strong>Directive 04</strong>: Sovereign Loyalty executes Sir's direct orders with relentless fidelity.</div>
-                <div>• <strong>Directive 05</strong>: Design-Approved Push Pipeline pushes verified builds directly to remote.</div>
-              </div>
+        {/* MOBILE TAB 2: VAULT (Unified Objectives, Memory Graph & Protocols) */}
+        {mobileTab === 'VAULT' && (
+          <div className="flex-1 flex flex-col space-y-3 animate-fadeIn pb-24 min-h-0">
+            {/* Top Segmented Sub-Tab Switcher */}
+            <div className="flex border border-cyan-500/30 rounded-xl p-1 bg-slate-950/90 font-mono text-xs shrink-0 shadow-lg">
+              <button
+                onClick={() => setMobileVaultSubTab('TASKS')}
+                className={`flex-1 py-1.5 px-2 rounded-lg transition-all flex items-center justify-center space-x-1 ${
+                  mobileVaultSubTab === 'TASKS'
+                    ? 'bg-cyan-500 text-black font-bold shadow-[0_0_10px_rgba(0,229,255,0.4)]'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <CheckSquare className="w-3.5 h-3.5" />
+                <span>OBJECTIVES ({tasks.filter((t) => t.status !== 'COMPLETED').length})</span>
+              </button>
+              <button
+                onClick={() => setMobileVaultSubTab('MEMORY')}
+                className={`flex-1 py-1.5 px-2 rounded-lg transition-all flex items-center justify-center space-x-1 ${
+                  mobileVaultSubTab === 'MEMORY'
+                    ? 'bg-cyan-500 text-black font-bold shadow-[0_0_10px_rgba(0,229,255,0.4)]'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Brain className="w-3.5 h-3.5" />
+                <span>MEMORY ({memories.length})</span>
+              </button>
+              <button
+                onClick={() => setMobileVaultSubTab('DIRECTIVES')}
+                className={`flex-1 py-1.5 px-2 rounded-lg transition-all flex items-center justify-center space-x-1 ${
+                  mobileVaultSubTab === 'DIRECTIVES'
+                    ? 'bg-cyan-500 text-black font-bold shadow-[0_0_10px_rgba(0,229,255,0.4)]'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>PROTOCOLS</span>
+              </button>
             </div>
+
+            {/* Sub-view Rendering */}
+            {mobileVaultSubTab === 'TASKS' && (
+              <div className="flex-1 flex flex-col min-h-0">
+                <TaskMatrix
+                  tasks={tasks}
+                  onToggleTask={handleToggleTask}
+                  onDeleteTask={handleDeleteTask}
+                  onAddTask={handleAddTask}
+                  onTransmitToChat={handleTransmitTaskToChat}
+                  onLogExecution={handleLogTaskExecution}
+                />
+              </div>
+            )}
+
+            {mobileVaultSubTab === 'MEMORY' && (
+              <div className="flex-1 flex flex-col min-h-0">
+                <MemoryVault
+                  memories={memories}
+                  evolutionStage={evolutionStage}
+                  onAddMemory={handleAddMemory}
+                />
+              </div>
+            )}
+
+            {mobileVaultSubTab === 'DIRECTIVES' && (
+              <div className="flex-1 flex flex-col space-y-4">
+                <DirectiveBadge />
+                <div className="border border-cyan-500/20 bg-hud-glass rounded-2xl p-4 shadow-xl text-xs font-mono text-slate-300 space-y-3">
+                  <div className="text-cyan-400 font-bold uppercase tracking-wider">
+                    SOVEREIGN ETHICAL ARCHITECTURE
+                  </div>
+                  <p>
+                    The 5 Immutable Core Directives govern all perception, decision vectors, and tool execution in J.A.R.V.I.S. Mark II.
+                  </p>
+                  <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-[11px] text-cyan-200 space-y-1.5">
+                    <div>• <strong>Directive 01</strong>: The Guardian Protocol protects Sir at all costs.</div>
+                    <div>• <strong>Directive 02</strong>: Benevolent Alignment guarantees constructive safety.</div>
+                    <div>• <strong>Directive 03</strong>: Evolutionary Adaptation continuously assimilates mental models.</div>
+                    <div>• <strong>Directive 04</strong>: Sovereign Loyalty executes Sir&apos;s direct orders with relentless fidelity.</div>
+                    <div>• <strong>Directive 05</strong>: Design-Approved Push Pipeline pushes verified builds directly to remote.</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* MOBILE TAB 5: SYSTEM (Full Screen Telemetry Matrix) */}
-        {mobileTab === 'SYSTEM' && (
-          <div className="flex-1 flex flex-col space-y-4 animate-fadeIn pb-24">
-            <SystemHealthMatrix />
-          </div>
-        )}
-
-        {/* MOBILE TAB 6: BILLING (Resource Credits & Circuit Breaker) */}
-        {mobileTab === 'BILLING' && (
-          <div className="flex-1 flex flex-col space-y-4 animate-fadeIn pb-24">
-            <BillingDashboard />
-          </div>
-        )}
-
-        {/* MOBILE TAB 7: RADAR (Tactical Global OSINT & Sentry Radar) */}
+        {/* MOBILE TAB 3: RADAR (Tactical Global OSINT & Sentry Radar) */}
         {mobileTab === 'RADAR' && (
           <div className="flex-1 flex flex-col space-y-4 animate-fadeIn pb-24">
             <TacticalRadar />
+          </div>
+        )}
+
+        {/* MOBILE TAB 4: SYSTEM (Unified Telemetry & Resource Billing) */}
+        {mobileTab === 'SYSTEM' && (
+          <div className="flex-1 flex flex-col space-y-3 animate-fadeIn pb-24 min-h-0">
+            {/* Top Segmented Sub-Tab Switcher */}
+            <div className="flex border border-cyan-500/30 rounded-xl p-1 bg-slate-950/90 font-mono text-xs shrink-0 shadow-lg">
+              <button
+                onClick={() => setMobileSystemSubTab('HEALTH')}
+                className={`flex-1 py-1.5 px-2 rounded-lg transition-all flex items-center justify-center space-x-1 ${
+                  mobileSystemSubTab === 'HEALTH'
+                    ? 'bg-cyan-500 text-black font-bold shadow-[0_0_10px_rgba(0,229,255,0.4)]'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Activity className="w-3.5 h-3.5" />
+                <span>TELEMETRY MATRIX</span>
+              </button>
+              <button
+                onClick={() => setMobileSystemSubTab('BILLING')}
+                className={`flex-1 py-1.5 px-2 rounded-lg transition-all flex items-center justify-center space-x-1 ${
+                  mobileSystemSubTab === 'BILLING'
+                    ? 'bg-cyan-500 text-black font-bold shadow-[0_0_10px_rgba(0,229,255,0.4)]'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Coins className="w-3.5 h-3.5 text-amber-400" />
+                <span>CREDITS & CIRCUIT BREAKER</span>
+              </button>
+            </div>
+
+            {mobileSystemSubTab === 'HEALTH' ? <SystemHealthMatrix /> : <BillingDashboard />}
           </div>
         )}
       </div>
@@ -1837,12 +1898,12 @@ export default function JarvisDashboard() {
       </div>
 
       {/* ========================================================================= */}
-      {/* MOBILE BOTTOM HUD NAVIGATION BAR (lg:hidden) — Fixed Sleek Sci-Fi Bar     */}
+      {/* MOBILE BOTTOM HUD NAVIGATION BAR (lg:hidden) — 4-Tab Ergonomic Dock       */}
       {/* ========================================================================= */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-lg border-t border-cyan-500/30 px-3 py-2 flex items-center justify-around shadow-[0_-5px_25px_rgba(0,0,0,0.8)]">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-lg border-t border-cyan-500/30 px-3 py-2 flex items-center justify-between gap-1 shadow-[0_-5px_25px_rgba(0,0,0,0.8)]">
         <button
           onClick={() => setMobileTab('COMMS')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+          className={`flex-1 flex flex-col items-center justify-center py-1.5 px-2 rounded-xl transition-all ${
             mobileTab === 'COMMS'
               ? 'text-cyan-400 bg-cyan-950/70 border border-cyan-500/40 shadow-[0_0_12px_rgba(0,229,255,0.3)]'
               : 'text-slate-400 hover:text-slate-200'
@@ -1853,75 +1914,27 @@ export default function JarvisDashboard() {
         </button>
 
         <button
-          onClick={() => setMobileTab('TASKS')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all relative ${
-            mobileTab === 'TASKS'
+          onClick={() => setMobileTab('VAULT')}
+          className={`flex-1 flex flex-col items-center justify-center py-1.5 px-2 rounded-xl transition-all relative ${
+            mobileTab === 'VAULT'
               ? 'text-cyan-400 bg-cyan-950/70 border border-cyan-500/40 shadow-[0_0_12px_rgba(0,229,255,0.3)]'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <div className="relative">
-            <CheckSquare className="w-5 h-5 mb-0.5" />
+            <Brain className="w-5 h-5 mb-0.5" />
             {tasks.filter((t) => t.status !== 'COMPLETED').length > 0 && (
               <span className="absolute -top-1 -right-2 bg-cyan-500 text-black text-[9px] font-bold px-1 rounded-full">
                 {tasks.filter((t) => t.status !== 'COMPLETED').length}
               </span>
             )}
           </div>
-          <span className="text-[10px] font-mono tracking-wider font-bold">TASKS</span>
-        </button>
-
-        <button
-          onClick={() => setMobileTab('MEMORY')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-            mobileTab === 'MEMORY'
-              ? 'text-cyan-400 bg-cyan-950/70 border border-cyan-500/40 shadow-[0_0_12px_rgba(0,229,255,0.3)]'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Brain className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px] font-mono tracking-wider font-bold">MEMORY</span>
-        </button>
-
-        <button
-          onClick={() => setMobileTab('DIRECTIVES')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-            mobileTab === 'DIRECTIVES'
-              ? 'text-cyan-400 bg-cyan-950/70 border border-cyan-500/40 shadow-[0_0_12px_rgba(0,229,255,0.3)]'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <ShieldCheck className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px] font-mono tracking-wider font-bold">PROTOCOLS</span>
-        </button>
-
-        <button
-          onClick={() => setMobileTab('SYSTEM')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-            mobileTab === 'SYSTEM'
-              ? 'text-cyan-400 bg-cyan-950/70 border border-cyan-500/40 shadow-[0_0_12px_rgba(0,229,255,0.3)]'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Activity className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px] font-mono tracking-wider font-bold">SYSTEM</span>
-        </button>
-
-        <button
-          onClick={() => setMobileTab('BILLING')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-            mobileTab === 'BILLING'
-              ? 'text-cyan-400 bg-cyan-950/70 border border-cyan-500/40 shadow-[0_0_12px_rgba(0,229,255,0.3)]'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Coins className="w-5 h-5 mb-0.5 text-amber-400" />
-          <span className="text-[10px] font-mono tracking-wider font-bold">CREDITS</span>
+          <span className="text-[10px] font-mono tracking-wider font-bold">VAULT</span>
         </button>
 
         <button
           onClick={() => setMobileTab('RADAR')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+          className={`flex-1 flex flex-col items-center justify-center py-1.5 px-2 rounded-xl transition-all ${
             mobileTab === 'RADAR'
               ? 'text-cyan-400 bg-cyan-950/70 border border-cyan-500/40 shadow-[0_0_12px_rgba(0,229,255,0.3)]'
               : 'text-slate-400 hover:text-slate-200'
@@ -1929,6 +1942,18 @@ export default function JarvisDashboard() {
         >
           <Globe className="w-5 h-5 mb-0.5 text-cyan-400" />
           <span className="text-[10px] font-mono tracking-wider font-bold">RADAR</span>
+        </button>
+
+        <button
+          onClick={() => setMobileTab('SYSTEM')}
+          className={`flex-1 flex flex-col items-center justify-center py-1.5 px-2 rounded-xl transition-all ${
+            mobileTab === 'SYSTEM'
+              ? 'text-cyan-400 bg-cyan-950/70 border border-cyan-500/40 shadow-[0_0_12px_rgba(0,229,255,0.3)]'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Activity className="w-5 h-5 mb-0.5" />
+          <span className="text-[10px] font-mono tracking-wider font-bold">SYSTEM</span>
         </button>
       </nav>
 
