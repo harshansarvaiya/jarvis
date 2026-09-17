@@ -35,6 +35,7 @@ import { TaskMatrix } from '@/components/TaskMatrix';
 import { MemoryVault } from '@/components/MemoryVault';
 import { SystemHealthMatrix } from '@/components/SystemHealthMatrix';
 import { BillingDashboard } from '@/components/BillingDashboard';
+import { TacticalRadar } from '@/components/TacticalRadar';
 import { SettingsModal } from '@/components/SettingsModal';
 import { SecurityGateModal } from '@/components/SecurityGateModal';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
@@ -161,8 +162,8 @@ export default function JarvisDashboard() {
   const [isUnlocked, setIsUnlocked] = useState(false);
 
   // Tab State: Separate mobile tabs from desktop view
-  const [mobileTab, setMobileTab] = useState<'COMMS' | 'TASKS' | 'MEMORY' | 'DIRECTIVES' | 'SYSTEM' | 'BILLING'>('COMMS');
-  const [desktopTab, setDesktopTab] = useState<'TASKS' | 'MEMORY' | 'REACTOR' | 'SYSTEM' | 'BILLING'>('TASKS');
+  const [mobileTab, setMobileTab] = useState<'COMMS' | 'TASKS' | 'MEMORY' | 'DIRECTIVES' | 'SYSTEM' | 'BILLING' | 'RADAR'>('COMMS');
+  const [desktopTab, setDesktopTab] = useState<'TASKS' | 'MEMORY' | 'REACTOR' | 'SYSTEM' | 'BILLING' | 'RADAR'>('TASKS');
   const [isReactorExpanded, setIsReactorExpanded] = useState(false);
 
   // Quick Action Prompts for horizontal ribbons
@@ -1404,6 +1405,13 @@ export default function JarvisDashboard() {
             <BillingDashboard />
           </div>
         )}
+
+        {/* MOBILE TAB 7: RADAR (Tactical Global OSINT & Sentry Radar) */}
+        {mobileTab === 'RADAR' && (
+          <div className="flex-1 flex flex-col space-y-4 animate-fadeIn pb-24">
+            <TacticalRadar />
+          </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -1754,6 +1762,15 @@ export default function JarvisDashboard() {
               <Coins className="w-3.5 h-3.5 text-amber-400" />
               <span>CREDITS</span>
             </button>
+            <button
+              onClick={() => setDesktopTab('RADAR')}
+              className={`flex-1 py-1.5 rounded transition-colors flex items-center justify-center space-x-1 ${
+                desktopTab === 'RADAR' ? 'bg-cyan-500 text-black font-bold' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5 text-cyan-400" />
+              <span>RADAR</span>
+            </button>
           </div>
 
           <div className={`flex-1 min-h-0 ${desktopTab === 'TASKS' ? 'flex flex-col' : 'hidden'}`}>
@@ -1783,6 +1800,11 @@ export default function JarvisDashboard() {
           {/* Billing & Resource Telemetry Tab */}
           <div className={`flex-1 min-h-0 overflow-y-auto ${desktopTab === 'BILLING' ? 'flex flex-col' : 'hidden'}`}>
             <BillingDashboard />
+          </div>
+
+          {/* Tactical Situational Radar OSINT Tab */}
+          <div className={`flex-1 min-h-0 overflow-y-auto ${desktopTab === 'RADAR' ? 'flex flex-col' : 'hidden'}`}>
+            <TacticalRadar />
           </div>
 
           {/* Full Cinematic Arc Reactor in Right Column Tab */}
@@ -1895,6 +1917,18 @@ export default function JarvisDashboard() {
         >
           <Coins className="w-5 h-5 mb-0.5 text-amber-400" />
           <span className="text-[10px] font-mono tracking-wider font-bold">CREDITS</span>
+        </button>
+
+        <button
+          onClick={() => setMobileTab('RADAR')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+            mobileTab === 'RADAR'
+              ? 'text-cyan-400 bg-cyan-950/70 border border-cyan-500/40 shadow-[0_0_12px_rgba(0,229,255,0.3)]'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Globe className="w-5 h-5 mb-0.5 text-cyan-400" />
+          <span className="text-[10px] font-mono tracking-wider font-bold">RADAR</span>
         </button>
       </nav>
 
