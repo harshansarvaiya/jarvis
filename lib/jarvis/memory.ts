@@ -499,3 +499,76 @@ function addLog(state: JarvisState, type: SystemLog['type'], message: string, me
     state.logs = state.logs.slice(0, 200);
   }
 }
+
+/**
+ * Louvain-inspired Community Clustering Engine for Cognitive State
+ * Groups memories into modular architectural domains based on semantic & category affinity
+ */
+export interface MemoryDomainCluster {
+  domain: string;
+  itemCount: number;
+  sampleMemories: MemoryItem[];
+}
+
+export function getClusteredMemoryDomains(): MemoryDomainCluster[] {
+  const state = loadJarvisState();
+  const memories = state.memories;
+
+  const domainRules: Array<{ domain: string; keywords: string[]; categories: MemoryCategory[] }> = [
+    {
+      domain: 'Infrastructure & Cloud Runner',
+      keywords: ['gcp', 'vm', 'runner', 'vercel', 'upstash', 'cgroup', 'daemon', 'systemd', 'process', 'ram', 'cpu'],
+      categories: ['PROJECT', 'INSIGHT'],
+    },
+    {
+      domain: 'Guardian Protocol & Security',
+      keywords: ['directive', 'guardian', 'security', 'western', 'privacy', 'careful', 'override', 'owasp', 'audit'],
+      categories: ['PRINCIPLE', 'CORRECTION', 'PROCEDURAL_RULE'],
+    },
+    {
+      domain: 'Sir Preferences & Operations Butler',
+      keywords: ['sir', 'preference', 'harshan', 'routine', 'telegram', 'push', 'vapid', 'briefing', 'habit'],
+      categories: ['PREFERENCE', 'DECISION'],
+    },
+    {
+      domain: 'CodeAct & Autonomous Agents',
+      keywords: ['codeact', 'friday', 'jarvis', 'subagent', 'tree-sitter', 'mcp', 'ast', 'compiler', 'tsc'],
+      categories: ['WORKFLOW_RECIPE', 'PROCEDURAL_RULE'],
+    },
+    {
+      domain: 'System Evolution & Principles',
+      keywords: ['evolution', 'stage', 'dna', 'milestone', 'learning', 'retro'],
+      categories: ['EVOLUTION', 'PRINCIPLE'],
+    },
+  ];
+
+  const clusters: Record<string, MemoryItem[]> = {};
+  domainRules.forEach((d) => (clusters[d.domain] = []));
+  clusters['General Knowledge'] = [];
+
+  for (const mem of memories) {
+    let assigned = false;
+    const haystack = `${mem.content} ${mem.context || ''} ${mem.category}`.toLowerCase();
+
+    for (const rule of domainRules) {
+      if (
+        rule.categories.includes(mem.category) ||
+        rule.keywords.some((kw) => haystack.includes(kw))
+      ) {
+        clusters[rule.domain].push(mem);
+        assigned = true;
+        break;
+      }
+    }
+
+    if (!assigned) {
+      clusters['General Knowledge'].push(mem);
+    }
+  }
+
+  return Object.entries(clusters).map(([domain, items]) => ({
+    domain,
+    itemCount: items.length,
+    sampleMemories: items.slice(0, 3),
+  }));
+}

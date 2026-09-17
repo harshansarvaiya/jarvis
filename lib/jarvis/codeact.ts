@@ -36,6 +36,11 @@ export interface CodeActObservation {
   compilerClean: boolean;
   diffSummary?: string;
   executionMs: number;
+  astImpact?: {
+    query: string;
+    affectedSymbolsCount: number;
+    matchedSymbols?: string[];
+  };
 }
 
 export interface CodeActExecutionStep {
@@ -92,9 +97,13 @@ export async function runCompilerVerification(cwd = process.cwd()): Promise<{ cl
   }
 }
 
+import { searchCodebaseGraph } from './codebase-memory';
+
 export interface CodeActOptions {
   type?: 'SHELL' | 'PYTHON' | 'MUTATION' | 'VERIFY';
   verifyCompiler?: boolean;
+  checkAstImpact?: boolean;
+  targetSymbol?: string;
   cwd?: string;
   timeoutMs?: number;
 }
@@ -122,9 +131,30 @@ export async function runCodeActStep(
   let exitCode = 0;
   let compilerClean = false;
   let verified = false;
+  let astImpactData: CodeActObservation['astImpact'] = undefined;
 
   const cwd = options.cwd || process.cwd();
   const timeout = options.timeoutMs || 25000;
+
+  // AST Graph Pre-Flight Inspection for MUTATION actions or when explicitly requested
+  if (options.checkAstImpact || action.type === 'MUTATION' || options.targetSymbol) {
+    try {
+      const queryTerm = options.targetSymbol || intent.split(' ')[0] || 'CodeAct';
+      const cbmRes = await searchCodebaseGraph(queryTerm);
+      if (cbmRes.success && cbmRes.output && cbmRes.output.results) {
+        const matches = Array.isArray(cbmRes.output.results)
+          ? cbmRes.output.results.map((r: any) => `${r.qn || r.name} (${r.label || 'Symbol'})`)
+          : [];
+        astImpactData = {
+          query: queryTerm,
+          affectedSymbolsCount: cbmRes.output.returned || matches.length,
+          matchedSymbols: matches.slice(0, 5),
+        };
+      }
+    } catch {
+      // Best-effort AST pre-flight
+    }
+  }
 
   try {
     if (action.type === 'PYTHON') {
@@ -172,6 +202,7 @@ export async function runCodeActStep(
     exitCode,
     verified,
     compilerClean,
+    astImpact: astImpactData,
     executionMs: Date.now() - startTime,
   };
 
