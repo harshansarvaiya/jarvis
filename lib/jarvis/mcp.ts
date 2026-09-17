@@ -1647,3 +1647,62 @@ export async function executePlaywrightMCP(
     };
   }
 }
+
+// ============================================================================
+// 11. CODEBASE MEMORY MCP ENGINE (Tree-sitter AST Graph Query Server)
+// ============================================================================
+import {
+  searchCodebaseGraph,
+  getCodebaseArchitecture,
+  getFileOutline,
+  traceCodePath,
+  updateCodebaseIndex,
+} from './codebase-memory';
+
+export async function executeCodebaseMemoryMCP(
+  action: 'search_graph' | 'get_architecture' | 'get_file_outline' | 'trace_path' | 'index_repository',
+  params: Record<string, any> = {}
+): Promise<MCPExecutionResult> {
+  const startTime = Date.now();
+  try {
+    let res: any;
+    switch (action) {
+      case 'search_graph':
+        res = await searchCodebaseGraph(params.query || '');
+        break;
+      case 'get_architecture':
+        res = await getCodebaseArchitecture();
+        break;
+      case 'get_file_outline':
+        res = await getFileOutline(params.filePath || params.file || '');
+        break;
+      case 'trace_path':
+        res = await traceCodePath(params.symbol || params.target || '');
+        break;
+      case 'index_repository':
+        res = await updateCodebaseIndex();
+        break;
+      default:
+        throw new Error(`Unsupported CodebaseMemory action: ${action}`);
+    }
+
+    return {
+      success: res.success,
+      server: 'mcp:codebase_memory',
+      action,
+      output: res.output,
+      error: res.error,
+      latencyMs: Date.now() - startTime,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      server: 'mcp:codebase_memory',
+      action,
+      output: null,
+      error: error.message || 'Codebase Memory MCP execution failed',
+      latencyMs: Date.now() - startTime,
+    };
+  }
+}
+

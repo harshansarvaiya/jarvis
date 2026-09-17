@@ -23,6 +23,7 @@ import {
   executeMemoryMCP,
   executeGoogleCalendarMCP,
   executePlaywrightMCP,
+  executeCodebaseMemoryMCP,
 } from './mcp';
 import {
   queryKnowledgeBase,
@@ -2263,6 +2264,12 @@ export async function executeJarvisTool(
       case 'mcp_playwright': {
         const { action, ...params } = args;
         const res = await executePlaywrightMCP(action, params);
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'mcp_codebase_memory': {
+        const { action, ...params } = args;
+        const res = await executeCodebaseMemoryMCP(action, params);
         return { success: res.success, result: res.output, error: res.error };
       }
 
