@@ -2,6 +2,11 @@ name: Strix DAST Scan
 
 on:
   workflow_dispatch:
+    inputs:
+      target_path:
+        description: 'Target directory or route to audit'
+        required: false
+        default: 'app/api'
 
 jobs:
   strix-scan:
@@ -15,13 +20,14 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install uv
-        run: pip install uv
+      - name: Install uv and Strix
+        run: |
+          pip install uv
+          uv pip install --system usestrix
 
-      - name: Install Strix and dependencies
-        run: uv pip install usestrix
-
-      - name: Run Strix Scan
-        run: strix --api-key ${{ secrets.STRIX_API_KEY }} --app-id ${{ secrets.STRIX_APP_ID }} .
+      - name: Run Strix Scan (Free Tier Provider)
+        run: |
+          strix --model gemini/gemini-2.0-flash --api-key ${{ secrets.STRIX_API_KEY }} ${{ github.event.inputs.target_path }}
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
