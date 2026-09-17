@@ -410,15 +410,29 @@ async function startTelegramGateway() {
       const updates = await gateway.getUpdates(offset, 30);
       for (const update of updates) {
         offset = update.update_id + 1;
-        await handleIncomingMessage(update);
+        try {
+          await handleIncomingMessage(update);
+        } catch (msgErr: any) {
+          console.error('[Telegram Gateway] Error handling update:', msgErr?.message || msgErr);
+        }
       }
     } catch (err: any) {
-      console.warn('[Telegram Gateway] Loop warning:', err.message);
+      console.warn('[Telegram Gateway] Loop warning:', err?.message || err);
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
   }
 }
 
-startTelegramGateway().catch((err) => {
-  console.error('[Telegram Gateway Fatal Error]:', err);
-});
+async function runSupervisor() {
+  while (true) {
+    try {
+      await startTelegramGateway();
+    } catch (fatalErr: any) {
+      console.error('[Telegram Gateway Supervisor Recovery]:', fatalErr?.message || fatalErr);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+    }
+  }
+}
+
+runSupervisor();
+
