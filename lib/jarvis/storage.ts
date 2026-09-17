@@ -40,6 +40,29 @@ export interface StorageProvider {
   clearChatHistory(): Promise<void>;
 }
 
+function sanitizeChatMessageForStorage(m: ChatMessageRecord): ChatMessageRecord {
+  return {
+    ...m,
+    image: undefined, // Never persist multi-megabyte base64 images in Redis chat history key
+    content: m.content && m.content.length > 4000 ? m.content.slice(0, 4000) + '…' : m.content,
+    toolCalls: m.toolCalls
+      ? m.toolCalls.map((tc) => ({
+          ...tc,
+          result:
+            typeof tc.result === 'object' && tc.result !== null
+              ? {
+                  stdout: typeof tc.result.stdout === 'string' ? tc.result.stdout.slice(0, 500) : undefined,
+                  output: typeof tc.result.output === 'string' ? tc.result.output.slice(0, 500) : undefined,
+                  success: tc.result.success,
+                }
+              : typeof tc.result === 'string'
+              ? tc.result.slice(0, 500)
+              : tc.result,
+        }))
+      : undefined,
+  };
+}
+
 // ==========================================
 // 1. Upstash Redis REST Provider (Cloud 24/7)
 // ==========================================
@@ -107,12 +130,11 @@ class UpstashRedisProvider implements StorageProvider {
     }
   }
 
+
+
   async saveChatHistory(messages: ChatMessageRecord[]): Promise<void> {
     try {
-      const sanitized = messages.slice(-200).map((m) => ({
-        ...m,
-        image: m.image && m.image.length > 80000 ? undefined : m.image,
-      }));
+      const sanitized = messages.slice(-50).map(sanitizeChatMessageForStorage);
       await this.execute('set', 'jarvis:chat_history', JSON.stringify(sanitized));
     } catch (err) {
       console.error('[Storage:Upstash] Failed to save chat history:', err);
@@ -125,19 +147,17 @@ class UpstashRedisProvider implements StorageProvider {
 
   async appendChatMessages(newMessages: ChatMessageRecord[]): Promise<void> {
     try {
-      const current = await this.getChatHistory(200);
+      const current = await this.getChatHistory(50);
       const existingIds = new Set(current.map((m) => m.id).filter(Boolean));
 
       for (const msg of newMessages) {
-        if (msg.id && existingIds.has(msg.id)) {
-          const idx = current.findIndex((m) => m.id === msg.id);
-          if (idx !== -1) current[idx] = { ...current[idx], ...msg };
+        const cleanMsg = sanitizeChatMessageForStorage(msg);
+        if (cleanMsg.id && existingIds.has(cleanMsg.id)) {
+          const idx = current.findIndex((m) => m.id === cleanMsg.id);
+          if (idx !== -1) current[idx] = { ...current[idx], ...cleanMsg };
         } else {
-          current.push({
-            ...msg,
-            image: msg.image && msg.image.length > 80000 ? undefined : msg.image,
-          });
-          if (msg.id) existingIds.add(msg.id);
+          current.push(cleanMsg);
+          if (cleanMsg.id) existingIds.add(cleanMsg.id);
         }
       }
       await this.saveChatHistory(current);
@@ -227,10 +247,7 @@ class LocalDiskProvider implements StorageProvider {
     try {
       this.ensureDataDir();
       const file = this.getFilePath('chats');
-      const sanitized = messages.slice(-200).map((m) => ({
-        ...m,
-        image: m.image && m.image.length > 80000 ? undefined : m.image,
-      }));
+      const sanitized = messages.slice(-50).map(sanitizeChatMessageForStorage);
       fs.writeFileSync(file, JSON.stringify(sanitized, null, 2), 'utf-8');
     } catch (err) {
       console.error('[Storage:Local] Failed to save chat history:', err);
@@ -243,19 +260,17 @@ class LocalDiskProvider implements StorageProvider {
 
   async appendChatMessages(newMessages: ChatMessageRecord[]): Promise<void> {
     try {
-      const current = await this.getChatHistory(200);
+      const current = await this.getChatHistory(50);
       const existingIds = new Set(current.map((m) => m.id).filter(Boolean));
 
       for (const msg of newMessages) {
-        if (msg.id && existingIds.has(msg.id)) {
-          const idx = current.findIndex((m) => m.id === msg.id);
-          if (idx !== -1) current[idx] = { ...current[idx], ...msg };
+        const cleanMsg = sanitizeChatMessageForStorage(msg);
+        if (cleanMsg.id && existingIds.has(cleanMsg.id)) {
+          const idx = current.findIndex((m) => m.id === cleanMsg.id);
+          if (idx !== -1) current[idx] = { ...current[idx], ...cleanMsg };
         } else {
-          current.push({
-            ...msg,
-            image: msg.image && msg.image.length > 80000 ? undefined : msg.image,
-          });
-          if (msg.id) existingIds.add(msg.id);
+          current.push(cleanMsg);
+          if (cleanMsg.id) existingIds.add(cleanMsg.id);
         }
       }
       await this.saveChatHistory(current);
