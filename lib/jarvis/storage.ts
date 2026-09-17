@@ -55,11 +55,14 @@ class UpstashRedisProvider implements StorageProvider {
   }
 
   async execute(command: string, ...args: any[]): Promise<any> {
-    const endpoint = `${this.url}/${command}/${args.map((a) => encodeURIComponent(typeof a === 'object' ? JSON.stringify(a) : String(a))).join('/')}`;
-    const res = await fetch(endpoint, {
+    const formattedArgs = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a)));
+    const res = await fetch(this.url, {
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${this.token}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify([command, ...formattedArgs]),
       cache: 'no-store',
     });
 

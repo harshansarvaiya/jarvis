@@ -1,7 +1,7 @@
 /**
  * J.A.R.V.I.S. Mark II — 24/7 Cloud Cron & Background Worker Daemon
  * Runs persistently on the Cloud Runner VM (`antigravity-cloud-runner`)
- * Executes scheduled task reminders, VAPID Web Push alerts, and autonomous health sweeps.
+ * Executes scheduled task reminders, autonomous briefing syntheses, VAPID Web Push alerts, and Telegram sentry sweeps.
  */
 
 import { Redis } from '@upstash/redis';
@@ -32,6 +32,7 @@ const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 const VAPID_PUB = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const VAPID_PRIV = process.env.VAPID_PRIVATE_KEY;
+const ALLOWED_USER_ID = process.env.TELEGRAM_ALLOWED_USER_ID || '864360540';
 const PRODUCTION_URL = 'https://jarvis-iota-beige.vercel.app';
 
 let redis: Redis | null = null;
@@ -47,8 +48,24 @@ if (VAPID_PUB && VAPID_PRIV) {
   }
 }
 
-// 2. Push Notification Dispatcher Helper
+// 2. Push Notification Dispatcher Helper (Web Push + Telegram Sentry)
 async function dispatchPush(title: string, body: string, actionUrl: string = '/') {
+  // Dual-channel: Dispatch proactive alert directly to Sir's Telegram
+  try {
+    const { telegramGateway } = await import('../lib/jarvis/telegram');
+    const authChatId = (await telegramGateway.getAuthorizedChatId()) || ALLOWED_USER_ID;
+    if (authChatId) {
+      await telegramGateway.sendMessage(
+        authChatId,
+        `🔔 *[J.A.R.V.I.S. PROACTIVE ALERT]*\n\n*${title}*\n${body}`,
+        { parseMode: 'Markdown' }
+      );
+      console.log(`[Cloud Worker] 📱 Telegram proactive alert sent to chat ID: ${authChatId}`);
+    }
+  } catch (tgErr: any) {
+    console.warn('[Cloud Worker] Telegram dispatch warning:', tgErr.message);
+  }
+
   if (!redis) {
     console.log(`[Cloud Worker] (Local Simulation) Notification: [${title}] ${body}`);
     return;
@@ -57,7 +74,6 @@ async function dispatchPush(title: string, body: string, actionUrl: string = '/'
   try {
     const keys = await redis.keys('jarvis:push_subs:*');
     if (!keys || keys.length === 0) {
-      console.log(`[Cloud Worker] No active push subscriptions found in Redis for: "${title}"`);
       return;
     }
 
@@ -92,27 +108,13 @@ async function dispatchPush(title: string, body: string, actionUrl: string = '/'
         }
       }
     }
-    console.log(`[Cloud Worker] 📲 Push dispatched to ${sentCount}/${keys.length} devices: "${title}"`);
-
-    // Dual-channel: Dispatch proactive alert to Sir's Telegram
-    try {
-      const { telegramGateway } = await import('../lib/jarvis/telegram');
-      const authChatId = await telegramGateway.getAuthorizedChatId();
-      if (authChatId) {
-        await telegramGateway.sendMessage(
-          authChatId,
-          `🔔 *[J.A.R.V.I.S. PROACTIVE ALERT]*\n\n*${title}*\n${body}`,
-          { parseMode: 'Markdown' }
-        );
-        console.log(`[Cloud Worker] 📱 Telegram proactive alert sent to chat ID: ${authChatId}`);
-      }
-    } catch {}
+    console.log(`[Cloud Worker] 📲 Web Push dispatched to ${sentCount}/${keys.length} devices: "${title}"`);
   } catch (err: any) {
     console.error('[Cloud Worker] Push dispatch error:', err.message);
   }
 }
 
-// 3. Routine A: Scheduled Reminders & Due Date Poller
+// 3. Routine A: Autonomous Scheduled Task & Cron Execution Engine
 async function checkScheduledReminders() {
   if (!redis) return;
   try {
@@ -132,26 +134,103 @@ async function checkScheduledReminders() {
     let stateModified = false;
 
     for (const task of state.tasks) {
-      if (task.status === 'PENDING' && task.dueDate) {
+      // Check for PENDING or stuck IN_PROGRESS tasks that reached due time
+      if ((task.status === 'PENDING' || task.status === 'IN_PROGRESS') && task.dueDate) {
         const dueTime = new Date(task.dueDate).getTime();
-        // Trigger if due time has arrived (within 24h window to avoid stale spam)
+        
+        // Trigger if due time has arrived (within 24h window)
         if (!isNaN(dueTime) && dueTime <= now && now - dueTime < 24 * 60 * 60 * 1000) {
-          console.log(`[Cloud Worker] ⏰ Due task triggered: "${task.title}"`);
+          const isCron =
+            task.tags?.some((t: string) => ['cron', 'briefing', 'news', 'scheduled-routine', 'report', 'ai-news'].includes(t.toLowerCase())) ||
+            task.title.toLowerCase().includes('cron') ||
+            task.title.toLowerCase().includes('briefing') ||
+            task.title.toLowerCase().includes('news');
           
-          await dispatchPush(
-            task.title.startsWith('[NOTIFICATION REMINDER]') ? '⏰ J.A.R.V.I.S. Reminder' : '🎯 Objective Due',
-            task.description || task.title,
-            '/'
-          );
+          const isDaily = isCron || task.tags?.includes('daily') || task.title.toLowerCase().includes('daily');
 
-          task.status = 'IN_PROGRESS';
-          task.executionAudit = task.executionAudit || [];
-          task.executionAudit.push({
-            timestamp: new Date().toISOString(),
-            status: 'IN_PROGRESS',
-            notes: 'Triggered autonomously by Cloud Cron Worker.',
-          });
-          stateModified = true;
+          console.log(`[Cloud Worker] ⏰ Scheduled Task Triggered: "${task.title}" (isCron=${isCron}, isDaily=${isDaily})`);
+
+          if (isCron) {
+            // Autonomous AI Research & Synthesis Execution
+            try {
+              const { runJarvisAgent } = await import('../lib/jarvis/agent');
+              const { telegramGateway } = await import('../lib/jarvis/telegram');
+              const authChatId = (await telegramGateway.getAuthorizedChatId()) || ALLOWED_USER_ID;
+
+              const synthPrompt = `[SCHEDULED AUTONOMOUS CRON DIRECTIVE // 09:00 AM IST]:
+Task: "${task.title}"
+Details: "${task.description || ''}"
+
+Synthesize a top-tier executive intelligence briefing for Sir (Harshan Sarvaiya). Include:
+1. Top Frontier AI & Tech Breakthroughs / Product Releases
+2. Strategic Implications for Architecture & Distributed Systems
+3. High-Signal Action Items & Recommendations`;
+
+              const result = await runJarvisAgent(
+                [{ role: 'user', content: synthPrompt }],
+                { model: 'gemini-3.7-flash', orchestrationMode: 'auto' }
+              );
+
+              console.log(`[Cloud Worker] 🤖 Synthesized intelligence briefing (${result.telemetry?.latencyMs}ms).`);
+
+              // Dispatch full briefing to Telegram
+              if (authChatId) {
+                const header = `🌅 *[AUTONOMOUS 09:00 AM IST BRIEFING]*\n*${task.title}*\n\n`;
+                await telegramGateway.sendMessage(
+                  authChatId,
+                  `${header}${result.reply}`,
+                  { parseMode: 'Markdown' }
+                );
+                console.log(`[Cloud Worker] 📱 Intelligence briefing delivered to Telegram chat: ${authChatId}`);
+              }
+
+              // Dispatch lockscreen push alert
+              await dispatchPush(
+                `🌅 ${task.title}`,
+                result.vocalSummary || result.reply.slice(0, 180),
+                '/'
+              );
+
+              task.executionAudit = task.executionAudit || [];
+              task.executionAudit.push({
+                timestamp: new Date().toISOString(),
+                status: 'COMPLETED',
+                notes: `Autonomous synthesis executed successfully via ${result.telemetry?.engineUsed || 'Gemini 3.7'}.`,
+              });
+
+              if (isDaily) {
+                // Advance schedule by +24 hours for tomorrow at 09:00 AM IST
+                const nextDue = new Date(dueTime + 24 * 60 * 60 * 1000).toISOString();
+                task.dueDate = nextDue;
+                task.status = 'PENDING';
+                console.log(`[Cloud Worker] 🔄 Recurring cron schedule advanced to tomorrow: ${nextDue}`);
+              } else {
+                task.status = 'COMPLETED';
+                task.completedAt = new Date().toISOString();
+              }
+              stateModified = true;
+            } catch (cronErr: any) {
+              console.error('[Cloud Worker] Scheduled task synthesis failed:', cronErr.message);
+              await dispatchPush('⚠️ Scheduled Task Warning', `Synthesis issue on: ${task.title} (${cronErr.message})`, '/');
+            }
+          } else {
+            // Standard Reminder Task
+            await dispatchPush(
+              task.title.startsWith('[NOTIFICATION REMINDER]') ? '⏰ J.A.R.V.I.S. Reminder' : '🎯 Objective Due',
+              task.description || task.title,
+              '/'
+            );
+
+            task.status = 'COMPLETED';
+            task.completedAt = new Date().toISOString();
+            task.executionAudit = task.executionAudit || [];
+            task.executionAudit.push({
+              timestamp: new Date().toISOString(),
+              status: 'COMPLETED',
+              notes: 'Triggered autonomously by Cloud Cron Worker.',
+            });
+            stateModified = true;
+          }
         }
       }
     }
@@ -164,7 +243,7 @@ async function checkScheduledReminders() {
   }
 }
 
-// 4. Routine B: Proactive Tactical Briefings (08:30 AM IST Morning & 09:30 PM IST Evening)
+// 4. Routine B: Proactive Tactical Briefings (08:30 AM - 09:15 AM IST Morning & 09:30 PM IST Evening)
 async function checkScheduledBriefings() {
   if (!redis) return;
   try {
@@ -189,9 +268,10 @@ async function checkScheduledBriefings() {
     const completedTasks = tasks.filter((t) => t.status === 'COMPLETED');
 
     // -------------------------------------------------------------
-    // MORNING TACTICAL BRIEFING (Window: 08:20 AM - 08:45 AM IST)
+    // MORNING TACTICAL BRIEFING (Window: 08:30 AM - 09:30 AM IST)
     // -------------------------------------------------------------
-    if (istHour === 8 && istMin >= 20 && istMin <= 45) {
+    const isMorningWindow = (istHour === 8 && istMin >= 30) || (istHour === 9 && istMin <= 30);
+    if (isMorningWindow) {
       const morningKey = `jarvis:briefing:morning:${todayDateStr}`;
       const alreadySent = await redis.get(morningKey);
       if (!alreadySent) {
@@ -203,20 +283,20 @@ async function checkScheduledBriefings() {
         const message = `Good morning, Sir. Tactical radar initialized in Stage 5 Performance Mode.\n\n` +
           `📋 *Active Objectives (${pendingTasks.length} pending):*\n${taskHighlights}\n\n` +
           `🧠 *Substrate Health:*\n` +
-          `• Engine: Vertex AI Gemini 3.8 Flash (Credits Active)\n` +
+          `• Engine: Vertex AI Gemini 3.7 Flash & Groq LPU\n` +
           `• Host VM & Telegram Uplink: Online\n\n` +
           `Awaiting your sovereign command.`;
 
-        console.log(`[Cloud Worker] 🌅 Dispatching Morning Briefing to Sir (IST 08:30)...`);
+        console.log(`[Cloud Worker] 🌅 Dispatching Morning Briefing to Sir (IST ${istHour}:${istMin})...`);
         await dispatchPush('🌅 J.A.R.V.I.S. Morning Briefing', message, '/');
         await redis.set(morningKey, 'SENT');
       }
     }
 
     // -------------------------------------------------------------
-    // EVENING TACTICAL DE-BRIEF (Window: 09:20 PM - 09:45 PM IST)
+    // EVENING TACTICAL DE-BRIEF (Window: 09:20 PM - 10:00 PM IST)
     // -------------------------------------------------------------
-    if (istHour === 21 && istMin >= 20 && istMin <= 45) {
+    if (istHour === 21 && istMin >= 20) {
       const eveningKey = `jarvis:briefing:evening:${todayDateStr}`;
       const alreadySent = await redis.get(eveningKey);
       if (!alreadySent) {
@@ -261,154 +341,13 @@ async function checkSystemWatchdog() {
   }
 }
 
-// 6. Routine D: Autonomous Cron Queue Processor
-async function processCronQueue() {
-  if (!redis) return;
-  try {
-    const queueItemStr = (await redis.lpop('jarvis:cron_queue')) as string | null;
-    if (!queueItemStr) return;
-
-    let job: any = null;
-    try {
-      job = JSON.parse(queueItemStr);
-    } catch {
-      return;
-    }
-
-    console.log(`[Cloud Worker] ⚡ Processing background queue job: "${job.type || 'generic'}"`);
-
-    if (job.type === 'custom_push' && job.title && job.message) {
-      await dispatchPush(job.title, job.message, job.url || '/');
-    }
-  } catch (err: any) {
-    console.warn('[Cloud Worker] Queue processing warning:', err.message);
-  }
-}
-
-// 6B. Routine E: Autonomous Subagent Background Queue Processor (Pillar 3)
-async function processSubagentQueue() {
-  if (!redis) return;
-  try {
-    const taskStr = (await redis.lpop('jarvis:subagent_tasks')) as string | null;
-    if (!taskStr) return;
-
-    let subagentTask: any = null;
-    try {
-      subagentTask = JSON.parse(taskStr);
-    } catch {
-      return;
-    }
-
-    console.log(`[Cloud Worker] 🤖 Autonomous Subagent started: "${subagentTask.title}"`);
-    const prompt = subagentTask.prompt || subagentTask.instructions || subagentTask.title;
-
-    try {
-      const { runJarvisAgent } = await import('../lib/jarvis/agent');
-      const { addMemory } = await import('../lib/jarvis/memory');
-
-      const result = await runJarvisAgent([
-        {
-          role: 'user',
-          content: `[AUTONOMOUS SUBAGENT DIRECTIVE]: ${prompt}. Perform deep empirical research, execute tools as necessary, and compile an executive intelligence report with verified facts, pricing, and entity details.`,
-        },
-      ], {
-        model: 'gemini-3.8-flash',
-      });
-
-      console.log(`[Cloud Worker] 🤖 Subagent "${subagentTask.title}" completed in ${result.telemetry.latencyMs}ms.`);
-
-      // Store in Redis subagent reports
-      await redis.lpush('jarvis:subagent_reports', JSON.stringify({
-        id: subagentTask.id || Date.now().toString(),
-        title: subagentTask.title,
-        prompt,
-        report: result.reply,
-        vocalSummary: result.vocalSummary,
-        toolCalls: result.toolCallsExecuted,
-        timestamp: new Date().toISOString(),
-      }));
-
-      // Assimilate into persistent memory
-      addMemory(
-        'TACTICAL' as any,
-        `Subagent Report [${subagentTask.title}]: ${result.vocalSummary || result.reply.slice(0, 250)}`,
-        'Autonomous Cloud Subagent Execution'
-      );
-
-      // Push notification to Sir's devices
-      await dispatchPush(
-        `🤖 Subagent Done: ${subagentTask.title}`,
-        result.vocalSummary || result.reply.slice(0, 180),
-        '/'
-      );
-    } catch (agentErr: any) {
-      console.error(`[Cloud Worker] Subagent execution failed:`, agentErr.message);
-      await dispatchPush(
-        `⚠️ Subagent Alert: ${subagentTask.title}`,
-        `Execution encountered an issue: ${agentErr.message.slice(0, 100)}`,
-        '/'
-      );
-    }
-  } catch (err: any) {
-    console.warn('[Cloud Worker] Subagent queue processing warning:', err.message);
-  }
-}
-
-// 6C. Routine F: Autonomous Cloud Command Bridge Processor (Pillar 4)
-async function processCommandQueue() {
-  if (!redis) return;
-  try {
-    const cmdStr = (await redis.lpop('jarvis:command_queue')) as string | null;
-    if (!cmdStr) return;
-
-    let cmdJob: any = null;
-    try {
-      cmdJob = JSON.parse(cmdStr);
-    } catch {
-      return;
-    }
-
-    console.log(`[Cloud Worker] 💻 Executing cloud command on VM: "${cmdJob.command}"`);
-    const { exec } = await import('child_process');
-    const { promisify } = await import('util');
-    const execPromise = promisify(exec);
-
-    try {
-      const { stdout, stderr } = await execPromise(cmdJob.command, {
-        timeout: 20000,
-        cwd: process.cwd(),
-      });
-
-      if (cmdJob.id) {
-        await redis.set(`jarvis:command_results:${cmdJob.id}`, JSON.stringify({
-          stdout: (stdout || '').slice(0, 4000),
-          stderr: (stderr || '').slice(0, 1000),
-          exitCode: 0,
-          timestamp: new Date().toISOString(),
-        }), { ex: 300 });
-      }
-    } catch (cmdErr: any) {
-      if (cmdJob.id) {
-        await redis.set(`jarvis:command_results:${cmdJob.id}`, JSON.stringify({
-          stdout: (cmdErr.stdout || '').slice(0, 1000),
-          stderr: (cmdErr.stderr || cmdErr.message).slice(0, 2000),
-          exitCode: cmdErr.code || 1,
-          timestamp: new Date().toISOString(),
-        }), { ex: 300 });
-      }
-    }
-  } catch (err: any) {
-    console.warn('[Cloud Worker] Command queue warning:', err.message);
-  }
-}
-
-// 7. Master Worker Loop & Lifecycle Controller
+// 6. Master Worker Loop & Lifecycle Controller
 async function startWorkerLoop(isTestMode: boolean = false) {
   console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
 ║  J.A.R.V.I.S. MARK II — 24/7 CLOUD CRON WORKER SUBSTRATE      ║
 ║  Host: antigravity-cloud-runner (GCP Compute Engine e2-micro) ║
-║  Status: INITIALIZED // DIRECTIVE 04 SOVEREIGN LOYALTY ACTIVE ║
+║  Mode: Autonomous Task Synthesis & 09:00 AM Cron Engine       ║
 ╚═══════════════════════════════════════════════════════════════╝
   `);
 
@@ -417,14 +356,13 @@ async function startWorkerLoop(isTestMode: boolean = false) {
     await checkSystemWatchdog();
     await checkScheduledReminders();
     await checkScheduledBriefings();
-    await processCronQueue();
     console.log('[Cloud Worker] Diagnostic sweep complete. Exiting cleanly.');
     process.exit(0);
   }
 
   console.log('[Cloud Worker] 🚀 24/7 Persistent Daemon active. Polling every 30 seconds...');
 
-  // Initial immediate sweep
+  // Immediate initial sweep
   await checkSystemWatchdog();
   await checkScheduledReminders();
   await checkScheduledBriefings();
@@ -433,14 +371,11 @@ async function startWorkerLoop(isTestMode: boolean = false) {
   setInterval(async () => {
     tickCount++;
     try {
-      // Every 30 seconds: Reminders, subagent tasks, cron queue, and cloud commands
+      // Every 30 seconds: Reminders & Autonomous Cron Tasks
       await checkScheduledReminders();
-      await processSubagentQueue();
-      await processCommandQueue();
-      await processCronQueue();
 
-      // Every 10 minutes (20 ticks): Scheduled morning/evening briefing check
-      if (tickCount % 20 === 0) {
+      // Every 5 minutes (10 ticks): Scheduled morning/evening briefing check
+      if (tickCount % 10 === 0) {
         await checkScheduledBriefings();
       }
 
@@ -454,7 +389,6 @@ async function startWorkerLoop(isTestMode: boolean = false) {
   }, 30000);
 }
 
-// Handle termination signals gracefully
 process.on('SIGINT', () => {
   console.log('\n[Cloud Worker] Shutting down gracefully on SIGINT, Sir.');
   process.exit(0);
