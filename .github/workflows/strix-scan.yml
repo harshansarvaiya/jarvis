@@ -1,61 +1,27 @@
-name: Strix DAST Security Scanner
+name: Strix DAST Scan
 
 on:
   workflow_dispatch:
-    inputs:
-      target_url:
-        description: 'Target URL to stress-test and audit'
-        required: false
-        default: 'https://jarvis-iota-beige.vercel.app'
-  schedule:
-    # Run once a week on Sunday at midnight UTC
-    - cron: '0 0 * * 0'
 
 jobs:
   strix-scan:
-    name: Execute Autonomous Strix Security Audit
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
-      - name: Install uv & Strix Agent
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          export PATH="$HOME/.local/bin:$PATH"
-          uv pip install --system strix || pip install strix
+      - name: Install uv
+        run: pip install uv
 
-      - name: Run Strix Autonomous Vulnerability Scan
+      - name: Install Strix and dependencies
+        run: uv pip install usestrix
+
+      - name: Run Strix Scan
+        run: strix --api-key ${{ secrets.STRIX_API_KEY }} --app-id ${{ secrets.STRIX_APP_ID }} .
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          TARGET_URL: ${{ github.event.inputs.target_url || 'https://jarvis-iota-beige.vercel.app' }}
-        run: |
-          echo "=========================================================="
-          echo "       STRIX DAST AUTONOMOUS SECURITY SCANNER             "
-          echo "Target: $TARGET_URL"
-          echo "Runner: GitHub Actions (Ubuntu 2-core / 7GB RAM)"
-          echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-          echo "=========================================================="
-          if command -v strix >/dev/null 2>&1; then
-            strix scan --target "$TARGET_URL" --output-format json --output-file strix-findings.json || true
-          else
-            echo "Strix CLI installed via module runner; executing fallback entrypoint..."
-            python3 -m strix --help || echo "Strix initialized successfully."
-          fi
-
-      - name: Upload Scan Artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: strix-security-report
-          path: strix-findings.json
-          retention-days: 14
