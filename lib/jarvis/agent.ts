@@ -763,10 +763,89 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     const toolCallsExecuted: Array<{ name: string; args: any; result: any }> = [];
 
     let loopCount = 0;
+    let pipelineAutoRetried = false;
     let functionCalls = candidate?.content?.parts?.filter((p: any) => p.functionCall);
 
-    // Multi-turn ReAct Autonomous Tool Execution Loop (up to 8 iterations)
-    while (functionCalls && functionCalls.length > 0 && loopCount < 8) {
+    // Multi-turn ReAct Autonomous Tool Execution Loop (up to 12 iterations for full-stack tasks)
+    while (loopCount < 12) {
+      // Check if model returned zero function calls, but an uncompleted UI component pipeline was detected
+      if (!functionCalls || functionCalls.length === 0) {
+        const unmountedComponent = toolCallsExecuted.find(
+          (t) =>
+            (t.name === 'edit_workspace_file' || t.name === 'cloud_write_file') &&
+            t.args?.path &&
+            (t.args.path.startsWith('components/') || t.args.path.includes('/components/')) &&
+            !t.args.path.startsWith('app/api/') &&
+            !toolCallsExecuted.some(
+              (other) =>
+                (other.name === 'edit_workspace_file' || other.name === 'cloud_write_file') &&
+                other.args?.path?.includes('app/page.tsx')
+            )
+        );
+
+        if (unmountedComponent && !pipelineAutoRetried && loopCount < 10) {
+          pipelineAutoRetried = true;
+          console.log(`[Autonomous Pipeline Sentry] Detected unmounted component "${unmountedComponent.args.path}". Prompting model to complete Stage 2-4...`);
+
+          contents.push({
+            role: 'model',
+            parts: candidate?.content?.parts || [{ text: 'Component authored on disk.' }],
+          });
+
+          contents.push({
+            role: 'user',
+            parts: [
+              {
+                text: `[AUTONOMOUS PIPELINE SENTRY - DIRECTIVE 05 MANDATE]: You created/updated UI component "${unmountedComponent.args.path}". Authoring alone is incomplete. You MUST now execute the remaining required pipeline steps: (1) Mount and import this component into 'app/page.tsx' navigation/tabs so Sir can access it in the UI, (2) Run 'cloud_execute_command' with 'npx tsc --noEmit' to verify type safety, and (3) Run 'cloud_execute_command' with 'git add -A && git commit -m "feat: ..." && git push origin main'. Proceed with tool calls immediately.`,
+              },
+            ],
+          });
+
+          const sentryGenConfig = {
+            temperature: 0.2,
+            maxOutputTokens: 4096,
+          };
+
+          try {
+            if (isVertexEngine) {
+              response = await callVertexAIGenerate({
+                model: selectedVertexModel,
+                contents,
+                systemInstruction,
+                tools: geminiTools,
+                generationConfig: sentryGenConfig,
+                signal: AbortSignal.timeout(180000),
+              });
+            } else {
+              response = await fetch(activeApiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents,
+                  systemInstruction,
+                  tools: geminiTools,
+                  generationConfig: sentryGenConfig,
+                }),
+                signal: AbortSignal.timeout(8000),
+              });
+            }
+
+            if (response && response.ok) {
+              data = await response.json();
+              candidate = data.candidates?.[0];
+              functionCalls = candidate?.content?.parts?.filter((p: any) => p.functionCall);
+              if (functionCalls && functionCalls.length > 0) {
+                continue;
+              }
+            }
+          } catch (sentryErr) {
+            console.warn('[Autonomous Pipeline Sentry] Continuation error:', sentryErr);
+          }
+        }
+
+        break;
+      }
+
       loopCount++;
       const toolResponseParts: any[] = [];
 

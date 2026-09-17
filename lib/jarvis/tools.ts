@@ -611,6 +611,14 @@ async function handleEditWorkspaceFile(args: { path: string; targetContent?: str
     throw new Error('Security Violation: Modifying secrets blocked by Guardian Protocol.');
   }
 
+  function getPipelineGuidance(targetPath: string): string | undefined {
+    const isComponent = (targetPath.startsWith('components/') || targetPath.includes('/components/')) && !targetPath.startsWith('app/api/');
+    if (isComponent) {
+      return `[MANDATORY 4-STAGE PIPELINE NOTICE]: You created/updated UI component "${targetPath}". Under Antigravity Standard & Directive 05, you MUST NOT stop here. Your next required operations in this same turn are: (1) Mount this component into 'app/page.tsx' tabs/views, (2) Run 'cloud_execute_command' with 'npx tsc --noEmit' to verify type-check, (3) Run 'cloud_execute_command' with 'git add -A && git commit -m "feat: ..." && git push origin main' to deploy.`;
+    }
+    return undefined;
+  }
+
   const fileExists = fs.existsSync(resolved);
   if (!fileExists) {
     if (args.createIfMissing || !args.targetContent) {
@@ -620,6 +628,7 @@ async function handleEditWorkspaceFile(args: { path: string; targetContent?: str
         path: relPath,
         action: 'file_created',
         bytesWritten: Buffer.byteLength(args.replacementContent),
+        pipelineGuidance: getPipelineGuidance(relPath),
       };
     }
     throw new Error(`File does not exist: ${relPath}. Set createIfMissing to true to create.`);
@@ -641,6 +650,7 @@ async function handleEditWorkspaceFile(args: { path: string; targetContent?: str
       action: 'content_replaced',
       success: true,
       bytesWritten: Buffer.byteLength(newContent),
+      pipelineGuidance: getPipelineGuidance(relPath),
     };
   } else {
     fs.writeFileSync(resolved, args.replacementContent, 'utf-8');
@@ -649,6 +659,7 @@ async function handleEditWorkspaceFile(args: { path: string; targetContent?: str
       action: 'file_overwritten',
       success: true,
       bytesWritten: Buffer.byteLength(args.replacementContent),
+      pipelineGuidance: getPipelineGuidance(relPath),
     };
   }
 }
