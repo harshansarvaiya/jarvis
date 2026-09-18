@@ -196,5 +196,23 @@
       "Automated Continuous Dependency Threat Sentry"
     ],
     "addedAt": "2026-09-17T16:05:00Z"
+  },
+  {
+    "name": "supermemoryai/supermemory",
+    "url": "https://github.com/supermemoryai/supermemory",
+    "domain": "State-of-the-Art Memory & Context Engine (#1 on LongMemEval & LoCoMo)",
+    "status": "ACTIVE_EXTRACTION",
+    "extractedFeatures": [
+      "Autonomous Memory & Fact Extraction Architecture",
+      "Dynamic Temporal Contradiction & Invalidation Logic",
+      "Unified Context & User Profile Snapshot Engine (~50ms)",
+      "Supermemory MCP Gateway Endpoint (`https://mcp.supermemory.ai/mcp`)"
+    ],
+    "futureRoadmap": [
+      "Live Supermemory MCP Connector in `lib/jarvis/mcp.ts`",
+      "Automated Temporal Contradiction Resolution in `lib/jarvis/memory.ts`",
+      "AST-Aware Code Chunking in Knowledge RAG"
+    ],
+    "addedAt": "2026-09-18T18:22:00Z"
   }
 ]
