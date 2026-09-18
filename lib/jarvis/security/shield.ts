@@ -104,3 +104,29 @@ ${sanitized}
 --- END UNTRUSTED DATA ---
 `;
 }
+
+/**
+ * Machine-Native Security Sanitization with TypeSafe Jev System One
+ * Combines regex pattern matching with Jev's sub-50ms probabilistic guardrail model.
+ */
+export async function sanitizeInboundTextAsync(rawText: string): Promise<ShieldSanitizationResult> {
+  const result = sanitizeInboundText(rawText);
+
+  if (process.env.TYPESAFE_API_KEY && rawText && rawText.length > 15) {
+    try {
+      const { jevGuardrailThreatCheck } = await import('../providers/jev');
+      const jevCheck = await jevGuardrailThreatCheck(rawText);
+      if (jevCheck.isThreat) {
+        result.flags.push(`JEV_GUARDRAIL_ALERT: Threat probability ${Math.round(jevCheck.threatProbability * 100)}%`);
+        result.riskScore = Math.max(result.riskScore, Math.round(jevCheck.threatProbability * 100));
+        result.threatDetected = true;
+        result.neutralizedPatterns.push('TypeSafe Jev System One Adversarial Classifier');
+      }
+    } catch (jevErr) {
+      console.warn('[AgentShield] Jev guardrail check error:', jevErr);
+    }
+  }
+
+  return result;
+}
+

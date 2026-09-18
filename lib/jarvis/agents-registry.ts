@@ -182,3 +182,24 @@ export function selectOptimalSubagent(prompt: string): AgentProfile | undefined 
 
   return undefined;
 }
+
+/**
+ * Machine-Native Subagent Selector with TypeSafe AI (Jev System One)
+ * Leverages Jev's sub-50ms probabilistic choice model, falling back to heuristic regexes.
+ */
+export async function selectOptimalSubagentAsync(prompt: string): Promise<AgentProfile | undefined> {
+  if (process.env.TYPESAFE_API_KEY) {
+    try {
+      const { jevRouteSubagent } = await import('./providers/jev');
+      const routed = await jevRouteSubagent(prompt);
+      if (routed.subagentId) {
+        const profile = getSpecializedAgentProfile(routed.subagentId);
+        if (profile) return profile;
+      }
+    } catch (jevErr) {
+      console.warn('[SubagentRegistry] Jev routing error, using heuristics:', jevErr);
+    }
+  }
+  return selectOptimalSubagent(prompt);
+}
+

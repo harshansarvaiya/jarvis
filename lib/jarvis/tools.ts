@@ -361,29 +361,82 @@ async function runDeepWebScraper(url: string): Promise<any> {
     const targetUrl = url.startsWith('http') ? url : `https://${url}`;
     const res = await fetch(targetUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
+        'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
       },
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(8000),
     });
 
     if (!res.ok) {
+      // Automatic adaptive fallback to Playwright Chromium on HTTP blocks (e.g. 403, 429, 503)
+      if ([401, 403, 429, 503].includes(res.status)) {
+        try {
+          const pwFallback = await executePlaywrightMCP('navigate_and_extract', { url: targetUrl });
+          if (pwFallback.success && pwFallback.output?.text) {
+            return {
+              url: targetUrl,
+              title: pwFallback.output.title || targetUrl,
+              contentSnippet: pwFallback.output.text.slice(0, 3500),
+              totalLength: pwFallback.output.totalLength,
+              source: 'Adaptive Stealth Fallback (Project Hands Playwright)',
+            };
+          }
+        } catch {}
+      }
       return { url, error: `Target URL returned HTTP status ${res.status}` };
     }
 
     const html = await res.text();
-    const cleanText = html
+
+    // Scrapling-inspired Adaptive Structural Extraction:
+    // Try semantic main content containers first before stripping entire body
+    let primaryHtml = html;
+    const mainMatch = html.match(/<(?:main|article|section\s+class=["'][^"']*(?:content|article|main|post)[^"']*["'])[^>]*>([\s\S]*?)<\/(?:main|article|section)>/i);
+    if (mainMatch && mainMatch[1] && mainMatch[1].length > 200) {
+      primaryHtml = mainMatch[1];
+    }
+
+    const cleanText = primaryHtml
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
       .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, ' ')
       .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, ' ')
       .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, ' ')
+      .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, ' ')
       .replace(/<[^>]+>/g, ' ')
       .replace(/&amp;/g, '&')
       .replace(/&nbsp;/g, ' ')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
       .replace(/\s+/g, ' ')
       .trim();
+
+    // If client-side JavaScript hydration detected or body is empty, trigger headless Playwright
+    if (cleanText.length < 120 && (html.includes('id="root"') || html.includes('id="app"') || html.includes('__next') || html.includes('noscript'))) {
+      try {
+        const pwRes = await executePlaywrightMCP('navigate_and_extract', { url: targetUrl });
+        if (pwRes.success && pwRes.output?.text && pwRes.output.text.length > cleanText.length) {
+          return {
+            url: targetUrl,
+            title: pwRes.output.title || targetUrl,
+            contentSnippet: pwRes.output.text.slice(0, 3500),
+            totalLength: pwRes.output.totalLength,
+            source: 'Adaptive Headless Engine (Project Hands)',
+          };
+        }
+      } catch {}
+    }
 
     const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
     const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : targetUrl;
@@ -393,9 +446,22 @@ async function runDeepWebScraper(url: string): Promise<any> {
       title,
       contentSnippet: cleanText.slice(0, 3500),
       totalLength: cleanText.length,
-      source: 'Deep Web Scraper (Pillar 4)',
+      source: 'Adaptive Resilient Scraper (Pillar 4)',
     };
   } catch (err: any) {
+    // Catch-all fallback to Playwright on network timeout / SSL handshake failure
+    try {
+      const pwFallback = await executePlaywrightMCP('navigate_and_extract', { url });
+      if (pwFallback.success && pwFallback.output?.text) {
+        return {
+          url,
+          title: pwFallback.output.title || url,
+          contentSnippet: pwFallback.output.text.slice(0, 3500),
+          totalLength: pwFallback.output.totalLength,
+          source: 'Adaptive Stealth Fallback (Project Hands)',
+        };
+      }
+    } catch {}
     return { url, error: err.message || 'Deep web scraper request timed out' };
   }
 }

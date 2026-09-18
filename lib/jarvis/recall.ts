@@ -216,6 +216,53 @@ export function evaluateRetrievalQuality(
   };
 }
 
+/**
+ * Machine-Native CRAG Self-Grading with TypeSafe AI Jev System One
+ * Evaluates semantic relevance with Jev's ordinal scoring model, falling back to lexical heuristics.
+ */
+export async function evaluateRetrievalQualityAsync(
+  query: string,
+  retrievedText: string,
+  minConfidence = 0.4
+): Promise<CRAGEvaluationResult> {
+  if (process.env.TYPESAFE_API_KEY && retrievedText && retrievedText.length > 20) {
+    try {
+      const { jevGradeMemoryRelevance } = await import('./providers/jev');
+      const jevGrade = await jevGradeMemoryRelevance(query, retrievedText.slice(0, 1000));
+
+      let grade: CRAGRetrievalGrade = 'CORRECT';
+      let correctiveAction: 'PROCEED' | 'FALLBACK_SEARCH' | 'EXPAND_QUERY' = 'PROCEED';
+      let remediationAdvice: string | undefined;
+
+      if (jevGrade.score >= 2.0) {
+        grade = 'CORRECT';
+        correctiveAction = 'PROCEED';
+      } else if (jevGrade.score >= 1.0) {
+        grade = 'AMBIGUOUS';
+        correctiveAction = 'EXPAND_QUERY';
+        remediationAdvice = `TypeSafe Jev graded retrieval as moderately relevant (score ${jevGrade.score.toFixed(2)}/3).`;
+      } else {
+        grade = 'INCORRECT';
+        correctiveAction = 'FALLBACK_SEARCH';
+        remediationAdvice = `TypeSafe Jev identified low relevance (score ${jevGrade.score.toFixed(2)}/3). Verify via live search or codebase grep.`;
+      }
+
+      return {
+        grade,
+        confidenceScore: jevGrade.confidence,
+        matchedTokensCount: Math.round(jevGrade.score * 5),
+        correctiveAction,
+        remediationAdvice,
+      };
+    } catch (jevErr) {
+      console.warn('[CRAG] Jev grading error, using lexical fallback:', jevErr);
+    }
+  }
+
+  return evaluateRetrievalQuality(query, retrievedText, minConfidence);
+}
+
+
 // =========================================================================
 // 4. 4-TIER COGNITIVE RECALL ARCHITECTURE
 // =========================================================================

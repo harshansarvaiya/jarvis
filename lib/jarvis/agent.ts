@@ -19,8 +19,8 @@ import { appendUniversalChatMessage, appendAgentChatMessage, getCrossChannelCont
 import { getPersonaConfig, buildPersonaPromptBlock } from './persona';
 import { compressSystemPrompt, compressToolOutput } from './compression';
 
-import { getSpecializedAgentProfile, selectOptimalSubagent } from './agents-registry';
-import { sanitizeInboundText } from './security/shield';
+import { getSpecializedAgentProfile, selectOptimalSubagent, selectOptimalSubagentAsync } from './agents-registry';
+import { sanitizeInboundText, sanitizeInboundTextAsync } from './security/shield';
 
 export interface ChatMessage {
   id?: string;
@@ -145,8 +145,8 @@ export async function runJarvisAgent(
     };
   }
 
-  // 1. AgentShield Inbound Firewall (Directive 01 Guardian Protocol)
-  const shieldResult = sanitizeInboundText(lastUserMessage.content);
+  // 1. AgentShield Inbound Firewall (Directive 01 Guardian Protocol + TypeSafe Jev)
+  const shieldResult = await sanitizeInboundTextAsync(lastUserMessage.content);
   if (shieldResult.threatDetected) {
     console.warn(`[AgentShield Sentry] 🛡️ Neutralized inbound prompt injection threat (Risk=${shieldResult.riskScore}):`, shieldResult.flags);
     lastUserMessage.content = shieldResult.sanitized;
@@ -236,7 +236,7 @@ export async function runJarvisAgent(
   let specializedAgentBlock = '';
   const delegatedAgent = options.specializedAgentId
     ? getSpecializedAgentProfile(options.specializedAgentId)
-    : selectOptimalSubagent(lastUserMessage.content);
+    : await selectOptimalSubagentAsync(lastUserMessage.content);
 
   if (delegatedAgent) {
     specializedAgentBlock = `
