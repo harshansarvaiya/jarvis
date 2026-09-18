@@ -180,5 +180,21 @@
       "Subagent Evaluation Benchmarks"
     ],
     "addedAt": "2026-09-18T14:40:00Z"
+  },
+  {
+    "name": "simplifaisoul/osiris",
+    "url": "https://github.com/simplifaisoul/osiris",
+    "domain": "OSINT Cyber Forensics & Threat Intelligence",
+    "status": "ACTIVE_EXTRACTION",
+    "extractedFeatures": [
+      "Real-time CVE Vulnerability Indexing (`lib/jarvis/osint.ts` -> NVD NIST 2.0 + OSV.dev)",
+      "Crypto Wallet Forensics & OFAC Sanctions Cross-Matching (Blockscout + Blockstream)",
+      "Network IP Reconnaissance & Geo-Location (RDAP + Cloudflare DNS-over-HTTPS)"
+    ],
+    "futureRoadmap": [
+      "Dark Web Breach Correlation Engine",
+      "Automated Continuous Dependency Threat Sentry"
+    ],
+    "addedAt": "2026-09-17T16:05:00Z"
   }
 ]
