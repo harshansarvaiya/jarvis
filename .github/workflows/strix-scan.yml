@@ -25,10 +25,11 @@ jobs:
           pip install uv
           uv pip install --system strix-agent
 
-      - name: Run Strix Scan (Free Tier Provider)
+      - name: Run Strix Scan
         run: |
-          strix --model gemini/gemini-2.0-flash --api-key "${{ secrets.GEMINI_API_KEY }}" ${{ github.event.inputs.target_path }}
+          strix -t ${{ github.event.inputs.target_path || 'app/api' }} -m quick
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
