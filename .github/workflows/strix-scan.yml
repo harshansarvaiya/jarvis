@@ -25,9 +25,9 @@ jobs:
           pip install uv
           uv pip install --system strix-agent
 
-      - name: Run Strix Scan
+      - name: Run Strix Scan (Non-Interactive)
         run: |
-          strix -t ${{ github.event.inputs.target_path || 'app/api' }} -m quick
+          strix --target ${{ github.event.inputs.target_path || 'app/api' }} --mode quick --non-interactive
         env:
           STRIX_LLM: 'gemini/gemini-2.0-flash'
           LLM_API_KEY: ${{ secrets.GEMINI_API_KEY }}
