@@ -1117,12 +1117,12 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       if (/prefer|always|never|my rule|i want|remember that|from now on|i need you to/i.test(userText)) {
         addMemory('PREFERENCE', `Sir's Explicit Preference: "${lastUserMessage.content.slice(0, 300)}"`, 'Directive 03 Evolutionary Adaptation');
       } else if (process.env.TYPESAFE_API_KEY && lastUserMessage.content.length > 20) {
-        // Asynchronous non-blocking epistemic sieve
+        // Asynchronous non-blocking epistemic sieve (Store ONLY Sir's directives/preferences, never unverified assistant prose)
         jevAutonomousMemorySieve(lastUserMessage.content, finalReply)
           .then((sieve) => {
             if (sieve.shouldMemorize && sieve.category) {
               console.log(`[Jev Epistemic Sieve] 🧠 Auto-assimilated permanent ${sieve.category}: "${lastUserMessage.content.slice(0, 80)}"`);
-              addMemory(sieve.category as any, `Synthesized Insight: "${lastUserMessage.content.slice(0, 250)}" -> "${finalReply.slice(0, 250)}"`, 'Directive 03 Jev Epistemic Sieve');
+              addMemory(sieve.category as any, `Sir's Mandate: "${lastUserMessage.content.slice(0, 300)}"`, 'Directive 03 Jev Epistemic Sieve');
             }
           })
           .catch((sErr) => console.warn('[Jev Memory Sieve] Non-blocking warning:', sErr));
