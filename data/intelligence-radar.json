@@ -214,5 +214,22 @@
       "AST-Aware Code Chunking in Knowledge RAG"
     ],
     "addedAt": "2026-09-18T18:22:00Z"
+  },
+  {
+    "name": "elder-plinius/T3MP3ST",
+    "url": "https://github.com/elder-plinius/T3MP3ST",
+    "domain": "Adversarial Red-Teaming Intelligence & Swarm Threat Modeling",
+    "status": "ACTIVE_EXTRACTION",
+    "extractedFeatures": [
+      "8-Stage MITRE ATT&CK Multi-Agent Kill Chain Taxonomy",
+      "AgentShield Adversarial Prompt Injection Signatures (`lib/jarvis/security/shield.ts`)",
+      "Keyless Agent Session Harness Threat Modeling"
+    ],
+    "futureRoadmap": [
+      "Automated Attack Surface Mapping for AgentShield",
+      "Heuristic Sandboxing for Inbound Multi-Agent Prompts"
+    ],
+    "addedAt": "2026-09-18T20:10:00Z"
   }
 ]
+
