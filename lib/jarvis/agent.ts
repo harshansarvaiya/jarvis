@@ -9,6 +9,7 @@ import {
   deconstructOperationalMotive,
   extractCinematicVocalSummary,
   generateTacticalNextActions,
+  generateSpeculativeDraft,
   OperationalArchetype,
   OrchestrationTelemetry,
   detectActivePersona,
@@ -16,6 +17,7 @@ import {
 } from './orchestrator';
 import { appendUniversalChatMessage, appendAgentChatMessage, getCrossChannelContext } from './storage';
 import { getPersonaConfig, buildPersonaPromptBlock } from './persona';
+import { compressSystemPrompt, compressToolOutput } from './compression';
 
 import { getSpecializedAgentProfile, selectOptimalSubagent } from './agents-registry';
 import { sanitizeInboundText } from './security/shield';
@@ -271,11 +273,24 @@ ${skillsContext}
 ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 `;
 
-  const fullSystemPrompt = `${JARVIS_SYSTEM_PROMPT}\n\n${contextPrompt}`;
-
   // 4. Intent Classification & Cognitive Dispatch Decision
   const hasImage = Boolean(lastUserMessage.image && lastUserMessage.image.includes(';base64,'));
   const { archetype, reason } = classifyOperationalIntent(lastUserMessage.content, hasImage);
+
+  // Upgrade 3: Speculative Fast Reasoning Draft (Groq LPU -> Frontier Synthesis)
+  let speculativeDraftPrompt = '';
+  if (groqKey && (persona === 'FRIDAY' || archetype === 'DEEP_SYNTHESIS')) {
+    try {
+      const spec = await generateSpeculativeDraft(lastUserMessage.content, { groqApiKey: groqKey, timeoutMs: 600 });
+      if (spec && spec.draft) {
+        speculativeDraftPrompt = `\n[SPECULATIVE LPU REASONING DRAFT (${spec.latencyMs}ms)]:\n${spec.draft}\nUse this fast hypothesis as a pre-computed strategic scaffold to accelerate your verified synthesis.\n`;
+      }
+    } catch {}
+  }
+
+  // Upgrade 4: Dynamic Needle Packing & Context Compression
+  const uncompressedPrompt = `${JARVIS_SYSTEM_PROMPT}\n\n${contextPrompt}${speculativeDraftPrompt}`;
+  const fullSystemPrompt = compressSystemPrompt(uncompressedPrompt);
 
   const shouldPreferGroq =
     groqKey &&

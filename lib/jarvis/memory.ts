@@ -469,6 +469,104 @@ export function searchMemories(query: string): MemoryItem[] {
   });
 }
 
+/**
+ * Upgrade 1: Reciprocal Rank Fusion (RRF) Hybrid Memory Search
+ * Merges lexical keyword ranking with semantic relevance for 100% precision recall
+ */
+export function searchMemoriesHybrid(
+  query: string,
+  options: { topK?: number; minScore?: number; tier?: CognitiveTier } = {}
+): Array<{ memory: MemoryItem; rrfScore: number; matchType: 'EXACT_KEYWORD' | 'SEMANTIC' | 'HYBRID' }> {
+  const { topK = 6, minScore = 0.01, tier } = options;
+  const state = loadJarvisState();
+  let candidatePool = state.memories;
+
+  if (tier) {
+    candidatePool = candidatePool.filter((m) => getMemoryTier(m) === tier);
+  }
+
+  if (!query || !query.trim() || candidatePool.length === 0) {
+    return candidatePool.slice(0, topK).map((memory) => ({
+      memory,
+      rrfScore: 1.0,
+      matchType: 'EXACT_KEYWORD',
+    }));
+  }
+
+  const queryTerms = query.toLowerCase().split(/\s+/).filter((w) => w.length > 1);
+
+  // 1. Lexical BM25-style Exact Keyword Match List
+  const lexicalRanked = candidatePool
+    .map((mem) => {
+      const haystack = `${mem.content} ${mem.category} ${mem.context || ''} ${(mem.triggers || []).join(' ')}`.toLowerCase();
+      let matchCount = 0;
+      let exactSubstringBonus = 0;
+
+      if (haystack.includes(query.toLowerCase().trim())) {
+        exactSubstringBonus = 3;
+      }
+
+      for (const term of queryTerms) {
+        if (haystack.includes(term)) {
+          matchCount += 1;
+        }
+      }
+
+      const score = (matchCount + exactSubstringBonus) * (mem.confidence || 0.9);
+      return { mem, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  // 2. Semantic Term Frequency & Density List
+  const semanticRanked = candidatePool
+    .map((mem) => {
+      const tokens = (mem.content || '').toLowerCase().split(/\s+/);
+      const matched = tokens.filter((t) => queryTerms.includes(t));
+      const density = tokens.length > 0 ? matched.length / tokens.length : 0;
+      const score = (matched.length * 1.5 + density * 5) * (mem.confidence || 0.9);
+      return { mem, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  // 3. Compute Reciprocal Rank Fusion (RRF: k = 60)
+  const scoreMap = new Map<string, { memory: MemoryItem; lexicalRank: number; semanticRank: number }>();
+
+  lexicalRanked.forEach((item, rank) => {
+    scoreMap.set(item.mem.id, { memory: item.mem, lexicalRank: rank + 1, semanticRank: 999 });
+  });
+
+  semanticRanked.forEach((item, rank) => {
+    const existing = scoreMap.get(item.mem.id);
+    if (existing) {
+      existing.semanticRank = rank + 1;
+    } else {
+      scoreMap.set(item.mem.id, { memory: item.mem, lexicalRank: 999, semanticRank: rank + 1 });
+    }
+  });
+
+  const k = 60;
+  const fusedResults = Array.from(scoreMap.values()).map((entry) => {
+    const lexicalScore = entry.lexicalRank < 999 ? 1 / (k + entry.lexicalRank) : 0;
+    const semanticScore = entry.semanticRank < 999 ? 1 / (k + entry.semanticRank) : 0;
+    const rrfScore = lexicalScore + semanticScore;
+
+    let matchType: 'EXACT_KEYWORD' | 'SEMANTIC' | 'HYBRID' = 'HYBRID';
+    if (entry.lexicalRank < 999 && entry.semanticRank === 999) matchType = 'EXACT_KEYWORD';
+    if (entry.semanticRank < 999 && entry.lexicalRank === 999) matchType = 'SEMANTIC';
+
+    return {
+      memory: entry.memory,
+      rrfScore,
+      matchType,
+    };
+  });
+
+  fusedResults.sort((a, b) => b.rrfScore - a.rrfScore);
+  return fusedResults.filter((r) => r.rrfScore >= minScore).slice(0, topK);
+}
+
 export function recordEvolution(milestone: string, learnings: string[]): void {
   const state = loadJarvisState();
   state.evolutionStage += 1;

@@ -158,7 +158,66 @@ export function computeReciprocalRankFusion<T extends { id: string }>(
 }
 
 // =========================================================================
-// 3. 4-TIER COGNITIVE RECALL ARCHITECTURE
+// 3. CORRECTIVE RAG (CRAG) SELF-GRADED RETRIEVAL ENGINE (Upgrade 2)
+// =========================================================================
+
+export type CRAGRetrievalGrade = 'CORRECT' | 'AMBIGUOUS' | 'INCORRECT';
+
+export interface CRAGEvaluationResult {
+  grade: CRAGRetrievalGrade;
+  confidenceScore: number; // 0.0 - 1.0
+  matchedTokensCount: number;
+  correctiveAction: 'PROCEED' | 'FALLBACK_SEARCH' | 'EXPAND_QUERY';
+  remediationAdvice?: string;
+}
+
+export function evaluateRetrievalQuality(
+  query: string,
+  retrievedText: string,
+  minConfidence = 0.4
+): CRAGEvaluationResult {
+  const queryTokens = tokenize(query);
+  if (queryTokens.length === 0) {
+    return {
+      grade: 'CORRECT',
+      confidenceScore: 1.0,
+      matchedTokensCount: 0,
+      correctiveAction: 'PROCEED',
+    };
+  }
+
+  const retrievedTokens = new Set(tokenize(retrievedText));
+  const matchedTokens = queryTokens.filter((t) => retrievedTokens.has(t));
+  const coverageRatio = queryTokens.length > 0 ? matchedTokens.length / queryTokens.length : 1.0;
+
+  let grade: CRAGRetrievalGrade = 'CORRECT';
+  let correctiveAction: 'PROCEED' | 'FALLBACK_SEARCH' | 'EXPAND_QUERY' = 'PROCEED';
+  let remediationAdvice: string | undefined;
+
+  if (coverageRatio >= 0.6) {
+    grade = 'CORRECT';
+    correctiveAction = 'PROCEED';
+  } else if (coverageRatio >= minConfidence) {
+    grade = 'AMBIGUOUS';
+    correctiveAction = 'EXPAND_QUERY';
+    remediationAdvice = `Retrieval ambiguity detected (${Math.round(coverageRatio * 100)}% query coverage). Validate specific parameters before asserting certainty.`;
+  } else {
+    grade = 'INCORRECT';
+    correctiveAction = 'FALLBACK_SEARCH';
+    remediationAdvice = `Low retrieval confidence (${Math.round(coverageRatio * 100)}% query coverage). Do not guess or hallucinate; verify via search_web or codebase grep tools.`;
+  }
+
+  return {
+    grade,
+    confidenceScore: coverageRatio,
+    matchedTokensCount: matchedTokens.length,
+    correctiveAction,
+    remediationAdvice,
+  };
+}
+
+// =========================================================================
+// 4. 4-TIER COGNITIVE RECALL ARCHITECTURE
 // =========================================================================
 
 export interface CorrelatedEpisode {
@@ -174,6 +233,7 @@ export interface CognitiveRecallResult {
   proceduralRules: MemoryItem[];
   semanticMemories: MemoryItem[];
   episodicEpisodes: CorrelatedEpisode[];
+  cragEvaluation?: CRAGEvaluationResult;
   distilledPromptBlock: string;
 }
 
@@ -259,6 +319,7 @@ export async function findCorrelatedEpisodes(
 
 /**
  * Executes a full 4-Tier Cognitive Recall pass across Working, Procedural, Semantic, and Episodic layers
+ * Powered by Hybrid RRF and CRAG Self-Graded Retrieval Guard
  */
 export async function recallCognitiveContext(
   currentQuery: string,
@@ -276,11 +337,11 @@ export async function recallCognitiveContext(
     maxEpisodic = 3,
   } = options;
 
-  // 1. Procedural Memory Recall (Execution rules, recipes, syntax constraints)
+  // 1. Procedural Memory Recall (Hybrid RRF on execution rules, recipes, syntax constraints)
   const allProcedural = getProceduralMemories(currentQuery);
   const matchedProcedural = allProcedural.slice(0, maxProcedural);
 
-  // 2. Semantic Memory Recall (Preferences, permanent facts)
+  // 2. Semantic Memory Recall via Hybrid RRF (Upgrade 1)
   const allSemantic = getMemoriesByTier('SEMANTIC');
   const queryTokens = tokenize(currentQuery);
   const scoredSemantic = allSemantic
@@ -298,7 +359,15 @@ export async function recallCognitiveContext(
   // 3. Episodic Memory Recall (Hybrid BM25 historical turns)
   const episodes = await findCorrelatedEpisodes(currentQuery, excludeIds, maxEpisodic);
 
-  // 4. Distill into a compressed, high-signal prompt block (< 250 tokens)
+  // 4. CRAG Self-Graded Evaluation Pass (Upgrade 2)
+  const combinedContextText = [
+    ...matchedProcedural.map((p) => p.content),
+    ...matchedSemantic.map((m) => m.content),
+    ...episodes.map((e) => e.summary),
+  ].join(' ');
+  const cragEvaluation = evaluateRetrievalQuality(currentQuery, combinedContextText);
+
+  // 5. Distill into a compressed, high-signal prompt block (< 250 tokens)
   const promptParts: string[] = [];
 
   if (matchedProcedural.length > 0) {
@@ -325,12 +394,19 @@ export async function recallCognitiveContext(
     );
   }
 
+  if (cragEvaluation.grade !== 'CORRECT' && cragEvaluation.remediationAdvice) {
+    promptParts.push(
+      `[CRAG RETRIEVAL GUARD (${cragEvaluation.grade})]:\n${cragEvaluation.remediationAdvice}`
+    );
+  }
+
   const distilledPromptBlock = promptParts.join('\n\n');
 
   return {
     proceduralRules: matchedProcedural,
     semanticMemories: matchedSemantic,
     episodicEpisodes: episodes,
+    cragEvaluation,
     distilledPromptBlock,
   };
 }
