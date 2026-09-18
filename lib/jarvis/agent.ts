@@ -1081,24 +1081,6 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           persona,
         },
       });
-
-      await appendAgentChatMessage(
-        {
-          id: `msg-${Date.now()}-a`,
-          role: 'assistant',
-          content: finalReply,
-          vocalSummary: extractCinematicVocalSummary(finalReply),
-          toolCalls: toolCallsExecuted,
-          timestamp: new Date().toISOString(),
-          telemetry: {
-            engineUsed: isVertexEngine ? `Vertex AI ${selectedVertexModel}` : selectedModel,
-            model: isVertexEngine ? selectedVertexModel : selectedModel,
-            persona,
-          },
-        },
-        persona === 'FRIDAY' ? 'friday' : 'web',
-        persona === 'FRIDAY' ? 'antigravity' : 'web-pwa'
-      ).catch(() => {});
     } catch (trajErr) {
       console.warn('[Agent] Trajectory recording warning:', trajErr);
     }

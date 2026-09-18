@@ -63,6 +63,59 @@ function sanitizeChatMessageForStorage(m: ChatMessageRecord): ChatMessageRecord 
   };
 }
 
+export function deduplicateChatHistory(messages: ChatMessageRecord[]): ChatMessageRecord[] {
+  const result: ChatMessageRecord[] = [];
+  const seenIds = new Set<string>();
+
+  for (const msg of messages) {
+    if (!msg || !msg.role || msg.content === undefined || msg.content === null) continue;
+    const cleanMsg = sanitizeChatMessageForStorage(msg);
+
+    // If ID already present, merge in place
+    if (cleanMsg.id && seenIds.has(cleanMsg.id)) {
+      const idx = result.findIndex((m) => m.id === cleanMsg.id);
+      if (idx !== -1) {
+        result[idx] = { ...result[idx], ...cleanMsg };
+      }
+      continue;
+    }
+
+    // Semantic content & timing deduplication across trailing turns
+    const normContent = (cleanMsg.content || '').trim();
+    const existingIndex = result.slice(-10).findIndex((existing) => {
+      if (existing.role !== cleanMsg.role) return false;
+      const existingNorm = (existing.content || '').trim();
+      if (existingNorm !== normContent) return false;
+
+      // If timestamps exist, check if within 45 seconds of each other
+      if (existing.timestamp && cleanMsg.timestamp) {
+        const timeDiff = Math.abs(new Date(cleanMsg.timestamp).getTime() - new Date(existing.timestamp).getTime());
+        if (!isNaN(timeDiff) && timeDiff <= 45000) return true;
+      } else {
+        return true;
+      }
+      return false;
+    });
+
+    if (existingIndex !== -1) {
+      const targetIdx = result.length - (result.slice(-10).length - existingIndex);
+      if (targetIdx >= 0 && targetIdx < result.length) {
+        result[targetIdx] = {
+          ...result[targetIdx],
+          ...cleanMsg,
+          id: result[targetIdx].id || cleanMsg.id,
+          timestamp: result[targetIdx].timestamp || cleanMsg.timestamp,
+        };
+      }
+    } else {
+      result.push(cleanMsg);
+      if (cleanMsg.id) seenIds.add(cleanMsg.id);
+    }
+  }
+
+  return result.slice(-50);
+}
+
 // ==========================================
 // 1. Upstash Redis REST Provider (Cloud 24/7)
 // ==========================================
@@ -134,7 +187,7 @@ class UpstashRedisProvider implements StorageProvider {
 
   async saveChatHistory(messages: ChatMessageRecord[]): Promise<void> {
     try {
-      const sanitized = messages.slice(-50).map(sanitizeChatMessageForStorage);
+      const sanitized = deduplicateChatHistory(messages);
       await this.execute('set', 'jarvis:chat_history', JSON.stringify(sanitized));
     } catch (err) {
       console.error('[Storage:Upstash] Failed to save chat history:', err);
@@ -148,19 +201,8 @@ class UpstashRedisProvider implements StorageProvider {
   async appendChatMessages(newMessages: ChatMessageRecord[]): Promise<void> {
     try {
       const current = await this.getChatHistory(50);
-      const existingIds = new Set(current.map((m) => m.id).filter(Boolean));
-
-      for (const msg of newMessages) {
-        const cleanMsg = sanitizeChatMessageForStorage(msg);
-        if (cleanMsg.id && existingIds.has(cleanMsg.id)) {
-          const idx = current.findIndex((m) => m.id === cleanMsg.id);
-          if (idx !== -1) current[idx] = { ...current[idx], ...cleanMsg };
-        } else {
-          current.push(cleanMsg);
-          if (cleanMsg.id) existingIds.add(cleanMsg.id);
-        }
-      }
-      await this.saveChatHistory(current);
+      const merged = deduplicateChatHistory([...current, ...newMessages]);
+      await this.saveChatHistory(merged);
     } catch (err) {
       console.error('[Storage:Upstash] Failed to append chat messages:', err);
     }
@@ -247,7 +289,7 @@ class LocalDiskProvider implements StorageProvider {
     try {
       this.ensureDataDir();
       const file = this.getFilePath('chats');
-      const sanitized = messages.slice(-50).map(sanitizeChatMessageForStorage);
+      const sanitized = deduplicateChatHistory(messages);
       fs.writeFileSync(file, JSON.stringify(sanitized, null, 2), 'utf-8');
     } catch (err) {
       console.error('[Storage:Local] Failed to save chat history:', err);
@@ -261,19 +303,8 @@ class LocalDiskProvider implements StorageProvider {
   async appendChatMessages(newMessages: ChatMessageRecord[]): Promise<void> {
     try {
       const current = await this.getChatHistory(50);
-      const existingIds = new Set(current.map((m) => m.id).filter(Boolean));
-
-      for (const msg of newMessages) {
-        const cleanMsg = sanitizeChatMessageForStorage(msg);
-        if (cleanMsg.id && existingIds.has(cleanMsg.id)) {
-          const idx = current.findIndex((m) => m.id === cleanMsg.id);
-          if (idx !== -1) current[idx] = { ...current[idx], ...cleanMsg };
-        } else {
-          current.push(cleanMsg);
-          if (cleanMsg.id) existingIds.add(cleanMsg.id);
-        }
-      }
-      await this.saveChatHistory(current);
+      const merged = deduplicateChatHistory([...current, ...newMessages]);
+      await this.saveChatHistory(merged);
     } catch (err) {
       console.error('[Storage:Local] Failed to append chat messages:', err);
     }

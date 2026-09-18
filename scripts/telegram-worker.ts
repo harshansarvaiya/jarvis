@@ -19,6 +19,7 @@ import { transcribeAudioBuffer } from '../lib/jarvis/audio';
 import { runJarvisAgent } from '../lib/jarvis/agent';
 import {
   getUniversalChatHistory,
+  appendUniversalChatMessages,
   appendAgentChatMessage,
   ChatMessageRecord,
 } from '../lib/jarvis/storage';
@@ -350,9 +351,9 @@ async function processDirective(
       channel: 'telegram',
     };
 
-    await Promise.all([
-      appendAgentChatMessage(userMsgRecord, 'jarvis', 'telegram'),
-      appendAgentChatMessage(assistantMsgRecord, 'jarvis', 'telegram'),
+    await appendUniversalChatMessages([
+      { ...userMsgRecord, source: 'jarvis', channel: 'telegram' },
+      { ...assistantMsgRecord, source: 'jarvis', channel: 'telegram' },
     ]);
 
     // 4. Format Output for Telegram
