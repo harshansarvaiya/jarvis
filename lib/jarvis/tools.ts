@@ -1597,6 +1597,24 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'mcp_supermemory',
+    description: 'Supermemory Cloud Memory Engine (#1 on LongMemEval & LoCoMo) — Search or store synthesized personal memories with automated temporal contradiction resolution and user profile snapshots.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['search', 'add', 'profile'],
+          description: 'search: query memories with temporal ranking | add: save a new memory | profile: fetch rolling user snapshot',
+        },
+        query: { type: 'string', description: 'Search query for search action.' },
+        content: { type: 'string', description: 'Content to save for add action.' },
+        limit: { type: 'number', description: 'Max results to return (default: 5).' },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'mcp_calendar',
     description: 'Google Calendar MCP Engine — Inspect Sir’s real-time schedule, meetings, upcoming events, and find free availability slots. Actions: list_events, create_event, get_event, delete_event, get_free_busy.',
     parameters: {
@@ -1825,12 +1843,12 @@ export function getPrunedJarvisTools(category?: string): ToolDefinition[] {
 
   const dailyToolNames = new Set([
     'manage_task', 'store_memory', 'search_memory', 'generate_briefing', 'mcp_calendar',
-    'mcp_memory', 'notify_user', 'send_telegram_message', 'generate_retro', 'customize_persona'
+    'mcp_memory', 'mcp_supermemory', 'notify_user', 'send_telegram_message', 'generate_retro', 'customize_persona'
   ]);
 
   const knowledgeToolNames = new Set([
     'rag_search_knowledge', 'rag_ingest_document', 'emergency_wipe_sensitive', 'synthesize_skill',
-    'store_memory', 'search_memory'
+    'store_memory', 'search_memory', 'mcp_supermemory'
   ]);
 
   let targetSet: Set<string>;
@@ -2433,6 +2451,27 @@ export async function executeJarvisTool(
         const { action, ...params } = args;
         const res = await executeMemoryMCP(action, params);
         return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'mcp_supermemory': {
+        const { supermemory } = await import('./supermemory');
+        if (!supermemory.isConfigured()) {
+          return { success: false, result: null, error: 'SUPERMEMORY_API_KEY is not configured in .env.local.' };
+        }
+        const action = args.action || 'search';
+        if (action === 'search') {
+          const results = await supermemory.searchMemories(args.query || '', args.limit || 5);
+          return { success: true, result: { results, count: results.length } };
+        }
+        if (action === 'add') {
+          const addRes = await supermemory.addMemory({ content: args.content || '' });
+          return { success: addRes.success, result: addRes, error: addRes.error };
+        }
+        if (action === 'profile') {
+          const profile = await supermemory.getProfile();
+          return { success: true, result: profile };
+        }
+        return { success: false, result: null, error: `Unknown supermemory action: ${action}` };
       }
 
       case 'mcp_calendar': {

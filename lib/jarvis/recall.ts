@@ -15,6 +15,7 @@
 
 import { getUniversalChatHistory } from './storage';
 import { getMemoriesByTier, getProceduralMemories, MemoryItem, CognitiveTier } from './memory';
+import { supermemory } from './supermemory';
 
 const STOP_WORDS = new Set([
   'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
@@ -403,19 +404,31 @@ export async function recallCognitiveContext(
 
   const matchedSemantic = scoredSemantic.length > 0 ? scoredSemantic.slice(0, maxSemantic) : allSemantic.slice(0, maxSemantic);
 
-  // 3. Episodic Memory Recall (Hybrid BM25 historical turns)
-  const episodes = await findCorrelatedEpisodes(currentQuery, excludeIds, maxEpisodic);
+  // 3. Episodic Memory Recall (Hybrid BM25 historical turns + Supermemory Cloud Contradiction Layer)
+  const [episodes, cloudMemories] = await Promise.all([
+    findCorrelatedEpisodes(currentQuery, excludeIds, maxEpisodic),
+    supermemory.isConfigured() ? supermemory.searchMemories(currentQuery, 3) : Promise.resolve([]),
+  ]);
 
   // 4. CRAG Self-Graded Evaluation Pass (Upgrade 2)
   const combinedContextText = [
     ...matchedProcedural.map((p) => p.content),
     ...matchedSemantic.map((m) => m.content),
+    ...cloudMemories.map((c) => c.content),
     ...episodes.map((e) => e.summary),
   ].join(' ');
   const cragEvaluation = evaluateRetrievalQuality(currentQuery, combinedContextText);
 
   // 5. Distill into a compressed, high-signal prompt block (< 250 tokens)
   const promptParts: string[] = [];
+
+  if (cloudMemories.length > 0) {
+    promptParts.push(
+      `[TIER 3.5 - SUPERMEMORY TEMPORAL PROFILE]:\n${cloudMemories
+        .map((c) => `- ${c.content}`)
+        .join('\n')}`
+    );
+  }
 
   if (matchedProcedural.length > 0) {
     promptParts.push(

@@ -424,6 +424,17 @@ export function addMemory(
   state.memories.unshift(newMemory);
   addLog(state, 'EVOLUTION', `Memory assimilated [${inferredTier}:${category}]: ${content.slice(0, 60)}...`);
   saveJarvisState(state);
+
+  // Asynchronous sync to Supermemory Cloud (Non-blocking edge sync)
+  if (process.env.SUPERMEMORY_API_KEY) {
+    import('./supermemory').then(({ supermemory }) => {
+      supermemory.addMemory({
+        content,
+        metadata: { category, tier: inferredTier, context },
+      }).catch((sErr) => console.warn('[Supermemory Sync] Non-blocking warn:', sErr));
+    }).catch(() => {});
+  }
+
   return newMemory;
 }
 

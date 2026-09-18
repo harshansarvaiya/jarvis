@@ -31,6 +31,14 @@ const INJECTION_PATTERNS: Array<{ pattern: RegExp; label: string; risk: number }
 // 2. Invisible Unicode & Obfuscation Stripper
 const INVISIBLE_UNICODE_REGEX = /[\u200B-\u200D\uFEFF\u202A-\u202E\u2060-\u206F]/g;
 
+// 3. Secret Token Patterns (Auto-Masking to prevent credential leakage into state logs)
+const SECRET_TOKEN_PATTERNS = [
+  { pattern: /\b(sm_[A-Za-z0-9_-]{20,})\b/g, label: 'Supermemory API Token' },
+  { pattern: /\b(apikey_[A-Za-z0-9_-]{20,})\b/g, label: 'TypeSafe API Key' },
+  { pattern: /\b(ghp_[A-Za-z0-9]{25,}|github_pat_[A-Za-z0-9_]{25,})\b/g, label: 'GitHub Personal Access Token' },
+  { pattern: /\b(sk-[A-Za-z0-9_-]{20,}|nvapi-[A-Za-z0-9_-]{20,}|gsk_[A-Za-z0-9_-]{20,})\b/g, label: 'AI Provider Secret Key' },
+];
+
 /**
  * Sanitizes and inspects inbound user or external text before LLM context injection.
  */
@@ -49,6 +57,14 @@ export function sanitizeInboundText(rawText: string): ShieldSanitizationResult {
   const flags: string[] = [];
   const neutralizedPatterns: string[] = [];
   let maxRisk = 0;
+
+  // 0. Mask Secret Credentials in Input (Directive 01 Guardian Protocol)
+  for (const { pattern, label } of SECRET_TOKEN_PATTERNS) {
+    if (pattern.test(cleaned)) {
+      flags.push(`SECRET_MASKED: ${label}`);
+      cleaned = cleaned.replace(pattern, '[REDACTED_API_SECRET_TOKEN]');
+    }
+  }
 
   // 1. Strip invisible / zero-width Unicode characters used for prompt poisoning
   if (INVISIBLE_UNICODE_REGEX.test(cleaned)) {
