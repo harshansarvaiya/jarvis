@@ -30,6 +30,11 @@ import {
   VerbosityLevel,
   SparringIntensity,
 } from '../lib/jarvis/persona';
+import {
+  listSpecializedAgents,
+  getSpecializedAgentProfile,
+  AgentProfile,
+} from '../lib/jarvis/agents-registry';
 
 // 1. Load Local Environment
 function loadEnv() {
@@ -54,6 +59,42 @@ const ALLOWED_USER_ID = process.env.TELEGRAM_ALLOWED_USER_ID || '864360540';
 const gateway = new TelegramGateway();
 
 /**
+ * Builds the interactive specialized subagents matrix keyboard
+ */
+function buildSubagentsKeyboard(): TelegramInlineKeyboardMarkup {
+  const agents = listSpecializedAgents();
+  const keyboard: TelegramInlineKeyboardMarkup = {
+    inline_keyboard: [],
+  };
+
+  // 2 subagents per row
+  for (let i = 0; i < agents.length; i += 2) {
+    const row: any[] = [];
+    const a1 = agents[i];
+    row.push({
+      text: `${a1.name.split(' ')[0]} ${a1.role.slice(0, 18)}`,
+      callback_data: `subagent:${a1.id}`,
+    });
+    if (agents[i + 1]) {
+      const a2 = agents[i + 1];
+      row.push({
+        text: `${a2.name.split(' ')[0]} ${a2.role.slice(0, 18)}`,
+        callback_data: `subagent:${a2.id}`,
+      });
+    }
+    keyboard.inline_keyboard.push(row);
+  }
+
+  // Navigation shortcuts
+  keyboard.inline_keyboard.push([
+    { text: '📊 Main Briefing', callback_data: 'cmd:briefing' },
+    { text: '🎭 Persona Matrix', callback_data: 'persona:status' },
+  ]);
+
+  return keyboard;
+}
+
+/**
  * Builds quick tactical action keyboard for Telegram replies
  */
 function buildActionKeyboard(tacticalActions?: string[]): TelegramInlineKeyboardMarkup {
@@ -74,6 +115,7 @@ function buildActionKeyboard(tacticalActions?: string[]): TelegramInlineKeyboard
   keyboard.inline_keyboard.push([
     { text: '📊 Briefing', callback_data: 'cmd:briefing' },
     { text: '🎯 Tasks', callback_data: 'cmd:tasks' },
+    { text: '🤖 Agents', callback_data: 'cmd:subagents' },
     { text: '🛡️ Audit', callback_data: 'cmd:audit' },
   ]);
 
@@ -95,7 +137,8 @@ async function processDirective(
   rawText: string,
   base64Image?: string,
   replyToMessageId?: number,
-  isVoiceInput = false
+  isVoiceInput = false,
+  explicitDelegatedAgentId?: string
 ) {
   const typingPulse = setInterval(() => {
     gateway.sendTypingAction(chatId).catch(() => {});
@@ -116,8 +159,52 @@ async function processDirective(
     let requestedModel = 'gemini-3.7-flash';
     let requestedMode: any = 'auto';
     let cleanUserText = rawText.trim();
+    let delegatedAgentId = explicitDelegatedAgentId;
+    let delegatedProfile: AgentProfile | undefined = delegatedAgentId
+      ? getSpecializedAgentProfile(delegatedAgentId)
+      : undefined;
 
-    if (cleanUserText.startsWith('/groq')) {
+    if (cleanUserText === '/agents' || cleanUserText === '/subagents' || cleanUserText === '/team') {
+      const keyboard = buildSubagentsKeyboard();
+      await gateway.sendMessage(
+        chatId,
+        `🤖 **J.A.R.V.I.S. & F.R.I.D.A.Y. Specialized Subagents Matrix**\n\nCurated Top 10 High-ROI Autonomous Subagent profiles. Tap an agent below to inspect active tool suites and launch dedicated operations:\n\n_Or invoke directly via:_ \`/delegate <agent-id> <directive>\`\n_Example:_ \`/delegate security-auditor Check for secret leaks & OWASP compliance\``,
+        { replyToMessageId, replyMarkup: keyboard }
+      );
+      return;
+    } else if (
+      cleanUserText.startsWith('/delegate') ||
+      cleanUserText.startsWith('/subagent') ||
+      cleanUserText.startsWith('/agent')
+    ) {
+      const match = cleanUserText.match(/^\/(?:delegate|subagent|agent)(?:\s+([^\s]+))?(?:\s+(.*))?$/i);
+      const agentTarget = match?.[1]?.trim();
+      const taskBody = match?.[2]?.trim();
+
+      if (!agentTarget) {
+        const keyboard = buildSubagentsKeyboard();
+        await gateway.sendMessage(
+          chatId,
+          `🤖 **J.A.R.V.I.S. Subagents Matrix**\n\nPlease select an agent or specify an ID:\n\n_Syntax:_ \`/delegate <agent-id> <directive>\``,
+          { replyToMessageId, replyMarkup: keyboard }
+        );
+        return;
+      }
+
+      const foundProfile = getSpecializedAgentProfile(agentTarget);
+      if (foundProfile) {
+        delegatedAgentId = foundProfile.id;
+        delegatedProfile = foundProfile;
+        cleanUserText = taskBody || `Please perform your specialized domain review as ${foundProfile.role}, Sir.`;
+      } else {
+        await gateway.sendMessage(
+          chatId,
+          `Sir, I could not find a subagent matching \`${agentTarget}\`. Tap below to view available subagent profiles:`,
+          { replyToMessageId, replyMarkup: buildSubagentsKeyboard() }
+        );
+        return;
+      }
+    } else if (cleanUserText.startsWith('/groq')) {
       requestedModel = 'openai/gpt-oss-120b';
       requestedMode = 'groq';
       cleanUserText = cleanUserText.replace(/^\/groq\s*/i, '').trim();
@@ -244,6 +331,7 @@ async function processDirective(
     const result = await runJarvisAgent(contextMessages, {
       model: requestedModel,
       orchestrationMode: requestedMode,
+      specializedAgentId: delegatedAgentId,
     });
 
     // 3. Save Both Records to Universal Storage (Syncs to Web PWA in Real-Time)
@@ -271,6 +359,10 @@ async function processDirective(
 
     if (isVoiceInput) {
       responseText += `🎙️ *[Transcribed]*: _"${cleanUserText}"_\n\n`;
+    }
+
+    if (delegatedProfile) {
+      responseText += `🤖 *[Subagent: ${delegatedProfile.name}]*\n\n`;
     }
 
     responseText += result.reply;
@@ -355,6 +447,53 @@ async function handleIncomingMessage(update: TelegramUpdate) {
       directiveText = 'List all active pending tasks and priorities.';
     } else if (cq.data === 'cmd:audit') {
       directiveText = 'Run a comprehensive security audit of our infrastructure and codebase.';
+    } else if (cq.data === 'cmd:subagents' || cq.data === 'cmd:agents_menu') {
+      const keyboard = buildSubagentsKeyboard();
+      await gateway.sendMessage(
+        chatId,
+        `🤖 **J.A.R.V.I.S. & F.R.I.D.A.Y. Specialized Subagents Matrix**\n\nCurated Top 10 High-ROI Autonomous Subagent profiles. Tap an agent below to inspect active tool suites and launch dedicated operations:\n\n_Direct command:_ \`/delegate <agent-id> <directive>\``,
+        { replyToMessageId: cq.message?.message_id, replyMarkup: keyboard }
+      );
+      return;
+    } else if (cq.data.startsWith('subagent:')) {
+      const agentId = cq.data.replace(/^subagent:/, '');
+      const agent = getSpecializedAgentProfile(agentId);
+      if (agent) {
+        const kb: TelegramInlineKeyboardMarkup = {
+          inline_keyboard: [
+            [
+              { text: `🚀 Run ${agent.role.slice(0, 18)} Task`, callback_data: `subagent_run:${agent.id}` },
+            ],
+            [
+              { text: '🔙 Subagents Matrix', callback_data: 'cmd:subagents' },
+              { text: '📊 Main Briefing', callback_data: 'cmd:briefing' },
+            ],
+          ],
+        };
+        await gateway.sendMessage(
+          chatId,
+          `🤖 **Specialized Agent Profile**\n\n**${agent.name}**\n- **Role**: \`${agent.role}\`\n- **Category**: \`${agent.category}\`\n- **Recommended Model**: \`${agent.recommendedModel}\`\n- **Tool Suite**: \`${agent.tools.join(', ')}\`\n\n**Mission & Standards:**\n_${agent.systemPrompt}_\n\n_To delegate a custom directive:_ \`/delegate ${agent.id} <your directive>\``,
+          { replyToMessageId: cq.message?.message_id, replyMarkup: kb }
+        );
+        return;
+      }
+    } else if (cq.data.startsWith('subagent_run:')) {
+      const agentId = cq.data.replace(/^subagent_run:/, '');
+      const defaultTasks: Record<string, string> = {
+        'security-auditor': 'Run a comprehensive security audit of our repository and infrastructure. Verify zero secret leaks and OWASP compliance.',
+        'architecture-expert': 'Analyze the overall architecture, component topology, and module boundaries of J.A.R.V.I.S. Mark II.',
+        'build-error-resolver': 'Run compiler verification (npx tsc --noEmit) and report any build or type check errors.',
+        'nextjs-app-router-expert': 'Review Next.js App Router route handlers, server actions, and Edge compatibility in app/ directory.',
+        'tdd-testing-engineer': 'Review test coverage and formulate TDD verification contracts for our agent tools and storage engines.',
+        'performance-optimizer': 'Inspect infrastructure performance, memory consumption, cgroup limits, and VM health.',
+        'database-architect': 'Inspect Upstash Redis universal storage, state keys, and memory persistence health.',
+        'osint-threat-analyst': 'Run OSINT threat scan on external APIs and CVE radar for our dependencies.',
+        'refactoring-specialist': 'Inspect codebase for dead code, circular dependencies, and gstack reuse opportunities.',
+        'codeact-executor': 'Verify CodeAct step execution pipeline and tool execution harness status.',
+      };
+      const taskText = defaultTasks[agentId] || `Execute specialized operation as ${agentId}`;
+      await processDirective(chatId, taskText, undefined, cq.message?.message_id, false, agentId);
+      return;
     } else if (cq.data === 'cmd:groq') {
       directiveText = '/groq Report status and confirm Groq LPU 120B reflex tier active.';
     } else if (cq.data === 'cmd:gemini') {

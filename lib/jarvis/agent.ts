@@ -17,6 +17,8 @@ import {
 import { appendUniversalChatMessage, appendAgentChatMessage, getCrossChannelContext } from './storage';
 import { getPersonaConfig, buildPersonaPromptBlock } from './persona';
 
+import { getSpecializedAgentProfile } from './agents-registry';
+
 export interface ChatMessage {
   id?: string;
   role: 'user' | 'model' | 'system' | 'assistant';
@@ -41,6 +43,7 @@ export interface JarvisAgentOptions {
   openrouterApiKey?: string;
   provider?: 'google' | 'groq' | 'github-models' | 'openai' | 'nvidia' | 'openrouter' | 'auto';
   orchestrationMode?: 'auto' | 'groq' | 'gemini' | 'nvidia' | 'openrouter' | 'manual';
+  specializedAgentId?: string;
 }
 
 export function normalizeModel(m?: string): string {
@@ -219,9 +222,22 @@ export async function runJarvisAgent(
     console.warn('[Agent] Persona config loading warning:', personaErr);
   }
 
+  // 3.7. Specialized Subagent Profile Ingestion (Inspired by affaan-m/ECC)
+  let specializedAgentBlock = '';
+  const delegatedAgent = options.specializedAgentId ? getSpecializedAgentProfile(options.specializedAgentId) : undefined;
+  if (delegatedAgent) {
+    specializedAgentBlock = `
+[SPECIALIZED SUBAGENT PROFILE ENGAGED]:
+- Active Subagent: ${delegatedAgent.name} (Role: ${delegatedAgent.role}, Category: ${delegatedAgent.category})
+- Specialized Mission & Standard: ${delegatedAgent.systemPrompt}
+- Prioritized Domain Tools: ${delegatedAgent.tools.join(', ')}
+You must execute this directive strictly embodying the depth, rigor, and domain expertise of this specialized profile.`;
+  }
+
   const contextPrompt = `
 [CURRENT TEMPORAL CONTEXT]: ${new Date().toISOString()} (Local time: ${new Date().toLocaleString()})
 ${personaPromptBlock}
+${specializedAgentBlock}
 
 [TIER 1 - WORKING MEMORY & PRE-THOUGHT REASONING PASS]:
 - Unstated Motive: ${motivePass.unstatedMotive}
