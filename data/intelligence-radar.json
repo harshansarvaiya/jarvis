@@ -230,6 +230,23 @@
       "Heuristic Sandboxing for Inbound Multi-Agent Prompts"
     ],
     "addedAt": "2026-09-18T20:10:00Z"
+  },
+  {
+    "name": "Edge0-AI/edge0",
+    "url": "https://github.com/Edge0-AI/edge0",
+    "domain": "Edge MoE Inference & Speculative SSD Offloading",
+    "status": "MONITORED_ROADMAP",
+    "extractedFeatures": [
+      "Dynamic SSD Expert Offload Architecture (35B MoE in 3GB RAM)",
+      "Prerouter Speculative 1-Step Routing Prediction for Async I/O Overlap",
+      "INT4 Base Quantization + Recover-LoRA Adapter Routing"
+    ],
+    "futureRoadmap": [
+      "Offline Sovereign Local Mac Sidecar Daemon for J.A.R.V.I.S.",
+      "Linux/CUDA Port Monitoring for Cloud Edge Integration"
+    ],
+    "addedAt": "2026-09-18T20:33:00Z"
   }
 ]
+
 
