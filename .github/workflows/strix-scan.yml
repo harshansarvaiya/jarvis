@@ -18,16 +18,17 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
-      - name: Install uv and Strix
+      - name: Install uv and Strix Agent
         run: |
           pip install uv
-          uv pip install --system usestrix
+          uv pip install --system strix-agent
 
       - name: Run Strix Scan (Free Tier Provider)
         run: |
-          strix --model gemini/gemini-2.0-flash --api-key ${{ secrets.STRIX_API_KEY }} ${{ github.event.inputs.target_path }}
+          strix --model gemini/gemini-2.0-flash --api-key "${{ secrets.GEMINI_API_KEY }}" ${{ github.event.inputs.target_path }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
