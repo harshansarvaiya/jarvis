@@ -33,8 +33,11 @@ jobs:
         run: |
           strix -t ${{ github.event.inputs.target_path || 'app/api' }} -m quick -n
         env:
-          STRIX_LLM: ${{ github.event.inputs.model || 'gemini/gemini-2.0-flash' }}
-          LLM_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          STRIX_LLM: ${{ github.event.inputs.model || 'openrouter/google/gemini-2.5-flash' }}
+          LLM_API_KEY: ${{ secrets.OPENROUTER_API_KEY || secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_NIM_API_KEY }}
 
