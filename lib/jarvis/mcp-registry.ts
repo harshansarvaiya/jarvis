@@ -32,7 +32,8 @@ export function getGitHubClient(): GitHubClient {
   const token =
     process.env.GITHUB_TOKEN ||
     process.env.GITHUB_MODELS_TOKEN ||
-    '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';
+    process.env.GH_TOKEN ||
+    '';
 
   return {
     token,

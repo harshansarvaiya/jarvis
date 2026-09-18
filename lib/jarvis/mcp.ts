@@ -30,7 +30,8 @@ function getGitHubToken(): string {
   return (
     process.env.GITHUB_TOKEN ||
     process.env.GITHUB_MODELS_TOKEN ||
-    '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'
+    process.env.GH_TOKEN ||
+    ''
   );
 }
 

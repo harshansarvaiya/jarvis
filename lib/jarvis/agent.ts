@@ -18,6 +18,7 @@ import { appendUniversalChatMessage, appendAgentChatMessage, getCrossChannelCont
 import { getPersonaConfig, buildPersonaPromptBlock } from './persona';
 
 import { getSpecializedAgentProfile, selectOptimalSubagent } from './agents-registry';
+import { sanitizeInboundText } from './security/shield';
 
 export interface ChatMessage {
   id?: string;
@@ -142,7 +143,14 @@ export async function runJarvisAgent(
     };
   }
 
-  // 1. Safety & Directive Check (Guardian Protocol)
+  // 1. AgentShield Inbound Firewall (Directive 01 Guardian Protocol)
+  const shieldResult = sanitizeInboundText(lastUserMessage.content);
+  if (shieldResult.threatDetected) {
+    console.warn(`[AgentShield Sentry] 🛡️ Neutralized inbound prompt injection threat (Risk=${shieldResult.riskScore}):`, shieldResult.flags);
+    lastUserMessage.content = shieldResult.sanitized;
+  }
+
+  // 1.1 Safety & Directive Check (Guardian Protocol)
   const directiveCheck = validateActionAgainstDirectives(lastUserMessage.content);
   if (!directiveCheck.allowed) {
     const reply = `Sir, I must respectfully halt this operation under **[${directiveCheck.violatedDirective?.name}]**: ${directiveCheck.reason}. My prime mandate is to protect your security and well-being.`;

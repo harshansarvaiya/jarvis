@@ -35,6 +35,7 @@ import {
   getSpecializedAgentProfile,
   AgentProfile,
 } from '../lib/jarvis/agents-registry';
+import { sanitizeInboundText } from '../lib/jarvis/security/shield';
 
 // 1. Load Local Environment
 function loadEnv() {
@@ -589,6 +590,13 @@ async function handleIncomingMessage(update: TelegramUpdate) {
   }
 
   if (!userText && !hasPhoto && !hasDoc && !hasVoice && !hasAudio) return;
+
+  // AgentShield Inbound Inspection
+  const shield = sanitizeInboundText(userText);
+  if (shield.threatDetected) {
+    console.warn(`[AgentShield Gateway Sentry] 🛡️ Neutralized prompt injection pattern in incoming message:`, shield.flags);
+    userText = shield.sanitized;
+  }
 
   console.log(
     `[Telegram Gateway] 🛡️ Verified Sovereign Directive from Sir (ID: ${senderId}): "${userText.substring(0, 60)}..."${

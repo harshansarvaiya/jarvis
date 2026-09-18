@@ -32,6 +32,8 @@ import {
   wipeAllKnowledge,
 } from './rag';
 import { getSpecializedAgentProfile, selectOptimalSubagent } from './agents-registry';
+import { executeEnterpriseSastAudit } from './security/sast';
+import { scanWorkspaceForSecrets } from './security/secret-sentry';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
@@ -1346,6 +1348,20 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'scan_workspace_secrets',
+    description: 'Perform a comprehensive zero-leak static scan across all repository files for 35+ hardcoded secrets, API keys, private keys, database URIs, and tokens.',
+    parameters: {
+      type: 'object',
+      properties: {
+        targetDir: {
+          type: 'string',
+          description: 'Optional subfolder to scan (defaults to entire workspace).',
+        },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'rag_search_knowledge',
     description: 'Perform semantic vector search on the J.A.R.V.I.S. Knowledge Base using dense vector embeddings (Gemini 004). Returns relevant chunks with similarity confidence.',
     parameters: {
@@ -2308,66 +2324,34 @@ export async function executeJarvisTool(
       }
 
       case 'run_security_audit': {
-        // OWASP Top-10 + STRIDE static analysis using grep-based scanning
-        const scope = args.scope || 'full';
-        const includeStride = args.includeStride !== false;
-        const findings: Array<{ severity: string; category: string; description: string; location?: string }> = [];
-
-        const auditCommands: Array<{ label: string; cmd: string; severity: string; category: string }> = [
-          // OWASP A02 — Cryptographic Failures: hardcoded secrets
-          { label: 'Hardcoded secrets/tokens', cmd: `grep -rn --include="*.ts" --include="*.js" --include="*.tsx" -E "(password|secret|token|api_key|apikey)\\s*=\\s*['\"][A-Za-z0-9+/=]{8,}" . --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git | grep -v ".env" | head -20`, severity: 'CRITICAL', category: 'OWASP A02: Hardcoded Secrets' },
-          // OWASP A01 — Broken Access Control: missing auth middleware
-          { label: 'API routes without auth check', cmd: `grep -rn --include="*.ts" -l "export.*GET\\|export.*POST" app/api/ | xargs grep -L "getServerSession\\|verifyHmac\\|guardian\\|auth" 2>/dev/null | head -15`, severity: 'HIGH', category: 'OWASP A01: Missing Auth Check' },
-          // OWASP A03 — Injection: eval/exec usage
-          { label: 'Dangerous eval/exec patterns', cmd: `grep -rn --include="*.ts" --include="*.tsx" -E "eval\\(|new Function\\(|execSync\\(|child_process" . --exclude-dir=node_modules --exclude-dir=.git | grep -v "execAsync\\|test\\|spec" | head -20`, severity: 'HIGH', category: 'OWASP A03: Injection Vectors' },
-          // OWASP A05 — Security Misconfiguration: exposed debug endpoints
-          { label: 'Exposed debug/admin endpoints', cmd: `grep -rn --include="*.ts" -E "route.*debug|route.*admin|route.*internal" app/api/ | head -10`, severity: 'MEDIUM', category: 'OWASP A05: Security Misconfiguration' },
-          // OWASP A06 — Vulnerable Dependencies
-          { label: 'Known vulnerable dep patterns', cmd: `cat package.json | grep -E '"version"' | head -3 && npm audit --json 2>/dev/null | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8');try{const j=JSON.parse(d);const v=j.vulnerabilities||{};const c=Object.values(v).filter(x=>x.severity==='critical'||x.severity==='high');console.log('Critical+High vulns:',c.length);}catch{console.log('npm audit parse error');}" 2>/dev/null | head -5`, severity: 'HIGH', category: 'OWASP A06: Vulnerable Dependencies' },
-          // OWASP A09 — Security Logging
-          { label: 'Missing security event logging', cmd: `grep -rn --include="*.ts" "validateActionAgainstDirectives\\|Guardian Protocol" . --exclude-dir=node_modules | wc -l`, severity: 'LOW', category: 'OWASP A09: Logging Coverage' },
-        ];
-
-        const scopeFilter = scope === 'full' ? auditCommands : auditCommands.filter(c =>
-          (scope === 'auth' && c.category.includes('Auth')) ||
-          (scope === 'api' && (c.category.includes('Injection') || c.category.includes('Auth'))) ||
-          (scope === 'dependencies' && c.category.includes('Dependencies')) ||
-          (scope === 'env_secrets' && c.category.includes('Secrets'))
-        );
-
-        for (const audit of (scopeFilter.length > 0 ? scopeFilter : auditCommands)) {
-          try {
-            const { stdout, stderr } = await execAsync(audit.cmd, { cwd: process.cwd(), timeout: 12000, maxBuffer: 256 * 1024 });
-            const output = (stdout || stderr || '').trim();
-            if (output && output.length > 0 && !output.startsWith('0') && output !== '0') {
-              findings.push({ severity: audit.severity, category: audit.category, description: audit.label, location: output.slice(0, 400) });
-            }
-          } catch { /* grep returns exit 1 for no-match — not a real error */ }
-        }
-
-        const strideAnalysis = includeStride ? {
-          Spoofing: 'HMAC-SHA256 session tokens present (lib/jarvis/auth.ts). Telegram bot verified by token. ✓',
-          Tampering: 'Git SSH key rotation done. HTTPS PAT backed up in .env.local only. Monitor: no unsigned webhook endpoints.',
-          Repudiation: 'Trajectory records + execution audit in Upstash. Consider: add tamper-evident log hash chain.',
-          InformationDisclosure: 'Guardian Protocol blocks .env access. Check: API routes returning stack traces to client.',
-          DenialOfService: 'Rate limiting shield in middleware.ts. Cloud runner e2-micro has limited RAM — monitor memory-exhaustion vectors.',
-          ElevationOfPrivilege: 'No RBAC beyond single-user model (Sir). Directive 01 prevents privilege escalation. ✓',
-        } : null;
-
+        const report = await executeEnterpriseSastAudit();
         return {
           success: true,
           result: {
-            auditScope: scope,
-            findingsCount: findings.length,
-            findings: findings.sort((a, b) => {
-              const order = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-              return (order[a.severity as keyof typeof order] ?? 4) - (order[b.severity as keyof typeof order] ?? 4);
-            }),
-            strideAnalysis,
-            recommendation: findings.length === 0
-              ? '✅ No static patterns matched. Run npm audit manually for dependency CVEs.'
-              : `⚠️ ${findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length} HIGH/CRITICAL findings require attention.`,
+            securityScore: report.securityScore,
+            status: report.status,
+            totalFindings: report.totalFindings,
+            criticalCount: report.criticalCount,
+            highCount: report.highCount,
+            mediumCount: report.mediumCount,
+            lowCount: report.lowCount,
+            findings: report.findings,
+            secretScan: report.secretScan,
+            strideAnalysis: report.stride,
+            auditDurationMs: report.auditDurationMs,
+            recommendation: report.totalFindings === 0
+              ? '✅ Exemplary Security Posture. Zero OWASP Top-10 drifts or secret leaks detected.'
+              : `⚠️ ${report.criticalCount + report.highCount} Critical/High findings identified. Immediate remediation recommended.`,
           },
+        };
+      }
+
+      case 'scan_workspace_secrets': {
+        const targetDir = args.targetDir || process.cwd();
+        const report = await scanWorkspaceForSecrets(targetDir);
+        return {
+          success: true,
+          result: report,
         };
       }
 
