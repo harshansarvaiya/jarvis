@@ -26,6 +26,7 @@ import {
   jevUnifiedIngressTriage,
   jevPostGenCritic,
   jevAutonomousMemorySieve,
+  jevVerifyGroundingAndTruthfulness,
   JevToolCategory,
 } from './providers/jev';
 
@@ -1129,6 +1130,22 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       }
     } catch (prefErr) {
       console.warn('[Agent] Preference assimilation warning:', prefErr);
+    }
+    // Pre-Dispatch Empirical Grounding Critic Gate (TypeSafe Jev System One ~80ms)
+    if (process.env.TYPESAFE_API_KEY) {
+      try {
+        const groundingCheck = await jevVerifyGroundingAndTruthfulness(
+          lastUserMessage.content,
+          finalReply,
+          toolCallsExecuted
+        );
+        if (!groundingCheck.isGrounded && groundingCheck.unverifiedClaimsDetected) {
+          console.warn('[AgentShield / Jev Grounding Critic] ⚠️ Flagged ungrounded empirical affirmation in outbound response');
+          finalReply += `\n\n> ⚠️ *[Grounding Protocol Note: Empirical state affirmation unverified by active tool execution in this turn.]*`;
+        }
+      } catch (groundingErr) {
+        console.warn('[Agent] Grounding critic pass warning:', groundingErr);
+      }
     }
 
     const latencyMs = Date.now() - startTime;
