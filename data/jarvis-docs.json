@@ -1,5 +1,227 @@
 [
   {
+    "id": "doc-1789707567462-6xhh",
+    "title": "gstack Reuse Ladder & Anti-Overbuilding Codex",
+    "category": "ARCHITECTURE",
+    "totalChunks": 1,
+    "totalCharacters": 330,
+    "tags": [
+      "gstack",
+      "reuse",
+      "ladder",
+      "minimalism",
+      "sparc"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-18T04:59:27.474Z",
+    "updatedAt": "2026-09-18T04:59:27.474Z"
+  },
+  {
+    "id": "doc-1789707567426-c8un",
+    "title": "ECC AgentShield MCP & Tool Configuration Audit Pattern",
+    "category": "SECURITY",
+    "totalChunks": 1,
+    "totalCharacters": 431,
+    "tags": [
+      "agentshield",
+      "mcp",
+      "security",
+      "audit",
+      "tool-boundary"
+    ],
+    "isSensitive": true,
+    "createdAt": "2026-09-18T04:59:27.434Z",
+    "updatedAt": "2026-09-18T04:59:27.434Z"
+  },
+  {
+    "id": "doc-1789707567395-qjbz",
+    "title": "ECC Next.js 14 Route Handler & Middleware Security Pattern",
+    "category": "ARCHITECTURE",
+    "totalChunks": 1,
+    "totalCharacters": 513,
+    "tags": [
+      "nextjs",
+      "route-handler",
+      "middleware",
+      "auth",
+      "zod"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-18T04:59:27.404Z",
+    "updatedAt": "2026-09-18T04:59:27.404Z"
+  },
+  {
+    "id": "doc-1789707567360-9cdv",
+    "title": "Strict TypeScript Type Contracting & Any-Type Elimination",
+    "category": "REFACTORING",
+    "totalChunks": 1,
+    "totalCharacters": 397,
+    "tags": [
+      "typescript",
+      "types",
+      "interfaces",
+      "generics",
+      "strict"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-18T04:59:27.368Z",
+    "updatedAt": "2026-09-18T04:59:27.368Z"
+  },
+  {
+    "id": "doc-1789707567299-n8vj",
+    "title": "Telegram Gateway Long-Polling & Groq Voice Memo Processing",
+    "category": "INTEGRATION",
+    "totalChunks": 1,
+    "totalCharacters": 403,
+    "tags": [
+      "telegram",
+      "voice",
+      "groq",
+      "whisper",
+      "long-polling"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-18T04:59:27.307Z",
+    "updatedAt": "2026-09-18T04:59:27.307Z"
+  },
+  {
+    "id": "doc-1789707567200-s4jr",
+    "title": "VAPID Web Push Alerts & Lock-Screen Notification Dispatch",
+    "category": "NOTIFICATION",
+    "totalChunks": 1,
+    "totalCharacters": 437,
+    "tags": [
+      "push",
+      "vapid",
+      "pwa",
+      "safari",
+      "android",
+      "notifications"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-18T04:59:27.208Z",
+    "updatedAt": "2026-09-18T04:59:27.208Z"
+  },
+  {
+    "id": "doc-1789707567140-5dfe",
+    "title": "Louvain Memory Community Clustering & Sub-100ms Context Fetch",
+    "category": "DATA",
+    "totalChunks": 1,
+    "totalCharacters": 477,
+    "tags": [
+      "louvain",
+      "memory",
+      "upstash",
+      "redis",
+      "clustering"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-18T04:59:27.148Z",
+    "updatedAt": "2026-09-18T04:59:27.148Z"
+  },
+  {
+    "id": "doc-1789707567079-kjoj",
+    "title": "Directive 06 — Zero-Thrashing Infrastructure Protection Protocol",
+    "category": "INFRASTRUCTURE",
+    "totalChunks": 1,
+    "totalCharacters": 581,
+    "tags": [
+      "directive-06",
+      "gcp",
+      "e2-micro",
+      "cgroup",
+      "memory",
+      "docker-ban"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-18T04:59:27.087Z",
+    "updatedAt": "2026-09-18T04:59:27.087Z"
+  },
+  {
+    "id": "doc-1789707567027-8531",
+    "title": "AST Property Graph Exploration & Impact Analysis",
+    "category": "REFACTORING",
+    "totalChunks": 1,
+    "totalCharacters": 514,
+    "tags": [
+      "ast",
+      "codebase-memory",
+      "tree-sitter",
+      "graph",
+      "refactoring"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-18T04:59:27.035Z",
+    "updatedAt": "2026-09-18T04:59:27.035Z"
+  },
+  {
+    "id": "doc-1789707566999-gj3n",
+    "title": "Closed-Loop Test-Driven Development (TDD) & Verification Gate",
+    "category": "TESTING",
+    "totalChunks": 1,
+    "totalCharacters": 419,
+    "tags": [
+      "tdd",
+      "testing",
+      "verification",
+      "tsc",
+      "codeact"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-18T04:59:27.007Z",
+    "updatedAt": "2026-09-18T04:59:27.007Z"
+  },
+  {
+    "id": "doc-1789707566973-mgtk",
+    "title": "AgentShield & OWASP Top-10 Prompt/API Security Protocol",
+    "category": "SECURITY",
+    "totalChunks": 1,
+    "totalCharacters": 562,
+    "tags": [
+      "security",
+      "owasp",
+      "agentshield",
+      "prompt-injection",
+      "auth"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-18T04:59:26.980Z",
+    "updatedAt": "2026-09-18T04:59:26.980Z"
+  },
+  {
+    "id": "doc-1789707566896-s1tz",
+    "title": "Next.js 14/15 App Router & Server Component Boundary Protocol",
+    "category": "ARCHITECTURE",
+    "totalChunks": 1,
+    "totalCharacters": 577,
+    "tags": [
+      "nextjs",
+      "react",
+      "app-router",
+      "server-components",
+      "hydration"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-18T04:59:26.944Z",
+    "updatedAt": "2026-09-18T04:59:26.944Z"
+  },
+  {
+    "id": "doc-1789588446404-t9c3",
+    "title": "SPARC Spec: Graph RAG Integration",
+    "category": "SPARC_SPEC",
+    "totalChunks": 1,
+    "totalCharacters": 321,
+    "tags": [
+      "sparc",
+      "architecture",
+      "design-spec",
+      "graph-rag-integration"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-16T19:54:06.830Z",
+    "updatedAt": "2026-09-16T19:54:06.830Z"
+  },
+  {
     "id": "doc-1789537942689-ppfj",
     "title": "Master Operational Profile: Sir (Harshan Kishor Sarvaiya)",
     "category": "CREATOR_PROFILE",

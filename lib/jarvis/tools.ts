@@ -2565,37 +2565,20 @@ export async function executeJarvisTool(
       }
 
       case 'delegate_subagent': {
-        const { agentId, instruction } = args;
-        const profile = getSpecializedAgentProfile(agentId);
-        if (!profile) {
-          return { success: false, result: null, error: `Subagent "${agentId}" not found in registry.` };
+        const { agentId, instruction, contextPayload } = args;
+        if (!agentId || !instruction) {
+          return { success: false, result: null, error: 'agentId and instruction required for delegate_subagent.' };
         }
-
-        const findings: any = {
-          delegatedAgentId: profile.id,
-          delegatedAgentName: profile.name,
-          role: profile.role,
-          category: profile.category,
+        const { executeSubagentTask } = await import('./subagent-swarm');
+        const swarmResult = await executeSubagentTask({
+          agentId,
           instruction,
-          systemMission: profile.systemPrompt,
-          recommendedModel: profile.recommendedModel,
-          delegationStatus: 'SUCCESS',
-        };
-
-        if (profile.id === 'security-auditor') {
-          const auditResult = await executeJarvisTool('run_security_audit', { scope: 'full' });
-          findings.auditFindings = auditResult.result;
-        } else if (profile.id === 'build-error-resolver') {
-          const compileCheck = await executeJarvisTool('runCompilerVerification', { mode: 'check' });
-          findings.compilerStatus = compileCheck.result;
-        } else if (profile.id === 'performance-optimizer') {
-          const infraStatus = await executeJarvisTool('inspect_infrastructure', { fullHealthCheck: true });
-          findings.infrastructureStatus = infraStatus.result;
-        }
+          contextPayload,
+        });
 
         return {
-          success: true,
-          result: findings,
+          success: swarmResult.status === 'SUCCESS',
+          result: swarmResult,
         };
       }
 
