@@ -356,15 +356,20 @@ async function processDirective(
       { ...assistantMsgRecord, source: 'jarvis', channel: 'telegram' },
     ]);
 
-    // 4. Format Output for Telegram
+    // 4. Format Output for Telegram (Automatic Persona Assignment Header)
     let responseText = '';
 
     if (isVoiceInput) {
       responseText += `🎙️ *[Transcribed]*: _"${cleanUserText}"_\n\n`;
     }
 
+    const isFriday = result.telemetry?.persona === 'FRIDAY';
+    const personaHeader = isFriday ? '🛡️ **F.R.I.D.A.Y.**' : '⚡ **J.A.R.V.I.S.**';
+
     if (delegatedProfile) {
-      responseText += `🤖 *[Subagent: ${delegatedProfile.name}]*\n\n`;
+      responseText += `${personaHeader} ➔ *[Specialist: ${delegatedProfile.name}]*\n\n`;
+    } else {
+      responseText += `${personaHeader}\n\n`;
     }
 
     responseText += result.reply;

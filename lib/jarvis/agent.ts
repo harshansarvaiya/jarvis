@@ -13,6 +13,7 @@ import {
   OperationalArchetype,
   OrchestrationTelemetry,
   detectActivePersona,
+  detectActivePersonaAsync,
   ActivePersona,
 } from './orchestrator';
 import { appendUniversalChatMessage, appendAgentChatMessage, getCrossChannelContext } from './storage';
@@ -173,8 +174,8 @@ export async function runJarvisAgent(
     };
   }
 
-  // 2. Persona Detection & 4-Tier Cognitive Recall
-  const { persona, explicit: personaExplicit } = detectActivePersona(lastUserMessage.content);
+  // 2. Persona Detection (Powered by TypeSafe Jev) & 4-Tier Cognitive Recall
+  const { persona, explicit: personaExplicit } = await detectActivePersonaAsync(lastUserMessage.content);
 
   let recalledEpisodes: any[] = [];
   let cognitiveContextPrompt = '';
@@ -347,6 +348,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
                 archetype,
                 failoverOccurred: groqModel !== primaryModel,
                 recalledEpisodesCount: recalledEpisodes.length,
+                persona,
               },
             };
           }
@@ -389,6 +391,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             archetype,
             failoverOccurred: false,
             recalledEpisodesCount: recalledEpisodes.length,
+            persona,
           },
         };
       }
@@ -424,6 +427,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             archetype,
             failoverOccurred: false,
             recalledEpisodesCount: recalledEpisodes.length,
+            persona,
           },
         };
       }
@@ -463,6 +467,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             archetype,
             failoverOccurred: false,
             recalledEpisodesCount: recalledEpisodes.length,
+            persona,
           },
         };
       }
@@ -496,6 +501,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           archetype,
           failoverOccurred: false,
           recalledEpisodesCount: recalledEpisodes.length,
+          persona,
         },
       };
     }
@@ -513,6 +519,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         archetype: 'REFLEX_SPEED',
         failoverOccurred: false,
         recalledEpisodesCount: 0,
+        persona,
       },
     };
   }
@@ -736,6 +743,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
                     archetype,
                     failoverOccurred: true,
                     recalledEpisodesCount: recalledEpisodes.length,
+                    persona,
                   },
                 };
               }
@@ -776,6 +784,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
                 archetype,
                 failoverOccurred: true,
                 recalledEpisodesCount: recalledEpisodes.length,
+                persona,
               },
             };
           }
@@ -799,6 +808,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           archetype,
           failoverOccurred: true,
           recalledEpisodesCount: 0,
+          persona,
         },
         error: lastErrorText,
       };
