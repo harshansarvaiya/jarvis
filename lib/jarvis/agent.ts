@@ -1,6 +1,6 @@
 import { JARVIS_SYSTEM_PROMPT, CORE_DIRECTIVES, validateActionAgainstDirectives } from './directives';
 import { getTasks, getMemories, addMemory, recordEvolution } from './memory';
-import { JARVIS_TOOLS, executeJarvisTool } from './tools';
+import { JARVIS_TOOLS, getPrunedJarvisTools, executeJarvisTool } from './tools';
 import { findCorrelatedEpisodes, formatRecalledEpisodesPrompt } from './recall';
 import { queryKnowledgeBase, formatKnowledgePromptContext } from './rag';
 import { isVertexAIAvailable, callVertexAIGenerate, mapToVertexModel } from './vertex';
@@ -22,6 +22,12 @@ import { compressSystemPrompt, compressToolOutput } from './compression';
 
 import { getSpecializedAgentProfile, selectOptimalSubagent, selectOptimalSubagentAsync } from './agents-registry';
 import { sanitizeInboundText, sanitizeInboundTextAsync } from './security/shield';
+import {
+  jevUnifiedIngressTriage,
+  jevPostGenCritic,
+  jevAutonomousMemorySieve,
+  JevToolCategory,
+} from './providers/jev';
 
 export interface ChatMessage {
   id?: string;
@@ -146,11 +152,44 @@ export async function runJarvisAgent(
     };
   }
 
-  // 1. AgentShield Inbound Firewall (Directive 01 Guardian Protocol + TypeSafe Jev)
-  const shieldResult = await sanitizeInboundTextAsync(lastUserMessage.content);
-  if (shieldResult.threatDetected) {
-    console.warn(`[AgentShield Sentry] 🛡️ Neutralized inbound prompt injection threat (Risk=${shieldResult.riskScore}):`, shieldResult.flags);
-    lastUserMessage.content = shieldResult.sanitized;
+  // 1. Unified Speculative Ingress Fan-Out (TypeSafe AI Jev System One: Sub-120ms Ingress)
+  let persona: ActivePersona = 'JARVIS';
+  let personaExplicit = false;
+  let toolCategory: JevToolCategory = 'ALL_TOOLS';
+  let dynamicSubagentId: string | null = options.specializedAgentId || null;
+
+  if (process.env.TYPESAFE_API_KEY) {
+    try {
+      const triage = await jevUnifiedIngressTriage(lastUserMessage.content);
+      persona = triage.persona;
+      toolCategory = triage.toolCategory;
+      if (!dynamicSubagentId && triage.subagentId) {
+        dynamicSubagentId = triage.subagentId;
+      }
+      if (triage.isThreat) {
+        console.warn(`[AgentShield / Jev Sentry] 🛡️ Neutralized inbound threat (Risk=${triage.threatProbability})`);
+        const shieldResult = await sanitizeInboundTextAsync(lastUserMessage.content);
+        lastUserMessage.content = shieldResult.sanitized;
+      }
+    } catch (jevErr) {
+      console.warn('[Agent] Jev unified ingress triage error:', jevErr);
+    }
+  } else {
+    // Heuristic Fallbacks
+    const shieldResult = await sanitizeInboundTextAsync(lastUserMessage.content);
+    if (shieldResult.threatDetected) {
+      lastUserMessage.content = shieldResult.sanitized;
+    }
+    const detected = detectActivePersona(lastUserMessage.content);
+    persona = detected.persona;
+    personaExplicit = detected.explicit;
+  }
+
+  // Explicit keyword override takes precedence
+  const explicitCheck = detectActivePersona(lastUserMessage.content);
+  if (explicitCheck.explicit) {
+    persona = explicitCheck.persona;
+    personaExplicit = true;
   }
 
   // 1.1 Safety & Directive Check (Guardian Protocol)
@@ -173,9 +212,6 @@ export async function runJarvisAgent(
       },
     };
   }
-
-  // 2. Persona Detection (Powered by TypeSafe Jev) & 4-Tier Cognitive Recall
-  const { persona, explicit: personaExplicit } = await detectActivePersonaAsync(lastUserMessage.content);
 
   let recalledEpisodes: any[] = [];
   let cognitiveContextPrompt = '';
@@ -525,15 +561,16 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
   }
 
   try {
-    const geminiTools = [
+    const prunedToolsList = getPrunedJarvisTools(toolCategory);
+    const geminiTools = prunedToolsList.length > 0 ? [
       {
-        functionDeclarations: JARVIS_TOOLS.map((t) => ({
+        functionDeclarations: prunedToolsList.map((t) => ({
           name: t.name,
           description: t.description,
           parameters: t.parameters,
         })),
       },
-    ];
+    ] : undefined;
 
     const contents: any[] = [];
     const generationTemperature = archetype === 'DEEP_SYNTHESIS' ? 0.6 : 0.5;
@@ -1074,11 +1111,21 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       }
     }
 
-    // Pillar 5: Continuous Heuristic & Preference Assimilation
+    // Pillar 5: Autonomous Epistemic Heuristic & Preference Assimilation (TypeSafe Jev + Directive 03)
     try {
       const userText = lastUserMessage.content.toLowerCase();
       if (/prefer|always|never|my rule|i want|remember that|from now on|i need you to/i.test(userText)) {
         addMemory('PREFERENCE', `Sir's Explicit Preference: "${lastUserMessage.content.slice(0, 300)}"`, 'Directive 03 Evolutionary Adaptation');
+      } else if (process.env.TYPESAFE_API_KEY && lastUserMessage.content.length > 20) {
+        // Asynchronous non-blocking epistemic sieve
+        jevAutonomousMemorySieve(lastUserMessage.content, finalReply)
+          .then((sieve) => {
+            if (sieve.shouldMemorize && sieve.category) {
+              console.log(`[Jev Epistemic Sieve] 🧠 Auto-assimilated permanent ${sieve.category}: "${lastUserMessage.content.slice(0, 80)}"`);
+              addMemory(sieve.category as any, `Synthesized Insight: "${lastUserMessage.content.slice(0, 250)}" -> "${finalReply.slice(0, 250)}"`, 'Directive 03 Jev Epistemic Sieve');
+            }
+          })
+          .catch((sErr) => console.warn('[Jev Memory Sieve] Non-blocking warning:', sErr));
       }
     } catch (prefErr) {
       console.warn('[Agent] Preference assimilation warning:', prefErr);

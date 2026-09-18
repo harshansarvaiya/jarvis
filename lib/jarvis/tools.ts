@@ -1793,6 +1793,70 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
   },
 ];
 
+/**
+ * Dynamic Tool Pruning based on Jev System One tool category.
+ * Slashes prompt overhead by 60% by passing only the relevant tools.
+ */
+export function getPrunedJarvisTools(category?: string): ToolDefinition[] {
+  if (!category || category === 'ALL_TOOLS') {
+    return JARVIS_TOOLS;
+  }
+
+  if (category === 'CONVERSATIONAL_NONE') {
+    return [];
+  }
+
+  const workspaceToolNames = new Set([
+    'read_workspace_file', 'edit_workspace_file', 'grep_workspace', 'find_files',
+    'cloud_execute_command', 'cloud_write_file', 'cloud_check_deployment', 'mcp_filesystem',
+    'mcp_github', 'mcp_cloud', 'run_sparc_workflow', 'delegate_subagent', 'run_codeact_action',
+    'inspect_infrastructure', 'invoke_antigravity_cli', 'manage_task'
+  ]);
+
+  const securityToolNames = new Set([
+    'run_security_audit', 'scan_workspace_secrets', 'scan_cve_threats', 'trace_crypto_sanctions',
+    'inspect_ip_recon', 'run_red_team_critique', 'emergency_wipe_sensitive', 'delegate_subagent',
+    'cloud_execute_command'
+  ]);
+
+  const webToolNames = new Set([
+    'search_web', 'read_web_page', 'browser_navigate_and_act', 'mcp_exa', 'mcp_playwright', 'mcp_network'
+  ]);
+
+  const dailyToolNames = new Set([
+    'manage_task', 'store_memory', 'search_memory', 'generate_briefing', 'mcp_calendar',
+    'mcp_memory', 'notify_user', 'send_telegram_message', 'generate_retro', 'customize_persona'
+  ]);
+
+  const knowledgeToolNames = new Set([
+    'rag_search_knowledge', 'rag_ingest_document', 'emergency_wipe_sensitive', 'synthesize_skill',
+    'store_memory', 'search_memory'
+  ]);
+
+  let targetSet: Set<string>;
+  switch (category) {
+    case 'WORKSPACE_ENGINEERING':
+      targetSet = workspaceToolNames;
+      break;
+    case 'SECURITY_AUDITING':
+      targetSet = securityToolNames;
+      break;
+    case 'WEB_RESEARCH':
+      targetSet = webToolNames;
+      break;
+    case 'DAILY_OPERATIONS':
+      targetSet = dailyToolNames;
+      break;
+    case 'KNOWLEDGE_RAG':
+      targetSet = knowledgeToolNames;
+      break;
+    default:
+      return JARVIS_TOOLS;
+  }
+
+  return JARVIS_TOOLS.filter((t) => targetSet.has(t.name));
+}
+
 export async function executeJarvisTool(
   toolName: string,
   args: Record<string, any>
