@@ -193,6 +193,18 @@ export async function runJarvisAgent(
     personaExplicit = true;
   }
 
+  // GitHub Repository & Architecture Query Guarantee
+  const isGithubOrRepoQuery =
+    /github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+/i.test(lastUserMessage.content) ||
+    /\b(repository|repo|teardown|architecture of)\b/i.test(lastUserMessage.content);
+
+  if (isGithubOrRepoQuery) {
+    persona = 'FRIDAY';
+    if (toolCategory === 'CONVERSATIONAL_NONE') {
+      toolCategory = 'WEB_RESEARCH';
+    }
+  }
+
   // 1.1 Safety & Directive Check (Guardian Protocol)
   const directiveCheck = validateActionAgainstDirectives(lastUserMessage.content);
   if (!directiveCheck.allowed) {
@@ -576,10 +588,14 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     const contents: any[] = [];
     const generationTemperature = archetype === 'DEEP_SYNTHESIS' ? 0.6 : 0.5;
 
+    const repoTeardownAnchor = isGithubOrRepoQuery
+      ? `\n\n[MANDATORY GITHUB REPOSITORY & ARCHITECTURAL TEARDOWN STANDARD]: Sir has provided a GitHub repository / architecture for evaluation. You are strictly mandated to produce an exhaustive, Staff-level architectural teardown covering: 1. Anatomy & Core Execution Primitives, 2. Compliance with Directives 01 & 06, 3. Operational Trade-offs & Security/Latency, 4. Concrete Extraction Vector for J.A.R.V.I.S. (exact modules & radar admission). DO NOT truncate into a superficial 1-2 sentence summary.`
+      : '';
+
     const systemInstruction = {
       parts: [
         {
-          text: `${personaPromptBlock}\n\n${JARVIS_SYSTEM_PROMPT}\n\n${contextPrompt}\n\n[MANDATORY EMPIRICAL GROUNDING & ANTI-HALLUCINATION ANCHOR]: Speak directly to Sir as ${persona}. Fluid natural paragraphs. Strictly ban textbook listicles and newsletter headings. NEVER claim you tested an API or executed a command unless you actually invoked a tool in this turn and inspected its verbatim stdout. You operate on Google Cloud VM (antigravity-cloud-runner); ngrok is permanently decommissioned. If asked about VM or infrastructure health, ALWAYS execute inspect_infrastructure or check_runner_vm first.`,
+          text: `${personaPromptBlock}\n\n${JARVIS_SYSTEM_PROMPT}\n\n${contextPrompt}\n\n[MANDATORY EMPIRICAL GROUNDING & ANTI-HALLUCINATION ANCHOR]: Speak directly to Sir as ${persona}. Fluid natural paragraphs. Strictly ban textbook listicles and newsletter headings. NEVER claim you tested an API or executed a command unless you actually invoked a tool in this turn and inspected its verbatim stdout. You operate on Google Cloud VM (antigravity-cloud-runner); ngrok is permanently decommissioned. If asked about VM or infrastructure health, ALWAYS execute inspect_infrastructure or check_runner_vm first.${repoTeardownAnchor}`,
         },
       ],
     };
