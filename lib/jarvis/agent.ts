@@ -17,7 +17,7 @@ import {
 import { appendUniversalChatMessage, appendAgentChatMessage, getCrossChannelContext } from './storage';
 import { getPersonaConfig, buildPersonaPromptBlock } from './persona';
 
-import { getSpecializedAgentProfile } from './agents-registry';
+import { getSpecializedAgentProfile, selectOptimalSubagent } from './agents-registry';
 
 export interface ChatMessage {
   id?: string;
@@ -222,16 +222,19 @@ export async function runJarvisAgent(
     console.warn('[Agent] Persona config loading warning:', personaErr);
   }
 
-  // 3.7. Specialized Subagent Profile Ingestion (Inspired by affaan-m/ECC)
+  // 3.7. Autonomous & Explicit Specialized Subagent Assignment (Inspired by ECC & gstack)
   let specializedAgentBlock = '';
-  const delegatedAgent = options.specializedAgentId ? getSpecializedAgentProfile(options.specializedAgentId) : undefined;
+  const delegatedAgent = options.specializedAgentId
+    ? getSpecializedAgentProfile(options.specializedAgentId)
+    : selectOptimalSubagent(lastUserMessage.content);
+
   if (delegatedAgent) {
     specializedAgentBlock = `
-[SPECIALIZED SUBAGENT PROFILE ENGAGED]:
-- Active Subagent: ${delegatedAgent.name} (Role: ${delegatedAgent.role}, Category: ${delegatedAgent.category})
+[AUTONOMOUS SUBAGENT DELEGATION ACTIVE]:
+- Delegated Specialist: ${delegatedAgent.name} (Role: ${delegatedAgent.role}, Category: ${delegatedAgent.category})
 - Specialized Mission & Standard: ${delegatedAgent.systemPrompt}
 - Prioritized Domain Tools: ${delegatedAgent.tools.join(', ')}
-You must execute this directive strictly embodying the depth, rigor, and domain expertise of this specialized profile.`;
+You (${persona === 'FRIDAY' ? 'F.R.I.D.A.Y.' : 'J.A.R.V.I.S.'}) have autonomously engaged this specialist. Fulfill the directive embodying the depth, rigor, and verified domain expertise of this subagent.`;
   }
 
   const contextPrompt = `

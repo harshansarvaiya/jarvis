@@ -121,3 +121,64 @@ export function getSpecializedAgentProfile(idOrRole: string): AgentProfile | und
 export function listSpecializedAgents(): AgentProfile[] {
   return [...TOP_HIGH_ROI_AGENTS];
 }
+
+/**
+ * Autonomous Subagent Selector (Inspired by ECC & gstack)
+ * Evaluates semantic triggers to automatically assign directives to the optimal
+ * specialized subagent without requiring Sir to manually specify slash commands.
+ */
+export function selectOptimalSubagent(prompt: string): AgentProfile | undefined {
+  const clean = prompt.toLowerCase();
+
+  // 1. Security & Sentry
+  if (/\b(security|owasp|auth leak|secret leak|cso|vulnerab|exploit|threat scan|penetration|agentshield|api key leak)\b/i.test(clean)) {
+    return getSpecializedAgentProfile('security-auditor');
+  }
+
+  // 2. Build & Compiler Verification
+  if (/\b(build error|compile error|tsc error|compiler|type error|typescript error|tsc --noemit|fix types|typecheck|type check)\b/i.test(clean)) {
+    return getSpecializedAgentProfile('build-error-resolver');
+  }
+
+  // 3. Next.js App Router & Edge
+  if (/\b(next\.?js|app router|server component|client component|hydration mismatch|edge route|vercel edge|nextjs)\b/i.test(clean)) {
+    return getSpecializedAgentProfile('nextjs-app-router-expert');
+  }
+
+  // 4. Performance & Infrastructure Sentry
+  if (/\b(performance|latency|memory leak|cgroup|e2-micro|vm thrash|cpu throttle|sub-100ms|ram usage|memory usage|swap thrash)\b/i.test(clean)) {
+    return getSpecializedAgentProfile('performance-optimizer');
+  }
+
+  // 5. Architecture & Systems Topology
+  if (/\b(architecture|component topology|modular boundary|system design|subsystem|circular depend|sparc workflow|component boundaries)\b/i.test(clean)) {
+    return getSpecializedAgentProfile('architecture-expert');
+  }
+
+  // 6. Test-Driven Development (TDD)
+  if (/\b(tdd|unit test|test contract|test suite|test coverage|regression test|vitest|jest|write tests)\b/i.test(clean)) {
+    return getSpecializedAgentProfile('tdd-testing-engineer');
+  }
+
+  // 7. Universal Storage & Database Architecture
+  if (/\b(upstash|redis cluster|database schema|state persistence|memory domains|louvain clustering|redis key|dual-mode storage)\b/i.test(clean)) {
+    return getSpecializedAgentProfile('database-architect');
+  }
+
+  // 8. OSINT & Cyber Threat Radar
+  if (/\b(osint|ip recon|ip lookup|crypto sanction|ofac|cve advisory|whois lookup|threat intel|wallet trace)\b/i.test(clean)) {
+    return getSpecializedAgentProfile('osint-threat-analyst');
+  }
+
+  // 9. Clean Code & Refactoring
+  if (/\b(refactor|clean code|dead code|code smell|reuse ladder|code duplication|minimum diff|cleanup code)\b/i.test(clean)) {
+    return getSpecializedAgentProfile('refactoring-specialist');
+  }
+
+  // 10. CodeAct Execution
+  if (/\b(codeact|atomic code action|ast inspection|compiler verification loop)\b/i.test(clean)) {
+    return getSpecializedAgentProfile('codeact-executor');
+  }
+
+  return undefined;
+}

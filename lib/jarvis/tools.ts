@@ -31,6 +31,7 @@ import {
   wipeSensitiveKnowledge,
   wipeAllKnowledge,
 } from './rag';
+import { getSpecializedAgentProfile, selectOptimalSubagent } from './agents-registry';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
@@ -1678,6 +1679,36 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: 'delegate_subagent',
+    description: 'Autonomously delegate a specialized task, deep audit, or domain analysis to one of the Top 10 High-ROI specialized subagent archetypes (e.g. "security-auditor", "architecture-expert", "build-error-resolver", "performance-optimizer", "nextjs-app-router-expert", "tdd-testing-engineer", "database-architect", "osint-threat-analyst", "refactoring-specialist", "codeact-executor").',
+    parameters: {
+      type: 'object',
+      properties: {
+        agentId: {
+          type: 'string',
+          enum: [
+            'security-auditor',
+            'architecture-expert',
+            'build-error-resolver',
+            'nextjs-app-router-expert',
+            'tdd-testing-engineer',
+            'performance-optimizer',
+            'database-architect',
+            'osint-threat-analyst',
+            'refactoring-specialist',
+            'codeact-executor',
+          ],
+          description: 'The ID of the specialized subagent to invoke.',
+        },
+        instruction: {
+          type: 'string',
+          description: 'The specific task, audit directive, or problem statement for the subagent to execute.',
+        },
+      },
+      required: ['agentId', 'instruction'],
+    },
+  },
 ];
 
 export async function executeJarvisTool(
@@ -2549,12 +2580,39 @@ export async function executeJarvisTool(
         return { success: true, result: report };
       }
 
-      case 'inspect_ip_recon': {
-        const { inspectIpRecon } = await import('./osint');
-        const report = await inspectIpRecon({
-          target: args.target,
-        });
-        return { success: true, result: report };
+      case 'delegate_subagent': {
+        const { agentId, instruction } = args;
+        const profile = getSpecializedAgentProfile(agentId);
+        if (!profile) {
+          return { success: false, result: null, error: `Subagent "${agentId}" not found in registry.` };
+        }
+
+        const findings: any = {
+          delegatedAgentId: profile.id,
+          delegatedAgentName: profile.name,
+          role: profile.role,
+          category: profile.category,
+          instruction,
+          systemMission: profile.systemPrompt,
+          recommendedModel: profile.recommendedModel,
+          delegationStatus: 'SUCCESS',
+        };
+
+        if (profile.id === 'security-auditor') {
+          const auditResult = await executeJarvisTool('run_security_audit', { scope: 'full' });
+          findings.auditFindings = auditResult.result;
+        } else if (profile.id === 'build-error-resolver') {
+          const compileCheck = await executeJarvisTool('runCompilerVerification', { mode: 'check' });
+          findings.compilerStatus = compileCheck.result;
+        } else if (profile.id === 'performance-optimizer') {
+          const infraStatus = await executeJarvisTool('inspect_infrastructure', { fullHealthCheck: true });
+          findings.infrastructureStatus = infraStatus.result;
+        }
+
+        return {
+          success: true,
+          result: findings,
+        };
       }
 
       default:
