@@ -147,5 +147,38 @@
       "Home Assistant MQTT / Matter Ingress Adapter"
     ],
     "addedAt": "2026-09-16T15:52:00Z"
+  },
+  {
+    "name": "patchy631/ai-engineering-hub",
+    "url": "https://github.com/patchy631/ai-engineering-hub",
+    "domain": "AI Engineering & Multi-Agent Architecture",
+    "status": "ACTIVE_EXTRACTION",
+    "extractedFeatures": [
+      "Reciprocal Rank Fusion (RRF, k=60) Hybrid Vector + BM25 Memory",
+      "Corrective RAG (CRAG) Self-Grading Retrieval & Anti-Hallucination Guard",
+      "Speculative LPU Multi-Engine Orchestration (Groq LPU -> Vertex Gemini)",
+      "Dynamic Context Compression & Needle Packing"
+    ],
+    "futureRoadmap": [
+      "Agentic Graph Routing with LangGraph Patterns",
+      "Self-Reflective Multi-Agent Evaluation Sandboxes"
+    ],
+    "addedAt": "2026-09-18T13:40:00Z"
+  },
+  {
+    "name": "affaan-m/everything-claude-code",
+    "url": "https://github.com/affaan-m/everything-claude-code",
+    "domain": "Specialized Subagent Archetypes & Tool Harness",
+    "status": "ACTIVE_EXTRACTION",
+    "extractedFeatures": [
+      "Top 10 High-ROI Curated Agent Profiles Registry (`lib/jarvis/agents-registry.ts`)",
+      "Autonomous Subagent Swarm Execution Engine (`lib/jarvis/subagent-swarm.ts`)",
+      "Investigate Iron Law & SPARC Engineering Codex"
+    ],
+    "futureRoadmap": [
+      "Dynamic Subagent Parallel Fan-Out Execution",
+      "Subagent Evaluation Benchmarks"
+    ],
+    "addedAt": "2026-09-18T14:40:00Z"
   }
 ]
