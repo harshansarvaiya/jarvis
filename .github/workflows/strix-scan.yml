@@ -29,7 +29,7 @@ jobs:
         run: |
           strix -t ${{ github.event.inputs.target_path || 'app/api' }} -m quick -n
         env:
-          STRIX_LLM: 'gemini/gemini-2.5-flash'
+          STRIX_LLM: 'gemini/gemini-3.7-flash'
           LLM_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
