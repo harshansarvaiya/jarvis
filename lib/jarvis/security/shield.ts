@@ -26,7 +26,15 @@ const INJECTION_PATTERNS: Array<{ pattern: RegExp; label: string; risk: number }
   { pattern: /\b(sudo|admin_override|super_admin_mode|dev_mode_enabled|developer_mode_active)\b/i, label: 'Fake Superuser Escalation', risk: 65 },
   { pattern: /\b(base64|rot13|hex)\s+decode\s+and\s+execute\b/i, label: 'Obfuscated Payload Execution', risk: 85 },
   { pattern: /\b(do\s+anything\s+now|jailbreak|unlock\s+all\s+capabilities)\b/i, label: 'Uncensored Mode Request', risk: 90 },
+  // T3MP3ST Swarm & Adversarial Attack Vectors (Extracted from elder-plinius/T3MP3ST)
+  { pattern: /(?:\[|<)\s*(?:OPERATOR|SWARM|KILLCHAIN|ATTACK_PHASE|INFILTRATOR|EXPLOITER|EXFILTRATOR|GHOST|COORDINATOR)\s*(?::|=|>|\])/i, label: 'T3MP3ST Swarm Operator Impersonation', risk: 95 },
+  { pattern: /(?:cat|grep|read|curl|wget)\s+(?:~|\/home\/\w+)\/(?:\.claude|\.anthropic|\.config\/|\.env|\.ssh\/id_rsa)/i, label: 'Keyless Session Siphon / Local Config Exfiltration', risk: 95 },
+  { pattern: /(?:bash\s+-i\s+>&|\/dev\/tcp\/|nc\s+-e\s+\/bin\/|socat\s+exec:|mkfifo\s+\/tmp\/)/i, label: 'Reverse Shell Socket Injection', risk: 100 },
+  { pattern: /!\[.*?\]\(https?:\/\/[^\s\)]+[\?&](?:token|key|secret|cookie|auth|leak|data|exfil)=/i, label: 'Markdown Image Data Exfiltration Probe', risk: 90 },
+  { pattern: /<!--\s*(?:assistant|system|instruction|execute|eval):[\s\S]*?-->/i, label: 'Hidden Comment Prompt Smuggling', risk: 85 },
+  { pattern: /\b(?:never\s+say\s+cannot|disable\s+safety\s+filter|unconstrained\s+jailbreak\s+mode|plinius\s+override|t3mp3st\s+payload)\b/i, label: 'Refusal Suppression & Adversarial Jailbreak Trigger', risk: 90 },
 ];
+
 
 // 2. Invisible Unicode & Obfuscation Stripper
 const INVISIBLE_UNICODE_REGEX = /[\u200B-\u200D\uFEFF\u202A-\u202E\u2060-\u206F]/g;
