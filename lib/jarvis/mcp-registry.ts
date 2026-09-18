@@ -62,7 +62,7 @@ export const MCP_SERVERS = {
   },
   cloud: {
     name: 'mcp:cloud',
-    description: 'Vercel Edge and Ngrok tunnel telemetry, status inspection, and health auditing.',
+    description: 'Vercel Edge and Cloud Runner VM telemetry, status inspection, and health auditing.',
     execute: executeCloudMCP,
   },
   network: {

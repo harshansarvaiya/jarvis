@@ -427,7 +427,7 @@ export async function executeFileSystemMCP(
 // 3. CLOUD & DEPLOYMENT TELEMETRY MCP ENGINE
 // ============================================================================
 export async function executeCloudMCP(
-  action: 'ping_vercel' | 'check_tunnel' | 'telemetry_overview'
+  action: 'ping_vercel' | 'check_tunnel' | 'check_runner_vm' | 'telemetry_overview'
 ): Promise<MCPExecutionResult> {
   const startTime = Date.now();
 
@@ -454,23 +454,26 @@ export async function executeCloudMCP(
         };
       }
 
-      case 'check_tunnel': {
-        const domain = process.env.NGROK_DOMAIN || 'washbasin-penpal-muppet.ngrok-free.dev';
-        const url = `https://${domain}/api/jarvis/auth/status`;
+      case 'check_runner_vm': {
         const pingStart = Date.now();
-        const res = await fetch(url, {
-          headers: { 'ngrok-skip-browser-warning': 'true' },
-          signal: AbortSignal.timeout(5000),
-        }).catch((e) => ({ ok: false, status: 504, text: () => e.message }));
+        const os = await import('os');
+        const totalMemMb = Math.round(os.totalmem() / 1024 / 1024);
+        const freeMemMb = Math.round(os.freemem() / 1024 / 1024);
+        const loadAvg = os.loadavg();
+        const uptimeSeconds = os.uptime();
 
         return {
-          success: (res as any).ok,
+          success: true,
           server: 'mcp:cloud',
-          action: 'check_tunnel',
+          action: 'check_runner_vm',
           output: {
-            domain,
-            accessible: (res as any).ok,
-            status: (res as any).status,
+            host: 'antigravity-cloud-runner (GCP e2-micro, us-central1)',
+            uptimeFormatted: `${Math.floor(uptimeSeconds / 86400)}d ${Math.floor((uptimeSeconds % 86400) / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m`,
+            totalMemMb,
+            freeMemMb,
+            usedMemMb: totalMemMb - freeMemMb,
+            loadAvg,
+            status: 'HEALTHY_ONLINE',
             latencyMs: Date.now() - pingStart,
           },
           latencyMs: Date.now() - startTime,

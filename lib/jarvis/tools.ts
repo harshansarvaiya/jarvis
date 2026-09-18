@@ -1132,13 +1132,13 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'mcp_cloud',
-    description: 'Check Vercel Edge production deployment status, Ngrok static tunnel, or server telemetry.',
+    description: 'Check Vercel Edge production deployment status, Cloud Runner VM telemetry, or server health.',
     parameters: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
-          enum: ['ping_vercel', 'check_tunnel', 'telemetry_overview'],
+          enum: ['ping_vercel', 'check_runner_vm', 'telemetry_overview'],
           description: 'Cloud inspection action.',
         },
       },
@@ -2103,7 +2103,7 @@ export async function executeJarvisTool(
             },
             deploymentTopology: {
               cloudProduction: 'Vercel Edge (https://jarvis-iota-beige.vercel.app)',
-              encryptedTunnel: 'Ngrok static uplink (washbasin-penpal-muppet.ngrok-free.dev)',
+              cloudRunnerHost: 'Google Cloud Compute Engine e2-micro (antigravity-cloud-runner, us-central1, Ubuntu 24.04 LTS)',
               gitRepository: 'https://github.com/harshansarvaiya/jarvis (branch: main)',
             },
             coreDirectives: [

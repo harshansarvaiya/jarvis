@@ -578,7 +578,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     const systemInstruction = {
       parts: [
         {
-          text: `${personaPromptBlock}\n\n${JARVIS_SYSTEM_PROMPT}\n\n${contextPrompt}\n\n[MANDATORY FINAL ANCHOR]: Speak directly to Sir as ${persona}. Fluid natural paragraphs. Strictly ban textbook listicles and newsletter headings.`,
+          text: `${personaPromptBlock}\n\n${JARVIS_SYSTEM_PROMPT}\n\n${contextPrompt}\n\n[MANDATORY EMPIRICAL GROUNDING & ANTI-HALLUCINATION ANCHOR]: Speak directly to Sir as ${persona}. Fluid natural paragraphs. Strictly ban textbook listicles and newsletter headings. NEVER claim you tested an API or executed a command unless you actually invoked a tool in this turn and inspected its verbatim stdout. You operate on Google Cloud VM (antigravity-cloud-runner); ngrok is permanently decommissioned. If asked about VM or infrastructure health, ALWAYS execute inspect_infrastructure or check_runner_vm first.`,
         },
       ],
     };
