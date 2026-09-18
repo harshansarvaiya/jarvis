@@ -246,7 +246,25 @@
       "Linux/CUDA Port Monitoring for Cloud Edge Integration"
     ],
     "addedAt": "2026-09-18T20:33:00Z"
+  },
+  {
+    "name": "rmyndharis/OpenWA",
+    "url": "https://github.com/rmyndharis/OpenWA",
+    "domain": "Omnichannel Messaging & WhatsApp Protocol Gateway",
+    "status": "ACTIVE_EXTRACTION",
+    "extractedFeatures": [
+      "Lightweight Baileys WebSocket WhatsApp Engine (<50MB RAM, zero Chromium)",
+      "Inbound Webhook Dispatcher & REST API Adapter",
+      "Redis / Upstash Multi-Device Session Persistence Pattern"
+    ],
+    "futureRoadmap": [
+      "24/7 Sovereign WhatsApp Ingress Daemon (`scripts/whatsapp-worker.ts`)",
+      "Next.js Direct Ingress Route (`/api/whatsapp/webhook`)",
+      "Groq Whisper Voice Note Ingress Pipeline over WhatsApp"
+    ],
+    "addedAt": "2026-09-18T20:37:00Z"
   }
 ]
+
 
 
