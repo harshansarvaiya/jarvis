@@ -8,6 +8,11 @@ import { Redis } from '@upstash/redis';
 import webpush from 'web-push';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 // 1. Environment Initialization
 function loadEnv() {
@@ -458,22 +463,166 @@ async function checkGlobalThreatSentry() {
   }
 }
 
-// 7. Master Worker Loop & Lifecycle Controller
+// 7. Routine E: Proactive Infrastructure & API Token Health Probe
+async function checkInfrastructureAndTokenHealth() {
+  console.log('[Cloud Worker] 🩺 Running proactive infrastructure & token health probe...');
+
+  // 7.1 GitHub PAT Sentry
+  const ghToken = process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_TOKEN;
+  if (ghToken) {
+    try {
+      const ghRes = await fetch('https://api.github.com/user', {
+        headers: {
+          Authorization: `Bearer ${ghToken}`,
+          'User-Agent': 'JARVIS-ProactiveHealthSentry/2.0',
+        },
+        signal: AbortSignal.timeout(6000),
+      });
+
+      if (ghRes.status === 401 || ghRes.status === 403) {
+        console.warn('[Cloud Worker] 🚨 GitHub PAT has expired or is unauthorized!');
+        await dispatchPush(
+          '🚨 [SECURITY SENTRY] GitHub Token Expired',
+          'Primary GitHub PAT is unauthorized (HTTP 401/403). Direct repository sync may be throttled. Please refresh GITHUB_TOKEN in .env.local, Sir.',
+          '/'
+        );
+      } else if (ghRes.ok) {
+        console.log('[Cloud Worker] 🛡️ GitHub API Token: VALID (HTTP 200)');
+      }
+    } catch (e: any) {
+      console.warn('[Cloud Worker] GitHub token probe warning:', e.message);
+    }
+  }
+
+  // 7.2 Upstash Redis Edge Latency
+  if (redis) {
+    try {
+      const t0 = Date.now();
+      await redis.get('jarvis:state');
+      const rLatency = Date.now() - t0;
+      console.log(`[Cloud Worker] 💾 Upstash Redis Edge Latency: ${rLatency}ms`);
+    } catch (rErr: any) {
+      console.warn('[Cloud Worker] Upstash latency probe warning:', rErr.message);
+    }
+  }
+
+  // 7.3 GCP VM Cgroup Memory & Disk Sentry (Directive 06 Enforced)
+  try {
+    const mem = process.memoryUsage();
+    const rssMb = Math.round(mem.rss / 1024 / 1024);
+    const heapUsedMb = Math.round(mem.heapUsed / 1024 / 1024);
+    const freeRamMb = Math.round(os.freemem() / 1024 / 1024);
+
+    console.log(`[Cloud Worker] ⚙️ VM Health Sentry: RSS=${rssMb}MB, Heap=${heapUsedMb}MB, FreeRAM=${freeRamMb}MB`);
+
+    // Proactive memory cleanup if approaching VM limit (Directive 06: <450MB cgroup cap)
+    if (rssMb > 350 && (global as any).gc) {
+      (global as any).gc();
+      console.log('[Cloud Worker] 🧹 Proactive garbage collection sweep triggered.');
+    }
+
+    // Check available disk space on root filesystem
+    const { stdout } = await execAsync("df -BM / | tail -1 | awk '{print $4}'", { timeout: 4000 });
+    const availStr = (stdout || '').replace('M', '').trim();
+    const availMb = parseInt(availStr, 10);
+    if (!isNaN(availMb) && availMb < 2000) {
+      console.warn(`[Cloud Worker] ⚠️ Low disk space warning: ${availMb}MB remaining!`);
+      await dispatchPush(
+        '⚠️ [VM SENTRY] Low Disk Space Warning',
+        `Available disk space on runner root partition is ${availMb}MB (<2GB threshold). Clean temporary caches suggested.`,
+        '/'
+      );
+    }
+  } catch (sysErr: any) {
+    console.warn('[Cloud Worker] VM telemetry probe warning:', sysErr.message);
+  }
+}
+
+// 8. Routine F: Autonomous Build & Compiler Verification Sentry
+async function checkBuildIntegrityAndSelfHeal() {
+  try {
+    console.log('[Cloud Worker] 🔧 Running autonomous compiler verification (tsc --noEmit)...');
+    const { stdout, stderr } = await execAsync('./node_modules/.bin/tsc --noEmit', {
+      cwd: process.cwd(),
+      timeout: 120000,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    console.log('[Cloud Worker] 🛡️ Compiler Verification Passed: 0 TypeScript errors. Codebase nominal.');
+  } catch (tscErr: any) {
+    const errOutput = (tscErr.stdout || tscErr.stderr || tscErr.message || '').trim().slice(0, 500);
+    console.error('[Cloud Worker] 🚨 Build Regression Detected by Sentry:\n', errOutput);
+
+    const alertKey = `jarvis:threat_sentry:build_err:${errOutput.slice(0, 30)}`;
+    const alreadySeen = redis ? await redis.get(alertKey) : localSeenThreats.has(alertKey);
+
+    if (!alreadySeen) {
+      if (redis) await redis.set(alertKey, 'NOTIFIED', { ex: 24 * 3600 });
+      localSeenThreats.add(alertKey);
+
+      await dispatchPush(
+        '🚨 [BUILD REGRESSION DETECTED]',
+        `Compiler error found during 24/7 verification sweep:\n${errOutput.slice(0, 220)}...`,
+        '/'
+      );
+    }
+  }
+}
+
+// 9. Routine G: Core Dependency CVE Security Radar
+async function checkDependencySecurityRadar() {
+  try {
+    console.log('[Cloud Worker] 🔍 Running OSINT CVE security radar on core dependencies...');
+    const { scanCveThreats } = await import('../lib/jarvis/osint');
+    const corePackages = ['next', 'typescript', 'redis'];
+
+    for (const pkg of corePackages) {
+      const report = await scanCveThreats({ keyword: pkg, limit: 3 });
+      if (report && report.totalFound > 0) {
+        const criticalThreats = report.threats.filter((t) => t.severity === 'CRITICAL' || t.severity === 'HIGH');
+        if (criticalThreats.length > 0) {
+          const threat = criticalThreats[0];
+          const alertKey = `jarvis:threat_sentry:cve:${threat.id}`;
+          const alreadySeen = redis ? await redis.get(alertKey) : localSeenThreats.has(alertKey);
+
+          if (!alreadySeen) {
+            if (redis) await redis.set(alertKey, 'NOTIFIED', { ex: 7 * 24 * 3600 });
+            localSeenThreats.add(alertKey);
+
+            console.log(`[Cloud Worker] 🚨 CVE Sentry Alert: ${threat.id} on ${pkg}`);
+            await dispatchPush(
+              `🛡️ [CVE SENTRY] ${threat.id} (${pkg})`,
+              `High-severity CVE identified in ${pkg}:\n${threat.summary.slice(0, 160)}...\nFix: ${threat.fixedVersion || 'Advisory Pending'}`,
+              '/'
+            );
+          }
+        }
+      }
+    }
+  } catch (cveErr: any) {
+    console.warn('[Cloud Worker] CVE Sentry warning:', cveErr.message);
+  }
+}
+
+// 10. Master Worker Loop & Lifecycle Controller
 async function startWorkerLoop(isTestMode: boolean = false) {
   console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
 ║  J.A.R.V.I.S. MARK II — 24/7 CLOUD CRON WORKER SUBSTRATE      ║
 ║  Host: antigravity-cloud-runner (GCP Compute Engine e2-micro) ║
 ║  Mode: Autonomous Sentry, Global Threat Radar & Cron Engine   ║
+║  Stage: 5 Autonomous Sovereign Proactive Chrono-Sensing       ║
 ╚═══════════════════════════════════════════════════════════════╝
   `);
 
   if (isTestMode) {
-    console.log('[Cloud Worker] Running single diagnostic sweep (--test)...');
+    console.log('[Cloud Worker] Running full proactive diagnostic sweep (--test)...');
     await checkSystemWatchdog();
+    await checkInfrastructureAndTokenHealth();
+    await checkBuildIntegrityAndSelfHeal();
     await checkScheduledReminders();
     await checkScheduledBriefings();
     await checkGlobalThreatSentry();
+    await checkDependencySecurityRadar();
     console.log('[Cloud Worker] Diagnostic sweep complete. Exiting cleanly.');
     process.exit(0);
   }
@@ -482,6 +631,7 @@ async function startWorkerLoop(isTestMode: boolean = false) {
 
   // Immediate initial sweep
   await checkSystemWatchdog();
+  await checkInfrastructureAndTokenHealth();
   await checkScheduledReminders();
   await checkScheduledBriefings();
   await checkGlobalThreatSentry();
@@ -499,9 +649,24 @@ async function startWorkerLoop(isTestMode: boolean = false) {
         await checkGlobalThreatSentry();
       }
 
-      // Every 30 minutes (60 ticks): System watchdog ping
+      // Every 10 minutes (20 ticks): Infrastructure, token health, and VM cgroup memory sentry
+      if (tickCount % 20 === 0) {
+        await checkInfrastructureAndTokenHealth();
+      }
+
+      // Every 30 minutes (60 ticks): System watchdog ping to Vercel production edge
       if (tickCount % 60 === 0) {
         await checkSystemWatchdog();
+      }
+
+      // Every 4 hours (480 ticks): Autonomous build integrity & self-healing compiler verification
+      if (tickCount % 480 === 0) {
+        await checkBuildIntegrityAndSelfHeal();
+      }
+
+      // Every 12 hours (1440 ticks): Core dependency CVE security radar
+      if (tickCount % 1440 === 0) {
+        await checkDependencySecurityRadar();
       }
     } catch (loopErr: any) {
       console.error('[Cloud Worker] Loop execution error:', loopErr.message);
