@@ -111,6 +111,27 @@ export const HIGH_ROI_SKILL_PACKS: HighROISkillPack[] = [
 - Prop Signature Matching: Verify component prop keys against definition sites before passing parameters.`,
   },
   {
+    id: 'skill-ecc-nextjs-route-handlers',
+    title: 'ECC Next.js 14 Route Handler & Middleware Security Pattern',
+    category: 'ARCHITECTURE',
+    tags: ['nextjs', 'route-handler', 'middleware', 'auth', 'zod'],
+    content: `[ECC Next.js Route Handler Pattern]
+- Input Validation: Validate all request body JSON and query parameters using strict Zod schemas before processing.
+- Auth Middleware Sentry: Enforce session verification (getServerSession / HMAC token) on all non-public API routes.
+- CORS & Header Sanitization: Enforce strict origin matching, prevent credential leaks, and set Content-Security-Policy headers.
+- Rate Limiting: Apply Upstash Redis sliding-window rate limiters to public endpoints to block brute-force attacks.`,
+  },
+  {
+    id: 'skill-ecc-agentshield-mcp-audit',
+    title: 'ECC AgentShield MCP & Tool Configuration Audit Pattern',
+    category: 'SECURITY',
+    tags: ['agentshield', 'mcp', 'security', 'audit', 'tool-boundary'],
+    content: `[ECC AgentShield MCP Audit Pattern]
+- MCP Tool Boundary: Audit custom MCP server connections to prevent unauthorized command execution or filesystem traversal beyond workspace.
+- Secret Sanitization: Audit tool call loggers to mask tokens, passwords, and private keys before logging to transcript files.
+- Command Guardian: Block dangerous shell execution patterns (rm -rf, mkfs, drop database, apt install docker) at sentry level.`,
+  },
+  {
     id: 'skill-gstack-reuse-ladder',
     title: 'gstack Reuse Ladder & Anti-Overbuilding Codex',
     category: 'ARCHITECTURE',
