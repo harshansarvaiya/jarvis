@@ -1832,6 +1832,78 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['agentId', 'instruction'],
     },
   },
+  {
+    name: 'synthesize_jit_tool',
+    description: 'Dynamic Just-In-Time (JIT) tool synthesis engine. Creates, compiles, sandboxes, and registers a novel executable micro-tool in memory or persistent vault when no native tool exists.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Unique function name for the tool (e.g. "calculate_fibonacci_matrix", "parse_custom_binary_dump").',
+        },
+        description: {
+          type: 'string',
+          description: 'Clear description of what the synthesized tool does and when to use it.',
+        },
+        executableCode: {
+          type: 'string',
+          description: 'Async JavaScript/TypeScript function string: async (inputs, context) => { ... return result; }',
+        },
+        category: {
+          type: 'string',
+          enum: ['API_INTEGRATION', 'DATA_TRANSFORMATION', 'CODE_ANALYSIS', 'UTILITY', 'FORENSICS'],
+          description: 'Category classification for the synthesized tool.',
+        },
+        authorPersona: {
+          type: 'string',
+          enum: ['FRIDAY', 'JARVIS'],
+          description: 'Authoring AI persona identity.',
+        },
+        persistToVault: {
+          type: 'boolean',
+          description: 'Whether to persist this tool across sessions in Upstash Redis.',
+        },
+      },
+      required: ['name', 'description', 'executableCode'],
+    },
+  },
+  {
+    name: 'execute_jit_tool',
+    description: 'Executes an existing in-memory or persisted dynamic JIT micro-tool in a secure, sandboxed VM context.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Name of the synthesized JIT tool to invoke.',
+        },
+        inputs: {
+          type: 'object',
+          description: 'Key-value input parameters matching the synthesized tool expectations.',
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'analyze_visual_copilot_frame',
+    description: 'Multimodal Vision Co-Pilot & HUD Deconstruction Engine. Deconstructs screenshots, IDE code, terminal crash logs, architecture diagrams, or UI mockups using Gemini 3.7 Vision into structured AST insights, identified bugs, surgical diffs, and audio-ready tactical summaries.',
+    parameters: {
+      type: 'object',
+      properties: {
+        imageBase64: {
+          type: 'string',
+          description: 'Base64 image data URL or raw base64 string.',
+        },
+        userContextHint: {
+          type: 'string',
+          description: 'Optional focus directive or context hint (e.g. "Find the race condition in the React useEffect hook").',
+        },
+      },
+      required: ['imageBase64'],
+    },
+  },
 ];
 
 /**
@@ -2836,6 +2908,44 @@ export async function executeJarvisTool(
         }
         const { stepActiveEpic } = await import('./epic-executor');
         const res = await stepActiveEpic(epicId);
+        return { success: true, result: res };
+      }
+
+      case 'synthesize_jit_tool': {
+        const { name, description, executableCode, category, authorPersona, persistToVault, parametersSchema } = args;
+        if (!name || !executableCode) {
+          return { success: false, result: null, error: 'name and executableCode required for synthesize_jit_tool.' };
+        }
+        const { synthesizeJitTool } = await import('./jit-tools');
+        const res = await synthesizeJitTool({
+          name,
+          description: description || `JIT micro-tool: ${name}`,
+          executableCode,
+          category,
+          authorPersona,
+          persistToVault,
+          parametersSchema,
+        });
+        return { success: res.success, result: res.tool || res.error, error: res.error };
+      }
+
+      case 'execute_jit_tool': {
+        const { name, inputs } = args;
+        if (!name) {
+          return { success: false, result: null, error: 'name required for execute_jit_tool.' };
+        }
+        const { executeJitTool } = await import('./jit-tools');
+        const res = await executeJitTool(name, inputs || {});
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'analyze_visual_copilot_frame': {
+        const { imageBase64, userContextHint } = args;
+        if (!imageBase64) {
+          return { success: false, result: null, error: 'imageBase64 required for analyze_visual_copilot_frame.' };
+        }
+        const { analyzeVisualCopilotFrame } = await import('./vision-copilot');
+        const res = await analyzeVisualCopilotFrame({ imageBase64, userContextHint });
         return { success: true, result: res };
       }
 
