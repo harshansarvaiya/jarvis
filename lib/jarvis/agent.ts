@@ -649,12 +649,11 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     // Tier 1 Primary: Google Cloud Vertex AI (Draws 100% from ₹33,435+ GCP Credits)
     if (isVertexAIAvailable()) {
       const primaryCandidate = mapToVertexModel(requestedModel).model;
-      const vertexCandidates = [
-        primaryCandidate,
-        'gemini-3.7-flash',
-        'gemini-2.5-pro',
-        'gemini-2.5-flash',
-      ].filter((v, i, a) => a.indexOf(v) === i);
+      const isExplicitPro = requestedModel.toLowerCase().includes('pro');
+      const vertexCandidates = (isExplicitPro
+        ? [primaryCandidate, 'gemini-2.5-pro', 'gemini-3.7-flash', 'gemini-2.5-flash']
+        : [primaryCandidate, 'gemini-3.7-flash', 'gemini-2.5-flash']
+      ).filter((v, i, a) => a.indexOf(v) === i);
 
       for (const vertexCandidate of vertexCandidates) {
         try {
@@ -667,12 +666,8 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             generationConfig: {
               temperature: generationTemperature,
               maxOutputTokens: 4096,
-              thinkingConfig: {
-                includeThoughts: true,
-                thinkingBudget: 2048,
-              },
             },
-            signal: AbortSignal.timeout(180000),
+            signal: AbortSignal.timeout(isExplicitPro ? 30000 : 5500),
           });
 
           if (vRes.ok) {
