@@ -700,6 +700,63 @@ async function checkDependencySecurityRadar() {
   }
 }
 
+// 9.5 Autonomous "Sleep Cycle" Memory Consolidation with TypeSafe Jev System One
+async function consolidateCognitiveMemoriesWithJev() {
+  if (!process.env.TYPESAFE_API_KEY || !redis) return;
+  console.log('[Cloud Worker:Jev Sleep-Cycle] 🧠 Initiating cognitive memory consolidation sweep...');
+
+  try {
+    const { jevDetectMemoryContradiction } = await import('../lib/jarvis/providers/jev');
+    const stateStr = (await redis.get('jarvis:state')) as string | null;
+    if (!stateStr) return;
+
+    let state: any = null;
+    try {
+      state = typeof stateStr === 'string' ? JSON.parse(stateStr) : stateStr;
+    } catch {
+      return;
+    }
+
+    if (!Array.isArray(state?.memories) || state.memories.length < 4) return;
+
+    const memories: any[] = state.memories;
+    const initialCount = memories.length;
+    const idsToDeprecate = new Set<string>();
+
+    // Pair recent memories with older memories in same category
+    for (let i = 0; i < Math.min(10, memories.length); i++) {
+      const recent = memories[i];
+      if (!recent || !recent.content) continue;
+
+      for (let j = i + 1; j < Math.min(25, memories.length); j++) {
+        const older = memories[j];
+        if (!older || !older.content || idsToDeprecate.has(older.id)) continue;
+        if (recent.category !== older.category) continue;
+
+        const analysis = await jevDetectMemoryContradiction(older.content, recent.content);
+
+        if (analysis.relationship === 'SUPERSEDED_CONTRADICTION' && analysis.contradictionScore > 0.75) {
+          console.log(`[Cloud Worker:Jev Sleep-Cycle] 🔄 Deprecating contradicted memory: "${older.content.slice(0, 60)}" in favor of newer: "${recent.content.slice(0, 60)}"`);
+          idsToDeprecate.add(older.id);
+        } else if (analysis.relationship === 'DUPLICATE_REDUNDANT') {
+          console.log(`[Cloud Worker:Jev Sleep-Cycle] ✂️ Pruning redundant duplicate memory: "${older.content.slice(0, 60)}"`);
+          idsToDeprecate.add(older.id);
+        }
+      }
+    }
+
+    if (idsToDeprecate.size > 0) {
+      state.memories = memories.filter((m) => !idsToDeprecate.has(m.id));
+      await redis.set('jarvis:state', JSON.stringify(state));
+      console.log(`[Cloud Worker:Jev Sleep-Cycle] ✨ Consolidated memory vault: pruned ${idsToDeprecate.size} stale/contradictory records (${initialCount} -> ${state.memories.length}).`);
+    } else {
+      console.log('[Cloud Worker:Jev Sleep-Cycle] 🛡️ Memory vault verified: zero contradictions or redundant stale entries found.');
+    }
+  } catch (err: any) {
+    console.warn('[Cloud Worker:Jev Sleep-Cycle] Memory consolidation warning:', err.message);
+  }
+}
+
 // 10. Master Worker Loop & Lifecycle Controller
 async function startWorkerLoop(isTestMode: boolean = false) {
   console.log(`
@@ -761,6 +818,11 @@ async function startWorkerLoop(isTestMode: boolean = false) {
       // Every 30 minutes (60 ticks): System watchdog ping to Vercel production edge
       if (tickCount % 60 === 0) {
         await checkSystemWatchdog();
+      }
+
+      // Every 1 hour (120 ticks): Autonomous Sleep-Cycle Memory Consolidation via Jev System One
+      if (tickCount % 120 === 0) {
+        await consolidateCognitiveMemoriesWithJev();
       }
 
       // Every 4 hours (480 ticks): Autonomous build integrity & self-healing compiler verification

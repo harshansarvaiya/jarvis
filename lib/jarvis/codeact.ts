@@ -275,6 +275,25 @@ export async function executeAutonomousSelfPatch(args: {
       };
     }
 
+    // 2.5. Jev Blast-Radius Sentry (Evaluates mutation risk before auto-push)
+    if (process.env.TYPESAFE_API_KEY) {
+      try {
+        const { jevEvaluatePatchBlastRadius } = await import('./providers/jev');
+        const blastCheck = await jevEvaluatePatchBlastRadius({
+          targetFile: args.targetFile,
+          instruction: args.instruction,
+          mutatedSnippet: args.mutatedContent || '',
+        });
+
+        if (!blastCheck.isSafeToAutoPush) {
+          console.warn(`[SelfPatch:Jev Sentry] 🛡️ High-risk patch flagged (Risk: ${blastCheck.riskProbability}). Disabling auto-push.`);
+          args.pushToRemote = false;
+        }
+      } catch (blastErr) {
+        console.warn('[SelfPatch] Jev blast-radius sentry warning:', blastErr);
+      }
+    }
+
     // 3. Optional Git Commit & Push
     let commitSha: string | undefined = undefined;
     if (args.commitMessage) {

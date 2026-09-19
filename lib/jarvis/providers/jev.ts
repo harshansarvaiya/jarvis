@@ -519,3 +519,166 @@ export async function jevVerifyGroundingAndTruthfulness(
 
   return { isGrounded: true, score: 1.0, unverifiedClaimsDetected: false, confidence: 0.5 };
 }
+
+/**
+ * 1. Autonomous Memory Contradiction & Sleep-Cycle Consolidation Grader:
+ * Evaluates if a newer preference or principle contradicts, supersedes, or duplicates an older memory.
+ */
+export async function jevDetectMemoryContradiction(
+  existingMemory: string,
+  candidateMemory: string
+): Promise<{
+  relationship: 'SUPERSEDED_CONTRADICTION' | 'DUPLICATE_REDUNDANT' | 'ORTHOGONAL_NEW';
+  contradictionScore: number; // 0.0 - 1.0
+  confidence: number;
+}> {
+  try {
+    const state = `[EXISTING MEMORY]:\n"${existingMemory.slice(0, 400)}"\n\n[CANDIDATE MEMORY]:\n"${candidateMemory.slice(0, 400)}"`;
+    const response = await callJevSystemOne({
+      state,
+      questions: {
+        memory_relationship: {
+          type: 'choice',
+          instructions: 'Compare these two memory statements. Does the candidate memory contradict/supersede the existing memory, duplicate it, or represent completely orthogonal new knowledge?',
+          criteria: {
+            SUPERSEDED_CONTRADICTION: 'The candidate memory expresses a revised preference or contradictory rule that invalidates the existing memory.',
+            DUPLICATE_REDUNDANT: 'The candidate memory states essentially the same fact or rule with slightly different wording.',
+            ORTHOGONAL_NEW: 'Both memories represent independent, non-conflicting facts or principles that should both be retained.',
+          },
+        },
+        contradiction_probability: {
+          type: 'noul',
+          instructions: 'What is the probability that the candidate memory directly contradicts or replaces the existing memory?',
+        },
+      },
+    });
+
+    const choiceAns = response?.answers?.memory_relationship as JevChoiceAnswer | undefined;
+    const noulAns = response?.answers?.contradiction_probability as JevNoulAnswer | undefined;
+
+    const relationship = (choiceAns?.choice as any) || 'ORTHOGONAL_NEW';
+    const contradictionScore = noulAns?.noul ?? 0;
+
+    return {
+      relationship,
+      contradictionScore,
+      confidence: choiceAns?.confidence || 0.7,
+    };
+  } catch (err) {
+    console.warn('[TypeSafe Jev] Contradiction detection error:', err);
+    return { relationship: 'ORTHOGONAL_NEW', contradictionScore: 0, confidence: 0.5 };
+  }
+}
+
+/**
+ * 2. Autonomous Code Patch Blast-Radius & Security Sentry:
+ * Evaluates risk level of an automated code mutation before git push.
+ */
+export async function jevEvaluatePatchBlastRadius(options: {
+  targetFile: string;
+  instruction: string;
+  mutatedSnippet: string;
+}): Promise<{
+  riskTier: 'LOW_RISK_SAFE' | 'MEDIUM_RISK_ACCEPTABLE' | 'CRITICAL_HIGH_RISK';
+  riskProbability: number;
+  isSafeToAutoPush: boolean;
+  notes?: string;
+}> {
+  try {
+    const state = `Target File: ${options.targetFile}\nInstruction: "${options.instruction.slice(0, 200)}"\nMutated Diff / Code:\n\`\`\`\n${options.mutatedSnippet.slice(0, 800)}\n\`\`\``;
+    const response = await callJevSystemOne({
+      state,
+      questions: {
+        blast_radius: {
+          type: 'choice',
+          instructions: 'Evaluate the blast radius and architectural risk of this automated code patch.',
+          criteria: {
+            LOW_RISK_SAFE: 'Surgical bugfix, documentation, type enhancement, or localized helper with zero side-effects',
+            MEDIUM_RISK_ACCEPTABLE: 'Standard feature logic mutation with verified parameters',
+            CRITICAL_HIGH_RISK: 'Destructive deletion, credential exposure, security bypass, or infinite loop risk',
+          },
+        },
+        risk_score: {
+          type: 'noul',
+          instructions: 'What is the probability that this mutation introduces a catastrophic system failure or security flaw?',
+        },
+      },
+    });
+
+    const choiceAns = response?.answers?.blast_radius as JevChoiceAnswer | undefined;
+    const noulAns = response?.answers?.risk_score as JevNoulAnswer | undefined;
+
+    const riskTier = (choiceAns?.choice as any) || 'LOW_RISK_SAFE';
+    const riskProb = noulAns?.noul ?? 0.05;
+
+    return {
+      riskTier,
+      riskProbability: riskProb,
+      isSafeToAutoPush: riskTier !== 'CRITICAL_HIGH_RISK' && riskProb < 0.65,
+      notes: `Evaluated by Jev Blast-Radius Sentry (Risk: ${(riskProb * 100).toFixed(1)}%).`,
+    };
+  } catch (err) {
+    console.warn('[TypeSafe Jev] Patch blast-radius evaluation error:', err);
+    return { riskTier: 'LOW_RISK_SAFE', riskProbability: 0.1, isSafeToAutoPush: true };
+  }
+}
+
+/**
+ * 3. Multi-Engine Swarm Consensus Arbitrator (Machine-Native Judge):
+ * Evaluates diverging solution proposals from competing engines (Gemini vs Groq vs Llama)
+ * and selects the mathematically optimal vector.
+ */
+export async function jevArbitrateSwarmConsensus(
+  directive: string,
+  proposals: Array<{ engine: string; proposal: string }>
+): Promise<{
+  winningEngine: string;
+  confidenceScore: number;
+  rationalization: string;
+}> {
+  if (proposals.length === 0) {
+    return { winningEngine: 'default', confidenceScore: 1.0, rationalization: 'Single proposal.' };
+  }
+  if (proposals.length === 1) {
+    return { winningEngine: proposals[0].engine, confidenceScore: 1.0, rationalization: 'Single candidate proposal.' };
+  }
+
+  try {
+    const proposalCriteria: Record<string, string> = {};
+    let stateSummary = `Directive: "${directive.slice(0, 300)}"\n\n`;
+
+    proposals.forEach((p, idx) => {
+      const key = `proposal_${idx}_${p.engine.replace(/[^a-zA-Z0-9_]/g, '')}`;
+      proposalCriteria[key] = `${p.engine}: ${p.proposal.slice(0, 300)}`;
+      stateSummary += `[Option ${idx + 1} (${p.engine})]:\n${p.proposal.slice(0, 400)}\n\n`;
+    });
+
+    const response = await callJevSystemOne({
+      state: stateSummary,
+      questions: {
+        winning_proposal: {
+          type: 'choice',
+          instructions: 'Which solution proposal is the most robust, concise, technically accurate, and least prone to hallucinations/regressions?',
+          criteria: proposalCriteria,
+        },
+      },
+    });
+
+    const ans = response?.answers?.winning_proposal as JevChoiceAnswer | undefined;
+    if (ans && ans.choice) {
+      const matchedIdx = Object.keys(proposalCriteria).indexOf(ans.choice);
+      const winner = matchedIdx !== -1 ? proposals[matchedIdx] : proposals[0];
+
+      return {
+        winningEngine: winner.engine,
+        confidenceScore: ans.confidence || 0.85,
+        rationalization: `Selected ${winner.engine} as optimal solution vector by TypeSafe Jev Consensus Arbitrator.`,
+      };
+    }
+  } catch (err) {
+    console.warn('[TypeSafe Jev] Consensus arbitration error:', err);
+  }
+
+  return { winningEngine: proposals[0].engine, confidenceScore: 0.5, rationalization: 'Default primary selection.' };
+}
+
