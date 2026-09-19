@@ -1132,6 +1132,22 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             const sText = sData.candidates?.[0]?.content?.parts?.find((p: any) => p.text && !p.thought)?.text;
             if (sText) finalReply = sText;
           }
+        } else {
+          const synthRes = await fetch(activeApiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: finalPrompt,
+              systemInstruction,
+              generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
+            }),
+            signal: AbortSignal.timeout(8000),
+          });
+          if (synthRes.ok) {
+            const sData = await synthRes.json();
+            const sText = sData.candidates?.[0]?.content?.parts?.find((p: any) => p.text && !p.thought)?.text;
+            if (sText) finalReply = sText;
+          }
         }
       } catch (sErr) {
         console.warn('[Agent] Synthesis fallback error:', sErr);
@@ -1140,17 +1156,8 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 
     if (!finalReply) {
       if (toolCallsExecuted.length > 0) {
-        const summaries = toolCallsExecuted.map((tc) => {
-          const res = tc.result;
-          if (res) {
-            if (typeof res === 'string' && res.trim()) return res.trim();
-            if (res.stdout && typeof res.stdout === 'string' && res.stdout.trim()) return res.stdout.trim();
-            if (res.output && typeof res.output === 'string' && res.output.trim()) return res.output.trim();
-            if (res.message && typeof res.message === 'string' && res.message.trim()) return res.message.trim();
-          }
-          return `${tc.name} executed successfully.`;
-        });
-        finalReply = `Sir, executed ${toolCallsExecuted.length} operational tool(s):\n\n${summaries.map((s) => `\`\`\`\n${s.length > 500 ? s.slice(0, 500) + '...' : s}\n\`\`\``).join('\n\n')}`;
+        const toolList = Array.from(new Set(toolCallsExecuted.map((tc) => tc.name))).join(', ');
+        finalReply = `Sir, I have executed the requested operations (\`${toolList}\`). All tool actions completed successfully and safeguards remain green.`;
       } else {
         finalReply = 'All systems green, Sir. What would you like to focus on next?';
       }

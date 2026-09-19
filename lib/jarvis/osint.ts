@@ -417,3 +417,121 @@ export async function fetchGeopoliticalThreatRadar(): Promise<GeopoliticalThreat
     synthesis,
   };
 }
+
+export interface PhoneIntelligenceReport {
+  phone: string;
+  normalizedE164: string;
+  country: string;
+  countryCode: string;
+  carrier?: string;
+  lineType: 'MOBILE' | 'LANDLINE' | 'VOIP' | 'TOLL_FREE' | 'UNKNOWN';
+  isValidFormat: boolean;
+  infostealerExposure: {
+    isCompromised: boolean;
+    totalInfectionsFound: number;
+    stealers?: string[];
+    compromisedAccountsCount?: number;
+    details?: string;
+  };
+  threatLevel: 'NOMINAL' | 'ELEVATED' | 'COMPROMISED_CRITICAL';
+  source: string;
+  checkedAt: string;
+}
+
+// Country Code Reference Table
+const COUNTRY_CODES: Record<string, { country: string; code: string; defaultCarrier?: string }> = {
+  '1': { country: 'United States / Canada', code: 'US/CA' },
+  '44': { country: 'United Kingdom', code: 'GB' },
+  '91': { country: 'India', code: 'IN' },
+  '49': { country: 'Germany', code: 'DE' },
+  '33': { country: 'France', code: 'FR' },
+  '61': { country: 'Australia', code: 'AU' },
+  '81': { country: 'Japan', code: 'JP' },
+  '971': { country: 'United Arab Emirates', code: 'AE' },
+  '65': { country: 'Singapore', code: 'SG' },
+  '41': { country: 'Switzerland', code: 'CH' },
+  '31': { country: 'Netherlands', code: 'NL' },
+  '46': { country: 'Sweden', code: 'SE' },
+  '34': { country: 'Spain', code: 'ES' },
+  '39': { country: 'Italy', code: 'IT' },
+  '55': { country: 'Brazil', code: 'BR' },
+  '7': { country: 'Kazakhstan / Russia', code: 'KZ/RU' },
+};
+
+/**
+ * 5. Keyless Phone OSINT & Infostealer Forensic Intelligence
+ * Formats E.164, derives telecom metadata, and checks infostealer breach repositories.
+ */
+export async function scanPhoneIntelligence(args: { phone: string }): Promise<PhoneIntelligenceReport> {
+  const rawInput = args.phone.trim();
+  const digitsOnly = rawInput.replace(/\D/g, '');
+  const normalizedE164 = rawInput.startsWith('+') ? `+${digitsOnly}` : digitsOnly.length === 10 ? `+1${digitsOnly}` : `+${digitsOnly}`;
+
+  let detectedCountry = 'International / Unknown';
+  let detectedCode = 'INTL';
+  let lineType: 'MOBILE' | 'LANDLINE' | 'VOIP' | 'TOLL_FREE' | 'UNKNOWN' = 'MOBILE';
+
+  // 1. Identify Country Dialing Prefix
+  for (const [prefix, data] of Object.entries(COUNTRY_CODES).sort((a, b) => b[0].length - a[0].length)) {
+    const cleanPrefix = prefix.replace('+', '');
+    if (digitsOnly.startsWith(cleanPrefix)) {
+      detectedCountry = data.country;
+      detectedCode = data.code;
+      break;
+    }
+  }
+
+  // 2. Line Type Heuristic
+  if (digitsOnly.length === 10 && (digitsOnly.startsWith('800') || digitsOnly.startsWith('888') || digitsOnly.startsWith('877'))) {
+    lineType = 'TOLL_FREE';
+  }
+
+  const report: PhoneIntelligenceReport = {
+    phone: rawInput,
+    normalizedE164,
+    country: detectedCountry,
+    countryCode: detectedCode,
+    lineType,
+    isValidFormat: digitsOnly.length >= 7 && digitsOnly.length <= 15,
+    infostealerExposure: {
+      isCompromised: false,
+      totalInfectionsFound: 0,
+      stealers: [],
+    },
+    threatLevel: 'NOMINAL',
+    source: 'J.A.R.V.I.S. OSINT Sentry & Hudson Rock Cavalier Cyber Intelligence',
+    checkedAt: new Date().toISOString(),
+  };
+
+  // 3. Query Hudson Rock Cavalier Cyber Intelligence (Free/Keyless OSINT Infostealer database)
+  try {
+    const hrUrl = `https://cavalier.hudsonrock.com/api/json/v2/preview/search-by-phone?phone=${encodeURIComponent(normalizedE164)}`;
+    const hrRes = await fetch(hrUrl, {
+      headers: {
+        'User-Agent': 'JARVIS-OSINT/2.0 (Forensics)',
+        'Accept': 'application/json',
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (hrRes.ok) {
+      const hrData = await hrRes.json();
+      if (hrData && (hrData.stealers || hrData.infections || hrData.total_infections > 0)) {
+        const infections = hrData.infections || hrData.stealers || [];
+        report.infostealerExposure = {
+          isCompromised: true,
+          totalInfectionsFound: hrData.total_infections || infections.length || 1,
+          stealers: Array.isArray(infections) ? infections.map((i: any) => i.stealer_family || i.malware_family || 'Generic Stealer') : ['Infostealer Malware'],
+          compromisedAccountsCount: hrData.total_credentials || hrData.compromised_passwords,
+          details: 'Compromised via credential stealer infection on endpoint device associated with this phone number.',
+        };
+        report.threatLevel = 'COMPROMISED_CRITICAL';
+      }
+    }
+  } catch (hrErr: any) {
+    console.warn('[OSINT] Hudson Rock query error:', hrErr?.message);
+  }
+
+  return report;
+}
+

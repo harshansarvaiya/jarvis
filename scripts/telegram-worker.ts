@@ -414,30 +414,10 @@ async function processDirective(
 
     responseText += result.reply;
 
-    // Append Tool Execution Summaries & Outputs if tools were executed
+    // Append sleek Tool Execution Indicator if tools were executed
     if (result.toolCallsExecuted && result.toolCallsExecuted.length > 0) {
-      const toolBlocks: string[] = [];
-      for (const tc of result.toolCallsExecuted) {
-        let block = `⚡ \`${tc.name}\``;
-        const res = tc.result;
-        let rawOutput = '';
-        if (res) {
-          if (typeof res === 'string') {
-            rawOutput = res;
-          } else if (typeof res === 'object') {
-            rawOutput = res.stdout || res.output || res.result || '';
-          }
-        }
-        if (rawOutput && typeof rawOutput === 'string' && rawOutput.trim()) {
-          const cleanOut = rawOutput.trim();
-          if (!responseText.includes(cleanOut.slice(0, 30))) {
-            const truncatedOut = cleanOut.length > 400 ? cleanOut.slice(0, 400) + '...' : cleanOut;
-            block += `\n\`\`\`\n${truncatedOut}\n\`\`\``;
-          }
-        }
-        toolBlocks.push(block);
-      }
-      responseText += `\n\n${toolBlocks.join('\n\n')}`;
+      const uniqueTools = Array.from(new Set(result.toolCallsExecuted.map((tc) => tc.name)));
+      responseText += `\n\n⚙️ _Executed: ${uniqueTools.map((t) => `\`${t}\``).join(', ')}_`;
     }
 
     // Append Telemetry Badge (F.R.I.D.A.Y. vs J.A.R.V.I.S.)

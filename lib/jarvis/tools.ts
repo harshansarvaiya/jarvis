@@ -1414,6 +1414,29 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'scan_phone_intelligence',
+    description: 'Perform OSINT and cyber intelligence reconnaissance on a phone number: E.164 normalization, carrier routing heuristic, and checks against infostealer breach databases (Hudson Rock Cavalier / Lumma / RedLine / Vidar infections).',
+    parameters: {
+      type: 'object',
+      properties: {
+        phone: {
+          type: 'string',
+          description: 'The target phone number in national or international format (e.g. "+14155552671", "9876543210").',
+        },
+      },
+      required: ['phone'],
+    },
+  },
+  {
+    name: 'fetch_geopolitical_radar',
+    description: 'Query live European, Middle Eastern, and global geopolitical threat intelligence, chokepoint telemetry (Strait of Hormuz, Bab-el-Mandeb, Suwalki Gap), and regional escalation risk scores.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
     name: 'scan_workspace_secrets',
     description: 'Perform a comprehensive zero-leak static scan across all repository files for 35+ hardcoded secrets, API keys, private keys, database URIs, and tokens.',
     parameters: {
@@ -1833,7 +1856,7 @@ export function getPrunedJarvisTools(category?: string): ToolDefinition[] {
 
   const securityToolNames = new Set([
     'run_security_audit', 'scan_workspace_secrets', 'scan_cve_threats', 'trace_crypto_sanctions',
-    'inspect_ip_recon', 'run_red_team_critique', 'emergency_wipe_sensitive', 'delegate_subagent',
+    'inspect_ip_recon', 'scan_phone_intelligence', 'fetch_geopolitical_radar', 'run_red_team_critique', 'emergency_wipe_sensitive', 'delegate_subagent',
     'cloud_execute_command'
   ]);
 
@@ -2730,6 +2753,28 @@ export async function executeJarvisTool(
           addressOrName: args.addressOrName,
           asset: args.asset,
         });
+        return { success: true, result: report };
+      }
+
+      case 'inspect_ip_recon': {
+        const { inspectIpRecon } = await import('./osint');
+        const report = await inspectIpRecon({
+          target: args.target,
+        });
+        return { success: true, result: report };
+      }
+
+      case 'scan_phone_intelligence': {
+        const { scanPhoneIntelligence } = await import('./osint');
+        const report = await scanPhoneIntelligence({
+          phone: args.phone,
+        });
+        return { success: true, result: report };
+      }
+
+      case 'fetch_geopolitical_radar': {
+        const { fetchGeopoliticalThreatRadar } = await import('./osint');
+        const report = await fetchGeopoliticalThreatRadar();
         return { success: true, result: report };
       }
 
