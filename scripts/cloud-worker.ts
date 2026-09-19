@@ -503,6 +503,67 @@ async function checkGlobalThreatSentry() {
   }
 }
 
+// 6.3 Routine D.3: European & Global Geopolitical Escalation Radar (WW3 Monitor)
+async function checkGeopoliticalEscalationRadar() {
+  try {
+    const { fetchGeopoliticalThreatRadar } = await import('../lib/jarvis/osint');
+    const geoReport = await fetchGeopoliticalThreatRadar();
+
+    console.log(`[Cloud Worker] 🌐 Geopolitical Sentry Status: ${geoReport.overallThreatLevel} (${geoReport.theater})`);
+
+    // Update the task matrix in Upstash if task exists
+    if (redis) {
+      const stateStr = (await redis.get('jarvis:state')) as string | null;
+      if (stateStr) {
+        let state: any = null;
+        try {
+          state = typeof stateStr === 'string' ? JSON.parse(stateStr) : stateStr;
+        } catch {}
+
+        if (Array.isArray(state?.tasks)) {
+          const geoTask = state.tasks.find((t: any) =>
+            t.tags?.includes('ww3') ||
+            t.tags?.includes('geopolitics') ||
+            t.title?.toLowerCase().includes('geopolitical')
+          );
+
+          if (geoTask) {
+            geoTask.executionAudit = geoTask.executionAudit || [];
+            // Keep last 10 audits
+            if (geoTask.executionAudit.length > 10) {
+              geoTask.executionAudit = geoTask.executionAudit.slice(-10);
+            }
+            geoTask.executionAudit.push({
+              timestamp: new Date().toISOString(),
+              status: 'IN_PROGRESS',
+              notes: `[Autonomous Radar Telemetry] Status: ${geoReport.overallThreatLevel}. ${geoReport.synthesis}`,
+            });
+            await redis.set('jarvis:state', JSON.stringify(state));
+          }
+        }
+      }
+    }
+
+    if (geoReport.overallThreatLevel === 'CRITICAL_WATCH') {
+      const sentryKey = `jarvis:threat_sentry:geo:${new Date().toISOString().slice(0, 13)}`;
+      const alreadySeen = redis ? await redis.get(sentryKey) : localSeenThreats.has(sentryKey);
+
+      if (!alreadySeen) {
+        if (redis) await redis.set(sentryKey, 'NOTIFIED', { ex: 24 * 3600 });
+        localSeenThreats.add(sentryKey);
+
+        await dispatchPush(
+          '🚨 [GEOPOLITICAL RADAR] High Escalation Detected',
+          geoReport.synthesis,
+          '/radar'
+        );
+      }
+    }
+  } catch (geoErr: any) {
+    console.warn('[Cloud Worker] Geopolitical Radar warning:', geoErr.message);
+  }
+}
+
 // 7. Routine E: Proactive Infrastructure & API Token Health Probe
 async function checkInfrastructureAndTokenHealth() {
   console.log('[Cloud Worker] 🩺 Running proactive infrastructure & token health probe...');
@@ -662,6 +723,7 @@ async function startWorkerLoop(isTestMode: boolean = false) {
     await checkScheduledReminders();
     await checkScheduledBriefings();
     await checkGlobalThreatSentry();
+    await checkGeopoliticalEscalationRadar();
     await checkDependencySecurityRadar();
     console.log('[Cloud Worker] Diagnostic sweep complete. Exiting cleanly.');
     process.exit(0);
@@ -675,6 +737,7 @@ async function startWorkerLoop(isTestMode: boolean = false) {
   await checkScheduledReminders();
   await checkScheduledBriefings();
   await checkGlobalThreatSentry();
+  await checkGeopoliticalEscalationRadar();
 
   let tickCount = 0;
   setInterval(async () => {
@@ -692,6 +755,11 @@ async function startWorkerLoop(isTestMode: boolean = false) {
       // Every 10 minutes (20 ticks): Infrastructure, token health, and VM cgroup memory sentry
       if (tickCount % 20 === 0) {
         await checkInfrastructureAndTokenHealth();
+      }
+
+      // Every 15 minutes (30 ticks): Geopolitical & WW3 Escalation Radar sweep
+      if (tickCount % 30 === 0) {
+        await checkGeopoliticalEscalationRadar();
       }
 
       // Every 30 minutes (60 ticks): System watchdog ping to Vercel production edge

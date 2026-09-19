@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { scanCveThreats, traceCryptoSanctions, inspectIpRecon } from '@/lib/jarvis/osint';
+import { scanCveThreats, traceCryptoSanctions, inspectIpRecon, fetchGeopoliticalThreatRadar } from '@/lib/jarvis/osint';
 
 // Strategic Maritime Naval Chokepoints (OSIRIS-aligned)
 const MARITIME_CHOKEPOINTS = [
@@ -16,6 +16,7 @@ export async function GET() {
   const startTime = Date.now();
   let earthquakes: any[] = [];
   let spaceWeather: any[] = [];
+  let geopolitics: any = null;
 
   // 1. Fetch Real-Time USGS Earthquakes (4.5+ Day)
   try {
@@ -66,6 +67,13 @@ export async function GET() {
     console.warn('[Radar API] NOAA fetch warning:', err?.message);
   }
 
+  // 3. Fetch Geopolitical & WW3 Escalation Sentry
+  try {
+    geopolitics = await fetchGeopoliticalThreatRadar();
+  } catch (geoErr: any) {
+    console.warn('[Radar API] Geopolitics radar warning:', geoErr?.message);
+  }
+
   return NextResponse.json({
     status: 'ONLINE',
     latencyMs: Date.now() - startTime,
@@ -83,6 +91,7 @@ export async function GET() {
         total: MARITIME_CHOKEPOINTS.length,
         items: MARITIME_CHOKEPOINTS,
       },
+      geopolitics: geopolitics || { status: 'STANDBY' },
     },
   });
 }
@@ -107,8 +116,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, report });
     }
 
+    if (action === 'geopolitics' || action === 'ww3_radar') {
+      const report = await fetchGeopoliticalThreatRadar();
+      return NextResponse.json({ success: true, report });
+    }
+
     return NextResponse.json({ success: false, error: 'Invalid OSINT action requested' }, { status: 400 });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal Server Error' }, { status: 500 });
   }
 }
+
