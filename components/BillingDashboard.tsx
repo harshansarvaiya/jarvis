@@ -40,12 +40,32 @@ export const BillingDashboard: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [targetWarningDays, setTargetWarningDays] = useState<number>(14);
 
-  // Initial GCP Trial Pool Configuration: ₹33,435.00 across 90-day window
-  // Initialized approx ~2026-09-14
-  const gcpTotalCredits = 33435.00;
-  const gcpBurnEstimated = 42.50; // Micro e2 runner and light vertex calls
-  const gcpRemaining = gcpTotalCredits - gcpBurnEstimated;
-  const daysRemaining = 82; // 82 days remaining in 90-day sandbox
+  // Dynamic GCP Trial Pool State (initialized with temporal calculation)
+  const defaultStartDate = new Date('2026-09-14T00:00:00.000Z');
+  const defaultDaysElapsed = Math.floor(Math.max(0, Date.now() - defaultStartDate.getTime()) / (1000 * 60 * 60 * 24));
+  const defaultDaysRemaining = Math.max(0, 90 - defaultDaysElapsed);
+
+  const [gcpTotalCredits, setGcpTotalCredits] = useState<number>(33435.00);
+  const [gcpBurnEstimated, setGcpBurnEstimated] = useState<number>(Number((defaultDaysElapsed * 0.52).toFixed(2)));
+  const [daysRemaining, setDaysRemaining] = useState<number>(defaultDaysRemaining);
+
+  const gcpRemaining = Math.max(0, gcpTotalCredits - gcpBurnEstimated);
+
+  const fetchDynamicBilling = async () => {
+    try {
+      const res = await fetch('/api/jarvis/billing', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.billing) {
+          if (typeof data.billing.gcpTotalCredits === 'number') setGcpTotalCredits(data.billing.gcpTotalCredits);
+          if (typeof data.billing.gcpBurnEstimated === 'number') setGcpBurnEstimated(data.billing.gcpBurnEstimated);
+          if (typeof data.billing.daysRemaining === 'number') setDaysRemaining(data.billing.daysRemaining);
+        }
+      }
+    } catch (err) {
+      console.warn('[BillingDashboard] API fetch warning, using dynamic client calculation:', err);
+    }
+  };
 
   useEffect(() => {
     setLastRefreshed(formatISTTime(new Date()));
@@ -53,6 +73,7 @@ export const BillingDashboard: React.FC = () => {
     if (savedBreaker !== null) {
       setCircuitBreakerActive(savedBreaker === 'true');
     }
+    fetchDynamicBilling();
   }, []);
 
   const handleToggleBreaker = () => {
@@ -61,12 +82,11 @@ export const BillingDashboard: React.FC = () => {
     localStorage.setItem('jarvis_circuit_breaker_active', String(nextState));
   };
 
-  const handleManualRefresh = () => {
+  const handleManualRefresh = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      setLastRefreshed(formatISTTime(new Date()));
-      setIsRefreshing(false);
-    }, 600);
+    await fetchDynamicBilling();
+    setLastRefreshed(formatISTTime(new Date()));
+    setIsRefreshing(false);
   };
 
   const providers: ProviderBillingStatus[] = [
@@ -75,7 +95,7 @@ export const BillingDashboard: React.FC = () => {
       category: 'CLOUD_CREDITS',
       costCurrent: '₹0 / month out-of-pocket',
       costExposure: 'MANAGED_CREDIT',
-      limitType: '₹33,435 Free Trial Pool (Active)',
+      limitType: `₹${gcpTotalCredits.toLocaleString('en-IN', { maximumFractionDigits: 0 })} Free Trial Pool (Active)`,
       usageDescription: 'Active e2-micro VM + Vertex AI inference routes. Auto-billing disabled via Circuit Breaker.',
       status: circuitBreakerActive ? 'PROTECTED' : 'EXPOSURE_RISK',
       creditsRemaining: `₹${gcpRemaining.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`,
@@ -170,8 +190,9 @@ export const BillingDashboard: React.FC = () => {
           <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
             <div className="text-[10px] font-mono text-slate-400 uppercase">GCP Trial Pool Remaining</div>
             <div className="text-lg font-mono font-bold text-cyan-300 mt-0.5">₹{gcpRemaining.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
-            <div className="text-[10px] text-cyan-500/80 font-mono">Pool: ₹33,435.00</div>
+            <div className="text-[10px] text-cyan-500/80 font-mono">Pool: ₹{gcpTotalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </div>
+
 
           <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
             <div className="text-[10px] font-mono text-slate-400 uppercase">Credit Expiry Countdown</div>
