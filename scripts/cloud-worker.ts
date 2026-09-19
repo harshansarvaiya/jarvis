@@ -540,31 +540,8 @@ async function checkGeopoliticalEscalationRadar(options: { silent?: boolean } = 
       }
     }
 
-    if (options.silent) {
-      return;
-    }
-
-    // Only alert on critical watch when a state transition occurs or once every 24h
-    if (geoReport.overallThreatLevel === 'CRITICAL_WATCH') {
-      const stateKey = 'jarvis:threat_sentry:geo:last_level';
-      const lastLevel = redis ? await redis.get(stateKey) : localSeenThreats.has('geo:CRITICAL_WATCH') ? 'CRITICAL_WATCH' : null;
-
-      // State transition: only notify if previously NOT CRITICAL_WATCH or 24h expired
-      if (lastLevel !== 'CRITICAL_WATCH') {
-        if (redis) await redis.set(stateKey, 'CRITICAL_WATCH', { ex: 24 * 3600 });
-        localSeenThreats.add('geo:CRITICAL_WATCH');
-
-        await dispatchPush(
-          '🚨 [GEOPOLITICAL RADAR] High Escalation Detected',
-          geoReport.synthesis,
-          '/radar'
-        );
-      }
-    } else {
-      // Status dropped below critical, clear lock so future escalation alerts can trigger
-      if (redis) await redis.del('jarvis:threat_sentry:geo:last_level');
-      localSeenThreats.delete('geo:CRITICAL_WATCH');
-    }
+    // Geopolitical radar runs silently in background to keep Upstash telemetry and PWA /radar up to date
+    // Dispatches only during scheduled 09:00 AM / 09:00 PM executive briefings or when explicitly queried
   } catch (geoErr: any) {
     console.warn('[Cloud Worker] Geopolitical Radar warning:', geoErr.message);
   }
