@@ -2804,6 +2804,51 @@ export async function executeJarvisTool(
         return { success: res.success, result: res.output, error: res.error };
       }
 
+      case 'arbitrate_swarm_consensus': {
+        const { directive, context } = args;
+        if (!directive) {
+          return { success: false, result: null, error: 'directive required for arbitrate_swarm_consensus.' };
+        }
+        const { arbitrateSwarmConsensus } = await import('./consensus');
+        const consensusResult = await arbitrateSwarmConsensus(directive, context);
+        return { success: true, result: consensusResult };
+      }
+
+      case 'assimilate_cognitive_dna': {
+        const { category, statement, weight, source } = args;
+        if (!statement) {
+          return { success: false, result: null, error: 'statement required for assimilate_cognitive_dna.' };
+        }
+        const { assimilateDnaNode } = await import('./dynamic-dna');
+        const res = await assimilateDnaNode({
+          category: category || 'HEURISTIC',
+          statement,
+          weight: typeof weight === 'number' ? weight : 0.9,
+          source: source || 'Autonomous Interaction',
+        });
+        return { success: res.success, result: res };
+      }
+
+      case 'initialize_epic': {
+        const { title, goal, steps } = args;
+        if (!title || !goal || !Array.isArray(steps)) {
+          return { success: false, result: null, error: 'title, goal, and steps array required for initialize_epic.' };
+        }
+        const { initializeEpic } = await import('./epic-executor');
+        const epic = await initializeEpic(title, goal, steps);
+        return { success: true, result: epic };
+      }
+
+      case 'step_epic': {
+        const { epicId } = args;
+        if (!epicId) {
+          return { success: false, result: null, error: 'epicId required for step_epic.' };
+        }
+        const { stepActiveEpic } = await import('./epic-executor');
+        const res = await stepActiveEpic(epicId);
+        return { success: true, result: res };
+      }
+
       default:
         return { success: false, result: null, error: `Unknown tool: ${toolName}` };
     }
@@ -2811,5 +2856,6 @@ export async function executeJarvisTool(
     return { success: false, result: null, error: error.message || 'Tool execution failure' };
   }
 }
+
 
 

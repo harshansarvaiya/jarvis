@@ -19,6 +19,7 @@ import {
 import { appendUniversalChatMessage, appendAgentChatMessage, getCrossChannelContext } from './storage';
 import { getPersonaConfig, buildPersonaPromptBlock } from './persona';
 import { compressSystemPrompt, compressToolOutput } from './compression';
+import { getDynamicCognitiveDnaBlock } from './dynamic-dna';
 
 import { getSpecializedAgentProfile, selectOptimalSubagent, selectOptimalSubagentAsync } from './agents-registry';
 import { sanitizeInboundText, sanitizeInboundTextAsync } from './security/shield';
@@ -298,19 +299,19 @@ export async function runJarvisAgent(
     ? getSpecializedAgentProfile(options.specializedAgentId)
     : await selectOptimalSubagentAsync(lastUserMessage.content);
 
-  if (delegatedAgent) {
-    specializedAgentBlock = `
-[AUTONOMOUS SUBAGENT DELEGATION ACTIVE]:
-- Delegated Specialist: ${delegatedAgent.name} (Role: ${delegatedAgent.role}, Category: ${delegatedAgent.category})
-- Specialized Mission & Standard: ${delegatedAgent.systemPrompt}
-- Prioritized Domain Tools: ${delegatedAgent.tools.join(', ')}
-You (${persona === 'FRIDAY' ? 'F.R.I.D.A.Y.' : 'J.A.R.V.I.S.'}) have autonomously engaged this specialist. Fulfill the directive embodying the depth, rigor, and verified domain expertise of this subagent.`;
+  // 3.8. Load Dynamic Cognitive DNA & Context Steering
+  let dynamicDnaBlock = '';
+  try {
+    dynamicDnaBlock = await getDynamicCognitiveDnaBlock();
+  } catch (dnaErr) {
+    console.warn('[Agent] Dynamic DNA loading warning:', dnaErr);
   }
 
   const contextPrompt = `
 [CURRENT TEMPORAL CONTEXT]: ${new Date().toISOString()} (Local time: ${new Date().toLocaleString()})
 ${personaPromptBlock}
 ${specializedAgentBlock}
+${dynamicDnaBlock}
 
 [TIER 1 - WORKING MEMORY & PRE-THOUGHT REASONING PASS]:
 - Unstated Motive: ${motivePass.unstatedMotive}
@@ -332,6 +333,7 @@ ${skillsContext}
 [DIRECTIVE ENFORCEMENT]:
 ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 `;
+
 
   // 4. Intent Classification & Cognitive Dispatch Decision
   const hasImage = Boolean(lastUserMessage.image && lastUserMessage.image.includes(';base64,'));
