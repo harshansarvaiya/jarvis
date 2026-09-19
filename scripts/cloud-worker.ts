@@ -500,7 +500,7 @@ async function checkGlobalThreatSentry() {
 }
 
 // 6.3 Routine D.3: European & Global Geopolitical Escalation Radar (WW3 Monitor)
-async function checkGeopoliticalEscalationRadar() {
+async function checkGeopoliticalEscalationRadar(options: { silent?: boolean } = {}) {
   try {
     const { fetchGeopoliticalThreatRadar } = await import('../lib/jarvis/osint');
     const geoReport = await fetchGeopoliticalThreatRadar();
@@ -540,13 +540,19 @@ async function checkGeopoliticalEscalationRadar() {
       }
     }
 
-    if (geoReport.overallThreatLevel === 'CRITICAL_WATCH') {
-      const sentryKey = `jarvis:threat_sentry:geo:${new Date().toISOString().slice(0, 13)}`;
-      const alreadySeen = redis ? await redis.get(sentryKey) : localSeenThreats.has(sentryKey);
+    if (options.silent) {
+      return;
+    }
 
-      if (!alreadySeen) {
-        if (redis) await redis.set(sentryKey, 'NOTIFIED', { ex: 24 * 3600 });
-        localSeenThreats.add(sentryKey);
+    // Only alert on critical watch when a state transition occurs or once every 24h
+    if (geoReport.overallThreatLevel === 'CRITICAL_WATCH') {
+      const stateKey = 'jarvis:threat_sentry:geo:last_level';
+      const lastLevel = redis ? await redis.get(stateKey) : localSeenThreats.has('geo:CRITICAL_WATCH') ? 'CRITICAL_WATCH' : null;
+
+      // State transition: only notify if previously NOT CRITICAL_WATCH or 24h expired
+      if (lastLevel !== 'CRITICAL_WATCH') {
+        if (redis) await redis.set(stateKey, 'CRITICAL_WATCH', { ex: 24 * 3600 });
+        localSeenThreats.add('geo:CRITICAL_WATCH');
 
         await dispatchPush(
           '🚨 [GEOPOLITICAL RADAR] High Escalation Detected',
@@ -554,6 +560,10 @@ async function checkGeopoliticalEscalationRadar() {
           '/radar'
         );
       }
+    } else {
+      // Status dropped below critical, clear lock so future escalation alerts can trigger
+      if (redis) await redis.del('jarvis:threat_sentry:geo:last_level');
+      localSeenThreats.delete('geo:CRITICAL_WATCH');
     }
   } catch (geoErr: any) {
     console.warn('[Cloud Worker] Geopolitical Radar warning:', geoErr.message);
@@ -784,13 +794,13 @@ async function startWorkerLoop(isTestMode: boolean = false) {
 
   console.log('[Cloud Worker] 🚀 24/7 Persistent Daemon active. Polling every 30 seconds...');
 
-  // Immediate initial sweep
+  // Immediate initial sweep (silent mode — updates telemetry without dispatching restart spam)
   await checkSystemWatchdog();
   await checkInfrastructureAndTokenHealth();
   await checkScheduledReminders();
   await checkScheduledBriefings();
   await checkGlobalThreatSentry();
-  await checkGeopoliticalEscalationRadar();
+  await checkGeopoliticalEscalationRadar({ silent: true });
 
   let tickCount = 0;
   setInterval(async () => {
