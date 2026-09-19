@@ -57,6 +57,48 @@ function loadEnv() {
 
 loadEnv();
 
+// 1.1 Single-Instance Process Mutex Lock (Guarantees zero duplicate workers)
+const LOCK_FILE = '/tmp/jarvis-telegram-worker.lock';
+
+function acquireSingleInstanceLock() {
+  try {
+    if (fs.existsSync(LOCK_FILE)) {
+      const existingPidStr = fs.readFileSync(LOCK_FILE, 'utf8').trim();
+      const existingPid = parseInt(existingPidStr, 10);
+      if (!isNaN(existingPid) && existingPid !== process.pid) {
+        try {
+          // Signal 0 tests if existing PID is actively running
+          process.kill(existingPid, 0);
+          console.warn(`[Telegram Gateway] ⚠️ Another instance is already running (PID: ${existingPid}). Terminating this redundant duplicate process.`);
+          process.exit(0);
+        } catch {
+          // Process not running, stale lockfile - overwrite
+        }
+      }
+    }
+    fs.writeFileSync(LOCK_FILE, String(process.pid), 'utf8');
+
+    const cleanLock = () => {
+      try {
+        if (fs.existsSync(LOCK_FILE)) {
+          const stored = fs.readFileSync(LOCK_FILE, 'utf8').trim();
+          if (stored === String(process.pid)) {
+            fs.unlinkSync(LOCK_FILE);
+          }
+        }
+      } catch {}
+    };
+
+    process.on('exit', cleanLock);
+    process.on('SIGINT', () => { cleanLock(); process.exit(0); });
+    process.on('SIGTERM', () => { cleanLock(); process.exit(0); });
+  } catch (err) {
+    console.warn('[Telegram Gateway] Process lock warning:', err);
+  }
+}
+
+acquireSingleInstanceLock();
+
 const ALLOWED_USER_ID = process.env.TELEGRAM_ALLOWED_USER_ID || '864360540';
 const gateway = new TelegramGateway();
 

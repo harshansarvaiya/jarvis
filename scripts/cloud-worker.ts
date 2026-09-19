@@ -33,6 +33,48 @@ function loadEnv() {
 
 loadEnv();
 
+// 1.1 Single-Instance Process Mutex Lock (Guarantees zero duplicate cloud workers)
+const LOCK_FILE = '/tmp/jarvis-cloud-worker.lock';
+
+function acquireSingleInstanceLock() {
+  try {
+    if (fs.existsSync(LOCK_FILE)) {
+      const existingPidStr = fs.readFileSync(LOCK_FILE, 'utf8').trim();
+      const existingPid = parseInt(existingPidStr, 10);
+      if (!isNaN(existingPid) && existingPid !== process.pid) {
+        try {
+          // Signal 0 tests if existing PID is actively running
+          process.kill(existingPid, 0);
+          console.warn(`[Cloud Worker] ⚠️ Another instance is already running (PID: ${existingPid}). Terminating this redundant process.`);
+          process.exit(0);
+        } catch {
+          // Stale lockfile - overwrite
+        }
+      }
+    }
+    fs.writeFileSync(LOCK_FILE, String(process.pid), 'utf8');
+
+    const cleanLock = () => {
+      try {
+        if (fs.existsSync(LOCK_FILE)) {
+          const stored = fs.readFileSync(LOCK_FILE, 'utf8').trim();
+          if (stored === String(process.pid)) {
+            fs.unlinkSync(LOCK_FILE);
+          }
+        }
+      } catch {}
+    };
+
+    process.on('exit', cleanLock);
+    process.on('SIGINT', () => { cleanLock(); process.exit(0); });
+    process.on('SIGTERM', () => { cleanLock(); process.exit(0); });
+  } catch (err) {
+    console.warn('[Cloud Worker] Process lock warning:', err);
+  }
+}
+
+acquireSingleInstanceLock();
+
 const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 const VAPID_PUB = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
