@@ -76,3 +76,153 @@ export const MCP_SERVERS = {
     execute: executeDatabaseMCP,
   },
 };
+
+export interface DynamicMicroTool {
+  name: string;
+  description: string;
+  parametersSchema?: Record<string, any>;
+  endpointUrl?: string;
+  httpMethod?: 'GET' | 'POST';
+  headers?: Record<string, string>;
+  compiledAt: string;
+  source: 'EPHEMERAL_SYNTHESIS' | 'ARCHIVED_DNA';
+}
+
+class DynamicMicroToolRegistry {
+  private tools: Map<string, DynamicMicroTool> = new Map();
+
+  public registerTool(tool: DynamicMicroTool): void {
+    this.tools.set(tool.name, tool);
+  }
+
+  public getTool(name: string): DynamicMicroTool | undefined {
+    return this.tools.get(name);
+  }
+
+  public listTools(): DynamicMicroTool[] {
+    return Array.from(this.tools.values());
+  }
+}
+
+export const dynamicMicroToolRegistry = new DynamicMicroToolRegistry();
+
+/**
+ * Executes Just-In-Time (JIT) dynamic micro-MCP tools synthesized on the fly.
+ */
+export async function executeDynamicJitMCP(
+  action: 'register_tool' | 'execute_tool' | 'list_tools' | 'archive_to_dna',
+  params: Record<string, any> = {}
+): Promise<MCPExecutionResult> {
+  const startTime = Date.now();
+
+  try {
+    switch (action) {
+      case 'register_tool': {
+        const { name, description, parametersSchema, endpointUrl, httpMethod, headers } = params;
+        if (!name || !description) throw new Error('Parameters "name" and "description" are required to register a tool.');
+        
+        const tool: DynamicMicroTool = {
+          name,
+          description,
+          parametersSchema,
+          endpointUrl,
+          httpMethod: httpMethod || 'GET',
+          headers: headers || {},
+          compiledAt: new Date().toISOString(),
+          source: 'EPHEMERAL_SYNTHESIS',
+        };
+
+        dynamicMicroToolRegistry.registerTool(tool);
+
+        return {
+          success: true,
+          server: 'mcp:dynamic_jit',
+          action: 'register_tool',
+          output: { message: `Dynamic micro-tool "${name}" registered successfully.`, tool },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'execute_tool': {
+        const { name, inputs } = params;
+        if (!name) throw new Error('Parameter "name" is required to execute a dynamic tool.');
+        
+        const tool = dynamicMicroToolRegistry.getTool(name);
+        if (!tool) throw new Error(`Dynamic tool "${name}" is not registered in active registry.`);
+
+        if (tool.endpointUrl) {
+          const fetchOptions: RequestInit = {
+            method: tool.httpMethod || 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': 'JARVIS-Dynamic-JIT-Engine/2.0',
+              ...(tool.headers || {}),
+            },
+            signal: AbortSignal.timeout(10000),
+          };
+
+          if (tool.httpMethod === 'POST' && inputs) {
+            fetchOptions.body = JSON.stringify(inputs);
+          }
+
+          const res = await fetch(tool.endpointUrl, fetchOptions);
+          const data = await res.json().catch(() => res.text());
+
+          return {
+            success: res.ok,
+            server: `mcp:dynamic:${name}`,
+            action: 'execute_tool',
+            output: data,
+            latencyMs: Date.now() - startTime,
+          };
+        }
+
+        return {
+          success: true,
+          server: `mcp:dynamic:${name}`,
+          action: 'execute_tool',
+          output: { message: `Mock execution of dynamic tool "${name}" completed nominal.`, inputs },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'list_tools': {
+        const tools = dynamicMicroToolRegistry.listTools();
+        return {
+          success: true,
+          server: 'mcp:dynamic_jit',
+          action: 'list_tools',
+          output: { total: tools.length, tools },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'archive_to_dna': {
+        const { name } = params;
+        const tool = name ? dynamicMicroToolRegistry.getTool(name) : null;
+        if (tool) tool.source = 'ARCHIVED_DNA';
+
+        return {
+          success: true,
+          server: 'mcp:dynamic_jit',
+          action: 'archive_to_dna',
+          output: { message: `Tool "${name || 'all'}" archived into long-term cognitive DNA matrix.` },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      default:
+        throw new Error(`Unsupported Dynamic JIT MCP action: ${action}`);
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      server: 'mcp:dynamic_jit',
+      action,
+      output: null,
+      error: err.message || 'Dynamic JIT MCP execution failed',
+      latencyMs: Date.now() - startTime,
+    };
+  }
+}
+

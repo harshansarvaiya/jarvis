@@ -2797,6 +2797,13 @@ export async function executeJarvisTool(
         return { success: true, result: report };
       }
 
+      case 'mcp_dynamic_jit': {
+        const { action, ...params } = args;
+        const { executeDynamicJitMCP } = await import('./mcp-registry');
+        const res = await executeDynamicJitMCP(action, params);
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
       default:
         return { success: false, result: null, error: `Unknown tool: ${toolName}` };
     }
@@ -2804,4 +2811,5 @@ export async function executeJarvisTool(
     return { success: false, result: null, error: error.message || 'Tool execution failure' };
   }
 }
+
 
