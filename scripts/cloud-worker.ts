@@ -129,31 +129,27 @@ async function dispatchPush(title: string, body: string, actionUrl: string = '/'
       timestamp: new Date().toISOString(),
     });
 
-    let sentCount = 0;
-    for (const key of keys) {
-      const data = await redis.get(key);
-      if (!data) continue;
-
-      let sub: any = null;
-      try {
-        const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-        sub = parsed.subscription || parsed;
-      } catch {
-        continue;
-      }
-
-      if (!sub?.endpoint) continue;
-
-      try {
-        await webpush.sendNotification(sub, payload);
-        sentCount++;
-      } catch (err: any) {
-        if (err.statusCode === 410 || err.statusCode === 404) {
-          await redis.del(key);
+    const subResults = await Promise.all(
+      keys.map(async (key) => {
+        try {
+          const data = await redis!.get(key);
+          if (!data) return null;
+          const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+          const sub = parsed.subscription || parsed;
+          if (!sub?.endpoint) return null;
+          await webpush.sendNotification(sub, payload);
+          return true;
+        } catch (err: any) {
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            await redis!.del(key).catch(() => {});
+          }
+          return null;
         }
-      }
-    }
-    console.log(`[Cloud Worker] 📲 Web Push dispatched to ${sentCount}/${keys.length} devices: "${title}"`);
+      })
+    );
+
+    const sentCount = subResults.filter(Boolean).length;
+    console.log(`[Cloud Worker] 📲 Web Push dispatched in parallel to ${sentCount}/${keys.length} devices: "${title}"`);
   } catch (err: any) {
     console.error('[Cloud Worker] Push dispatch error:', err.message);
   }

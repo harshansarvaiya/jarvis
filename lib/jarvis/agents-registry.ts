@@ -188,18 +188,14 @@ export function selectOptimalSubagent(prompt: string): AgentProfile | undefined 
  * Leverages Jev's sub-50ms probabilistic choice model, falling back to heuristic regexes.
  */
 export async function selectOptimalSubagentAsync(prompt: string): Promise<AgentProfile | undefined> {
+  const localMatched = selectOptimalSubagent(prompt);
+  if (localMatched) return localMatched;
+
   if (process.env.TYPESAFE_API_KEY) {
-    try {
-      const { jevRouteSubagent } = await import('./providers/jev');
-      const routed = await jevRouteSubagent(prompt);
-      if (routed.subagentId) {
-        const profile = getSpecializedAgentProfile(routed.subagentId);
-        if (profile) return profile;
-      }
-    } catch (jevErr) {
-      console.warn('[SubagentRegistry] Jev routing error, using heuristics:', jevErr);
-    }
+    import('./providers/jev')
+      .then(({ jevRouteSubagent }) => jevRouteSubagent(prompt))
+      .catch((jevErr) => console.warn('[SubagentRegistry] Async Jev routing error:', jevErr));
   }
-  return selectOptimalSubagent(prompt);
+  return undefined;
 }
 

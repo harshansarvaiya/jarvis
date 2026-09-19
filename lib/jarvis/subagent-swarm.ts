@@ -55,16 +55,16 @@ export async function executeSubagentTask(options: {
       toolsExecuted.push('run_security_audit');
       diagnostics = auditRes.result;
     } else if (profile.id === 'build-error-resolver') {
-      const compileRes = await executeJarvisTool('runCompilerVerification', { mode: 'check' });
-      toolsExecuted.push('runCompilerVerification');
+      const compileRes = await executeJarvisTool('cloud_execute_command', { command: 'npx tsc --noEmit' });
+      toolsExecuted.push('cloud_execute_command');
       diagnostics = compileRes.result;
     } else if (profile.id === 'performance-optimizer') {
       const infraRes = await executeJarvisTool('inspect_infrastructure', { fullHealthCheck: true });
       toolsExecuted.push('inspect_infrastructure');
       diagnostics = infraRes.result;
     } else if (profile.id === 'architecture-expert') {
-      const archRes = await executeJarvisTool('getCodebaseArchitecture', {});
-      toolsExecuted.push('getCodebaseArchitecture');
+      const archRes = await executeJarvisTool('inspect_infrastructure', { fullHealthCheck: true });
+      toolsExecuted.push('inspect_infrastructure');
       diagnostics = archRes.result;
     }
   } catch (diagErr) {

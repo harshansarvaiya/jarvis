@@ -66,25 +66,13 @@ export function detectActivePersona(prompt: string): { persona: ActivePersona; e
  * Evaluates directive with Jev's choice model to determine whether FRIDAY or JARVIS is optimal.
  */
 export async function detectActivePersonaAsync(prompt: string): Promise<{ persona: ActivePersona; explicit: boolean; confidence?: number }> {
-  const clean = prompt.toLowerCase();
-  if (/\bfriday\b|\bf\.r\.i\.d\.a\.y\b/i.test(clean)) {
-    return { persona: 'FRIDAY', explicit: true, confidence: 1.0 };
-  }
-  if (/\bjarvis\b|\bj\.a\.r\.v\.i\.s\b/i.test(clean)) {
-    return { persona: 'JARVIS', explicit: true, confidence: 1.0 };
-  }
-
+  const result = detectActivePersona(prompt);
   if (process.env.TYPESAFE_API_KEY) {
-    try {
-      const { jevClassifyPersona } = await import('./providers/jev');
-      const jevResult = await jevClassifyPersona(prompt);
-      return { persona: jevResult.persona, explicit: false, confidence: jevResult.confidence };
-    } catch (jevErr) {
-      console.warn('[Orchestrator] Jev persona detection error, using heuristics:', jevErr);
-    }
+    import('./providers/jev')
+      .then(({ jevClassifyPersona }) => jevClassifyPersona(prompt))
+      .catch((jevErr) => console.warn('[Orchestrator] Async Jev persona warning:', jevErr));
   }
-
-  return detectActivePersona(prompt);
+  return result;
 }
 
 
