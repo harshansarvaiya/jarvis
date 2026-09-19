@@ -578,10 +578,11 @@ export function searchMemoriesHybrid(
   return fusedResults.filter((r) => r.rrfScore >= minScore).slice(0, topK);
 }
 
-export function recordEvolution(milestone: string, learnings: string[]): void {
+export function recordEvolution(milestone: string, learnings: string | string[]): void {
   const state = loadJarvisState();
   state.evolutionStage += 1;
-  learnings.forEach((learning) => {
+  const learningArr = Array.isArray(learnings) ? learnings : [learnings];
+  learningArr.forEach((learning) => {
     state.memories.unshift({
       id: `mem-evo-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       category: 'EVOLUTION',
