@@ -2751,6 +2751,52 @@ export async function executeJarvisTool(
         };
       }
 
+      case 'execute_self_patch': {
+        const { targetFile, instruction, mutatedContent, commitMessage, pushToRemote } = args;
+        if (!targetFile) {
+          return { success: false, result: null, error: 'targetFile is required for execute_self_patch.' };
+        }
+        const { executeAutonomousSelfPatch } = await import('./codeact');
+        const patchResult = await executeAutonomousSelfPatch({
+          targetFile,
+          instruction: instruction || 'Autonomous self-patch',
+          mutatedContent,
+          commitMessage,
+          pushToRemote: Boolean(pushToRemote),
+        });
+        return {
+          success: patchResult.success,
+          result: patchResult,
+          error: patchResult.error,
+        };
+      }
+
+      case 'dispatch_subagent_swarm': {
+        const { tasks } = args;
+        if (!Array.isArray(tasks) || tasks.length === 0) {
+          return { success: false, result: null, error: 'tasks array is required for dispatch_subagent_swarm.' };
+        }
+        const { dispatchSubagentSwarm } = await import('./subagent-swarm');
+        const swarmResult = await dispatchSubagentSwarm(tasks);
+        return { success: swarmResult.successful > 0, result: swarmResult };
+      }
+
+      case 'delegate_remote_workload': {
+        const { command, taskId, reason } = args;
+        if (!command) {
+          return { success: false, result: null, error: 'command is required for delegate_remote_workload.' };
+        }
+        const { delegateToRemoteCloudRunner } = await import('./subagent-swarm');
+        const delRes = await delegateToRemoteCloudRunner({ command, taskId, reason });
+        return { success: delRes.success, result: delRes, error: delRes.success ? undefined : delRes.message };
+      }
+
+      case 'get_geopolitical_radar': {
+        const { fetchGeopoliticalThreatRadar } = await import('./osint');
+        const report = await fetchGeopoliticalThreatRadar();
+        return { success: true, result: report };
+      }
+
       default:
         return { success: false, result: null, error: `Unknown tool: ${toolName}` };
     }
@@ -2758,3 +2804,4 @@ export async function executeJarvisTool(
     return { success: false, result: null, error: error.message || 'Tool execution failure' };
   }
 }
+

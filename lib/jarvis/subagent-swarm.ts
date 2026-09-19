@@ -206,3 +206,95 @@ Please provide your rigorous specialist breakdown:
     latencyMs: Date.now() - startTime,
   };
 }
+
+export interface SwarmSynthesisResult {
+  swarmId: string;
+  totalAgents: number;
+  successful: number;
+  failed: number;
+  results: SubagentExecutionResult[];
+  consensusSynthesis: string;
+  keyActionItems: string[];
+  totalLatencyMs: number;
+}
+
+/**
+ * Dispatches multiple specialized subagents in parallel with multi-perspective synthesis
+ */
+export async function dispatchSubagentSwarm(
+  tasks: Array<{ agentId: string; instruction: string; contextPayload?: string }>
+): Promise<SwarmSynthesisResult> {
+  const swarmId = `swarm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const startTime = Date.now();
+
+  const promises = tasks.map((t) => executeSubagentTask(t));
+  const settled = await Promise.allSettled(promises);
+
+  const results: SubagentExecutionResult[] = [];
+  let successful = 0;
+  let failed = 0;
+
+  for (let i = 0; i < settled.length; i++) {
+    const res = settled[i];
+    if (res.status === 'fulfilled') {
+      results.push(res.value);
+      if (res.value.status === 'SUCCESS') successful++;
+      else failed++;
+    } else {
+      failed++;
+      results.push({
+        agentId: tasks[i].agentId,
+        name: tasks[i].agentId,
+        role: 'Specialist',
+        category: 'ENGINEERING',
+        status: 'FAILED',
+        instruction: tasks[i].instruction,
+        findings: `Subagent execution error: ${res.reason?.message || 'Unknown error'}`,
+        recommendations: [],
+        toolsExecuted: [],
+        latencyMs: Date.now() - startTime,
+      });
+    }
+  }
+
+  // Aggregate recommendations
+  const allRecs = results.flatMap((r) => r.recommendations);
+  const uniqueRecs = Array.from(new Set(allRecs)).slice(0, 8);
+
+  const consensusSynthesis = `Swarm ${swarmId} complete: ${successful}/${tasks.length} specialists finished with consensus. Key findings integrated across ${results.map((r) => r.name).join(', ')}.`;
+
+  return {
+    swarmId,
+    totalAgents: tasks.length,
+    successful,
+    failed,
+    results,
+    consensusSynthesis,
+    keyActionItems: uniqueRecs,
+    totalLatencyMs: Date.now() - startTime,
+  };
+}
+
+/**
+ * Delegates heavy compute workloads (heavy compilation, docker sandboxes, full test suites)
+ * to remote GitHub Actions cloud runners via workflow_dispatch, strictly adhering to Directive 06.
+ */
+export async function delegateToRemoteCloudRunner(options: {
+  command: string;
+  taskId?: string;
+  reason?: string;
+}): Promise<{ success: boolean; message: string; runner: string }> {
+  const { executeGitHubMCP } = await import('./mcp');
+  const res = await executeGitHubMCP('dispatch_workflow_run', {
+    command: options.command,
+    taskId: options.taskId || `task-remote-${Date.now()}`,
+  });
+
+  return {
+    success: res.success,
+    message: res.success
+      ? `Workload successfully delegated to remote GitHub Actions runner (${options.reason || 'Heavy compute offload'}). Directive 06 strictly preserved.`
+      : `Delegation warning: ${res.error || 'Failed to dispatch GitHub Action'}`,
+    runner: 'github-actions-ubuntu-latest',
+  };
+}

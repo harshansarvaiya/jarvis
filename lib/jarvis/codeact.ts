@@ -210,3 +210,114 @@ export async function runCodeActStep(
 
   return { action, observation };
 }
+
+export interface SelfPatchResult {
+  success: boolean;
+  targetFile: string;
+  compilerClean: boolean;
+  rolledBack: boolean;
+  commitSha?: string;
+  error?: string;
+  output?: string;
+  executionMs: number;
+}
+
+/**
+ * Executes a closed-loop autonomous self-patch on a file with automatic backup,
+ * compiler verification gate (`tsc --noEmit`), rollback on failure, and optional Git commit & push.
+ */
+export async function executeAutonomousSelfPatch(args: {
+  targetFile: string;
+  instruction: string;
+  mutatedContent?: string;
+  commitMessage?: string;
+  pushToRemote?: boolean;
+  cwd?: string;
+}): Promise<SelfPatchResult> {
+  const startTime = Date.now();
+  const cwd = args.cwd || process.cwd();
+  const fullPath = path.isAbsolute(args.targetFile) ? args.targetFile : path.join(cwd, args.targetFile);
+
+  if (!fs.existsSync(fullPath)) {
+    return {
+      success: false,
+      targetFile: args.targetFile,
+      compilerClean: false,
+      rolledBack: false,
+      error: `File not found: ${args.targetFile}`,
+      executionMs: Date.now() - startTime,
+    };
+  }
+
+  const originalContent = fs.readFileSync(fullPath, 'utf8');
+
+  try {
+    // 1. Apply mutation
+    if (args.mutatedContent !== undefined) {
+      fs.writeFileSync(fullPath, args.mutatedContent, 'utf8');
+    }
+
+    // 2. Closed-Loop Compiler Verification Gate
+    const verifyRes = await runCompilerVerification(cwd);
+
+    if (!verifyRes.clean) {
+      // Rollback immediately to preserve stability
+      fs.writeFileSync(fullPath, originalContent, 'utf8');
+      console.warn(`[SelfPatch] ⚠️ Compiler check failed. Rolled back ${args.targetFile}`);
+
+      return {
+        success: false,
+        targetFile: args.targetFile,
+        compilerClean: false,
+        rolledBack: true,
+        error: `Compiler verification failed:\n${verifyRes.output}`,
+        executionMs: Date.now() - startTime,
+      };
+    }
+
+    // 3. Optional Git Commit & Push
+    let commitSha: string | undefined = undefined;
+    if (args.commitMessage) {
+      try {
+        await execAsync(`git add "${fullPath}"`, { cwd });
+        const { stdout: commitOut } = await execAsync(
+          `git commit -m "${args.commitMessage.replace(/"/g, '\\"')}"`,
+          { cwd }
+        );
+        const match = commitOut.match(/\[([a-zA-Z0-9_-]+)\s+([a-f0-9]+)\]/);
+        commitSha = match ? match[2] : 'committed';
+
+        if (args.pushToRemote) {
+          await execAsync('git push origin main', { cwd, timeout: 30000 });
+          console.log(`[SelfPatch] 🚀 Pushed commit ${commitSha} to origin/main.`);
+        }
+      } catch (gitErr: any) {
+        console.warn('[SelfPatch] Git commit/push warning:', gitErr.message);
+      }
+    }
+
+    return {
+      success: true,
+      targetFile: args.targetFile,
+      compilerClean: true,
+      rolledBack: false,
+      commitSha,
+      output: `Autonomous patch verified and applied cleanly (${Date.now() - startTime}ms).`,
+      executionMs: Date.now() - startTime,
+    };
+  } catch (err: any) {
+    // Safety rollback
+    if (fs.existsSync(fullPath)) {
+      fs.writeFileSync(fullPath, originalContent, 'utf8');
+    }
+
+    return {
+      success: false,
+      targetFile: args.targetFile,
+      compilerClean: false,
+      rolledBack: true,
+      error: err.message || 'Unexpected self-patch exception',
+      executionMs: Date.now() - startTime,
+    };
+  }
+}
