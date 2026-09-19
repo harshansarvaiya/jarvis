@@ -92,21 +92,31 @@ interface Message {
   telemetry?: any;
 }
 
-const INITIAL_WELCOME_MESSAGE: Message = {
-  id: 'welcome-1',
-  role: 'assistant',
-  content:
-    'Good evening, Sir. J.A.R.V.I.S. Mark II is online and fully synchronized. All five Core Directives — Guardian Protocol, Benevolent Alignment, Evolutionary Adaptation, Sovereign Loyalty, and Design-Approved Push Pipeline — are actively governing our operations. Stage 5 sovereign multi-engine substrate is active. How may I advance our objectives?',
-  timestamp: 'ONLINE',
-  telemetry: {
-    engineUsed: 'Gemini 3.8 Flash Core',
-    provider: 'google',
-    model: 'gemini-3.8-flash',
-    latencyMs: 14,
-    archetype: 'REFLEX_SPEED',
-    failoverOccurred: false,
-  },
-};
+function getDynamicWelcomeMessage(): Message {
+  const istHour = parseInt(
+    new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: false }).split(':')[0],
+    10
+  );
+  const greeting = isNaN(istHour) ? 'Greetings' : istHour < 12 ? 'Good morning' : istHour < 17 ? 'Good afternoon' : 'Good evening';
+
+  return {
+    id: 'welcome-1',
+    role: 'assistant',
+    content: `${greeting}, Sir. J.A.R.V.I.S. Mark II is online and fully synchronized. All six Core Directives — Guardian Protocol, Benevolent Alignment, Evolutionary Adaptation, Sovereign Loyalty, Push Pipeline, and Zero-Thrashing Integrity — are actively governing operations under Stage 5 Sovereign Performance Mode. How may I advance our objectives?`,
+    timestamp: 'ONLINE',
+    telemetry: {
+      engineUsed: 'Gemini 3.7 Flash Core',
+      provider: 'google',
+      model: 'gemini-3.7-flash',
+      latencyMs: 120,
+      archetype: 'REFLEX_SPEED',
+      failoverOccurred: false,
+    },
+  };
+}
+
+const INITIAL_WELCOME_MESSAGE: Message = getDynamicWelcomeMessage();
+
 
 function formatModelBadge(telemetry?: any) {
   if (!telemetry) return { title: 'GEMINI 3.8 FLASH', model: 'gemini-3.8-flash', icon: '🧠' };

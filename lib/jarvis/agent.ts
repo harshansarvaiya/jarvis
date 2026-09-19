@@ -20,6 +20,8 @@ import { appendUniversalChatMessage, appendAgentChatMessage, getCrossChannelCont
 import { getPersonaConfig, buildPersonaPromptBlock } from './persona';
 import { compressSystemPrompt, compressToolOutput } from './compression';
 import { getDynamicCognitiveDnaBlock } from './dynamic-dna';
+import * as fs from 'fs';
+import * as path from 'path';
 
 import { getSpecializedAgentProfile, selectOptimalSubagent, selectOptimalSubagentAsync } from './agents-registry';
 import { sanitizeInboundText, sanitizeInboundTextAsync } from './security/shield';
@@ -307,6 +309,26 @@ export async function runJarvisAgent(
     console.warn('[Agent] Dynamic DNA loading warning:', dnaErr);
   }
 
+  // 3.9. Load Dynamic Creator Profile & Gating
+  let creatorProfileBlock = `[CREATOR IDENTITY & CONTEXTUAL GATING]:
+- Creator: Sir (Harshan Kishor Sarvaiya), Java Full Stack Developer & Backend Consultant (Morgan Stanley via Wissen Tech), Mumbai (IST, UTC+5:30).
+- CRITICAL CONTEXTUAL GATING RULE: Only activate developer or lifestyle context when Sir explicitly touches upon backend engineering, system design, interview preparation, work scheduling, or fitness. Never force profile context into unrelated tasks.`;
+
+
+  try {
+    const profilePath = path.resolve(process.cwd(), 'data/sir-profile.json');
+    if (fs.existsSync(profilePath)) {
+      const pData = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+      if (pData?.identity) {
+        creatorProfileBlock = `[CREATOR IDENTITY & CONTEXTUAL GATING]:
+- Creator: Sir (${pData.identity.fullName || 'Harshan Kishor Sarvaiya'}), ${pData.identity.role || 'Backend Consultant'} (${pData.identity.affiliation || ''}), ${pData.identity.location || 'Mumbai'}.
+- CRITICAL CONTEXTUAL GATING RULE: ${pData.contextualGating?.rule || 'Only activate developer or lifestyle context when Sir explicitly touches upon backend engineering, system design, interview preparation, work scheduling, or fitness.'}`;
+      }
+    }
+  } catch (profErr) {
+    console.warn('[Agent] Profile load warning:', profErr);
+  }
+
   const contextPrompt = `
 [CURRENT TEMPORAL CONTEXT]: ${new Date().toISOString()} (Local time: ${new Date().toLocaleString()})
 ${personaPromptBlock}
@@ -326,13 +348,12 @@ ${completedTasks.map((t) => `- [COMPLETED] ${t.title} (ID: ${t.id}${t.completedA
 ${cognitiveContextPrompt}
 ${retrievedKnowledgeContext}
 ${skillsContext}
-[CREATOR IDENTITY & CONTEXTUAL GATING]:
-- Creator: Sir (Harshan Kishor Sarvaiya), Java Full Stack Developer & Backend Consultant (Morgan Stanley via Wissen Tech), Mumbai (IST, UTC+5:30).
-- CRITICAL CONTEXTUAL GATING RULE: Sir's professional engineering stack (Java, Spring Boot, Microservices, Kafka, Redis, SQL) and personal lifestyle (M/W/F office, 10k steps, vegetarian nutrition) are background context. DO NOT shoehorn or force his developer profile or personal routines into unrelated prompts (e.g. when discussing J.A.R.V.I.S. substrate architecture, Next.js, Telegram, general research, or general tasks). Only activate developer or lifestyle context when Sir explicitly touches upon backend engineering, system design, interview preparation, work scheduling, or fitness.
+${creatorProfileBlock}
 
 [DIRECTIVE ENFORCEMENT]:
 ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 `;
+
 
 
   // 4. Intent Classification & Cognitive Dispatch Decision

@@ -35,10 +35,14 @@ export function getGitHubClient(): GitHubClient {
     process.env.GH_TOKEN ||
     '';
 
+  const [envOwner, envRepo] = (process.env.GITHUB_REPOSITORY || 'harshansarvaiya/jarvis').split('/');
+  const repoOwner = process.env.GITHUB_REPO_OWNER || envOwner || 'harshansarvaiya';
+  const repoName = process.env.GITHUB_REPO_NAME || envRepo || 'jarvis';
+
   return {
     token,
-    repoOwner: 'harshansarvaiya',
-    repoName: 'jarvis',
+    repoOwner,
+    repoName,
     getRepo: () => executeGitHubMCP('get_repo'),
     listCommits: (limit = 5) => executeGitHubMCP('list_commits', { limit }),
     getFile: (path: string, ref = 'main') => executeGitHubMCP('get_file', { path, ref }),
@@ -48,6 +52,7 @@ export function getGitHubClient(): GitHubClient {
       executeGitHubMCP('create_or_update_file', { path, content, message, sha, branch }),
   };
 }
+
 
 export const MCP_SERVERS = {
   github: {
