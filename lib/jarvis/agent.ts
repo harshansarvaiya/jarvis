@@ -930,7 +930,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
                 systemInstruction,
                 tools: geminiTools,
                 generationConfig: sentryGenConfig,
-                signal: AbortSignal.timeout(180000),
+                signal: AbortSignal.timeout(8000),
               });
             } else {
               response = await fetch(activeApiUrl, {
@@ -1017,7 +1017,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             systemInstruction,
             tools: geminiTools,
             generationConfig: toolGenerationConfig,
-            signal: AbortSignal.timeout(180000),
+            signal: AbortSignal.timeout(8000),
           });
         } else {
           response = await fetch(activeApiUrl, {
@@ -1102,7 +1102,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             contents: finalPrompt,
             systemInstruction,
             generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
-            signal: AbortSignal.timeout(90000),
+            signal: AbortSignal.timeout(8000),
           });
           if (synthRes.ok) {
             const sData = await synthRes.json();

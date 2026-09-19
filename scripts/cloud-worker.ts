@@ -43,10 +43,8 @@ function acquireSingleInstanceLock() {
       const existingPid = parseInt(existingPidStr, 10);
       if (!isNaN(existingPid) && existingPid !== process.pid) {
         try {
-          // Signal 0 tests if existing PID is actively running
-          process.kill(existingPid, 0);
-          console.warn(`[Cloud Worker] ⚠️ Another instance is already running (PID: ${existingPid}). Terminating this redundant process.`);
-          process.exit(0);
+          process.kill(existingPid, 'SIGKILL');
+          console.log(`[Cloud Worker] 🔄 Terminated previous stale worker instance (PID: ${existingPid}) to yield to latest deploy.`);
         } catch {
           // Stale lockfile - overwrite
         }
