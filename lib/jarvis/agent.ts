@@ -156,37 +156,26 @@ export async function runJarvisAgent(
     };
   }
 
-  // 1. Unified Speculative Ingress Fan-Out (TypeSafe AI Jev System One: Sub-120ms Ingress)
-  let persona: ActivePersona = 'JARVIS';
-  let personaExplicit = false;
+  // 1. Ultra-Fast Zero-Latency Deterministic Ingress (0ms Local Reflex)
+  const shieldResult = await sanitizeInboundTextAsync(lastUserMessage.content);
+  if (shieldResult.threatDetected) {
+    lastUserMessage.content = shieldResult.sanitized;
+  }
+  const detected = detectActivePersona(lastUserMessage.content);
+  let persona: ActivePersona = detected.persona;
+  let personaExplicit = detected.explicit;
   let toolCategory: JevToolCategory = 'ALL_TOOLS';
   let dynamicSubagentId: string | null = options.specializedAgentId || null;
 
+  // Non-blocking speculative background Jev triage for adaptive telemetry
   if (process.env.TYPESAFE_API_KEY) {
-    try {
-      const triage = await jevUnifiedIngressTriage(lastUserMessage.content);
-      persona = triage.persona;
-      toolCategory = triage.toolCategory;
-      if (!dynamicSubagentId && triage.subagentId) {
-        dynamicSubagentId = triage.subagentId;
-      }
-      if (triage.isThreat) {
-        console.warn(`[AgentShield / Jev Sentry] 🛡️ Neutralized inbound threat (Risk=${triage.threatProbability})`);
-        const shieldResult = await sanitizeInboundTextAsync(lastUserMessage.content);
-        lastUserMessage.content = shieldResult.sanitized;
-      }
-    } catch (jevErr) {
-      console.warn('[Agent] Jev unified ingress triage error:', jevErr);
-    }
-  } else {
-    // Heuristic Fallbacks
-    const shieldResult = await sanitizeInboundTextAsync(lastUserMessage.content);
-    if (shieldResult.threatDetected) {
-      lastUserMessage.content = shieldResult.sanitized;
-    }
-    const detected = detectActivePersona(lastUserMessage.content);
-    persona = detected.persona;
-    personaExplicit = detected.explicit;
+    jevUnifiedIngressTriage(lastUserMessage.content)
+      .then((triage) => {
+        if (triage.isThreat) {
+          console.warn(`[AgentShield / Jev Sentry] 🛡️ Asynchronously identified threat (Risk=${triage.threatProbability})`);
+        }
+      })
+      .catch((jevErr) => console.warn('[Agent] Async Jev ingress warning:', jevErr));
   }
 
   // Explicit keyword override takes precedence
@@ -203,19 +192,6 @@ export async function runJarvisAgent(
 
   if (isGithubOrRepoQuery) {
     persona = 'FRIDAY';
-    if (toolCategory === 'CONVERSATIONAL_NONE') {
-      toolCategory = 'WEB_RESEARCH';
-    }
-  }
-
-  // VM / Infrastructure Telemetry Query Guarantee
-  const isVmOrInfraQuery =
-    /\b(vm|virtual machine|runner|server|offline|online|uptime|infrastructure|health)\b/i.test(lastUserMessage.content);
-
-  if (isVmOrInfraQuery) {
-    if (toolCategory === 'CONVERSATIONAL_NONE') {
-      toolCategory = 'WORKSPACE_ENGINEERING';
-    }
   }
 
   // 1.1 Safety & Directive Check (Guardian Protocol)
@@ -1182,21 +1158,19 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     } catch (prefErr) {
       console.warn('[Agent] Preference assimilation warning:', prefErr);
     }
-    // Pre-Dispatch Empirical Grounding Critic Gate (TypeSafe Jev System One ~80ms)
+    // Pre-Dispatch Empirical Grounding Critic (Async non-blocking background telemetry)
     if (process.env.TYPESAFE_API_KEY) {
-      try {
-        const groundingCheck = await jevVerifyGroundingAndTruthfulness(
-          lastUserMessage.content,
-          finalReply,
-          toolCallsExecuted
-        );
-        if (!groundingCheck.isGrounded && groundingCheck.unverifiedClaimsDetected) {
-          console.warn('[AgentShield / Jev Grounding Critic] ⚠️ Flagged ungrounded empirical affirmation in outbound response');
-          finalReply += `\n\n> ⚠️ *[Grounding Protocol Note: Empirical state affirmation unverified by active tool execution in this turn.]*`;
-        }
-      } catch (groundingErr) {
-        console.warn('[Agent] Grounding critic pass warning:', groundingErr);
-      }
+      jevVerifyGroundingAndTruthfulness(
+        lastUserMessage.content,
+        finalReply,
+        toolCallsExecuted
+      )
+        .then((groundingCheck) => {
+          if (!groundingCheck.isGrounded && groundingCheck.unverifiedClaimsDetected) {
+            console.warn('[AgentShield / Jev Grounding Critic] ⚠️ Asynchronously noted ungrounded empirical affirmation in outbound response');
+          }
+        })
+        .catch((groundingErr) => console.warn('[Agent] Async Grounding critic error:', groundingErr));
     }
 
     const latencyMs = Date.now() - startTime;
