@@ -41,9 +41,9 @@ function acquireSingleInstanceLock() {
     if (fs.existsSync(LOCK_FILE)) {
       const existingPidStr = fs.readFileSync(LOCK_FILE, 'utf8').trim();
       const existingPid = parseInt(existingPidStr, 10);
-      if (!isNaN(existingPid) && existingPid !== process.pid) {
+      if (!isNaN(existingPid) && existingPid !== process.pid && existingPid !== process.ppid) {
         try {
-          process.kill(existingPid, 'SIGKILL');
+          process.kill(existingPid, 'SIGTERM');
           console.log(`[Cloud Worker] 🔄 Terminated previous stale worker instance (PID: ${existingPid}) to yield to latest deploy.`);
         } catch {
           // Stale lockfile - overwrite
