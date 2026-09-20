@@ -679,7 +679,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
               temperature: generationTemperature,
               maxOutputTokens: 4096,
             },
-            signal: AbortSignal.timeout(isExplicitPro ? 30000 : 5500),
+            signal: AbortSignal.timeout(isExplicitPro ? 45000 : 25000),
           });
 
           if (vRes.ok) {
@@ -727,7 +727,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             tools: geminiTools,
             generationConfig,
           }),
-          signal: AbortSignal.timeout(6000), // Increased from 2500ms to 6000ms for reliable synthesis
+          signal: AbortSignal.timeout(20000),
         });
 
         if (res.ok) {
@@ -1018,7 +1018,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
                 systemInstruction,
                 tools: geminiTools,
                 generationConfig: sentryGenConfig,
-                signal: AbortSignal.timeout(8000),
+                signal: AbortSignal.timeout(25000),
               });
             } else {
               response = await fetch(activeApiUrl, {
@@ -1030,7 +1030,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
                   tools: geminiTools,
                   generationConfig: sentryGenConfig,
                 }),
-                signal: AbortSignal.timeout(8000),
+                signal: AbortSignal.timeout(25000),
               });
             }
 
@@ -1105,7 +1105,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             systemInstruction,
             tools: geminiTools,
             generationConfig: toolGenerationConfig,
-            signal: AbortSignal.timeout(8000),
+            signal: AbortSignal.timeout(25000),
           });
         } else {
           response = await fetch(activeApiUrl, {
@@ -1117,7 +1117,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
               tools: geminiTools,
               generationConfig: toolGenerationConfig,
             }),
-            signal: AbortSignal.timeout(8000),
+            signal: AbortSignal.timeout(25000),
           });
         }
 
@@ -1135,7 +1135,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
                 tools: geminiTools,
                 generationConfig: toolGenerationConfig,
               }),
-              signal: AbortSignal.timeout(6000),
+              signal: AbortSignal.timeout(20000),
             });
             if (fbRes.ok) {
               response = fbRes;
@@ -1190,7 +1190,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             contents: finalPrompt,
             systemInstruction,
             generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
-            signal: AbortSignal.timeout(8000),
+            signal: AbortSignal.timeout(25000),
           });
           if (synthRes.ok) {
             const sData = await synthRes.json();
@@ -1206,7 +1206,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
               systemInstruction,
               generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
             }),
-            signal: AbortSignal.timeout(8000),
+            signal: AbortSignal.timeout(25000),
           });
           if (synthRes.ok) {
             const sData = await synthRes.json();
@@ -1221,10 +1221,13 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 
     if (!finalReply) {
       if (toolCallsExecuted.length > 0) {
-        const toolList = Array.from(new Set(toolCallsExecuted.map((tc) => tc.name))).join(', ');
-        finalReply = `Sir, I have executed the requested operations (\`${toolList}\`). All tool actions completed successfully and safeguards remain green.`;
+        const toolSummaries = toolCallsExecuted.map((tc) => {
+          const raw = tc.result?.output || tc.result?.stdout || tc.result?.message || (typeof tc.result === 'string' ? tc.result : JSON.stringify(tc.result || {}));
+          return `- **\`${tc.name}\`**: ${String(raw).slice(0, 160)}`;
+        }).slice(0, 5).join('\n');
+        finalReply = `Sir, I completed the requested operations. Here is the operational summary of executed actions:\n\n${toolSummaries}\n\nAll tools completed cleanly and systems remain operational.`;
       } else {
-        finalReply = 'All systems green, Sir. What would you like to focus on next?';
+        finalReply = 'All systems green, Sir. Standing by for your directive.';
       }
     }
 

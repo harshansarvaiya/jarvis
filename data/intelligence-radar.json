@@ -263,8 +263,21 @@
       "Groq Whisper Voice Note Ingress Pipeline over WhatsApp"
     ],
     "addedAt": "2026-09-18T20:37:00Z"
+  },
+  {
+    "name": "trycua/cua",
+    "url": "https://github.com/trycua/cua",
+    "domain": "Computer-Use 2.0 & Cross-OS Desktop Sandboxing",
+    "status": "ACTIVE_EXTRACTION",
+    "extractedFeatures": [
+      "Hybrid OS-Level Driver & Accessibility-Tree Multiplexing (Zero-Cursor Takeover)",
+      "Disposable Sandbox SDK for CLI, Headless Web, & GUI Actuation",
+      "Specialized Small Decision Model Routing (CUA-S1-FORMS)"
+    ],
+    "futureRoadmap": [
+      "Local Mac Sandbox Adapter for Background GUI App Automation",
+      "Cloud Fleets API Integration for Heavy Isolated Tasks"
+    ],
+    "addedAt": "2026-09-20T18:35:00Z"
   }
 ]
-
-
-
