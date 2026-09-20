@@ -2103,6 +2103,42 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: 'dispatch_audit_swarm',
+    description: 'Dispatches a concurrent 4-agent parallel cognitive swarm (Security Auditor, Systems Architect, Performance Optimizer, Refactoring Specialist) running simultaneously on the GCP VM substrate with Vertex AI thinking budgets to produce an aggregated multi-perspective consensus matrix.',
+    parameters: {
+      type: 'object',
+      properties: {
+        focusTopic: {
+          type: 'string',
+          description: 'Optional focus domain or subsystem to audit (e.g. "auth & edge security", "storage persistence", "voice latency").',
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'execute_specialist_task',
+    description: 'Delegates a deep technical objective to a specific domain specialist subagent (e.g. "security-auditor", "architecture-expert", "performance-optimizer", "build-error-resolver", "refactoring-specialist") with AST graph context and isolated reasoning budget.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agentId: {
+          type: 'string',
+          description: 'Target specialist ID (e.g. "security-auditor", "architecture-expert", "performance-optimizer", "build-error-resolver", "refactoring-specialist").',
+        },
+        instruction: {
+          type: 'string',
+          description: 'Clear, actionable instruction for the specialist.',
+        },
+        contextPayload: {
+          type: 'string',
+          description: 'Optional code snippet or context.',
+        },
+      },
+      required: ['agentId', 'instruction'],
+    },
+  },
 ];
 
 /**
@@ -3360,6 +3396,53 @@ export async function executeJarvisTool(
         return {
           success: true,
           result: summary,
+        };
+      }
+
+      case 'dispatch_audit_swarm': {
+        const { focusTopic } = args;
+        const { dispatchDomainAuditSwarm } = await import('./subagent-swarm');
+        const swarmRes = await dispatchDomainAuditSwarm(focusTopic);
+        return {
+          success: true,
+          result: {
+            swarmId: swarmRes.swarmId,
+            totalAgents: swarmRes.totalAgents,
+            successful: swarmRes.successful,
+            consensusSynthesis: swarmRes.consensusSynthesis,
+            actionMatrix: swarmRes.actionMatrix,
+            specialistReports: swarmRes.results.map((r) => ({
+              agent: r.name,
+              role: r.role,
+              status: r.status,
+              latencyMs: r.latencyMs,
+              severityCounts: r.severityCounts,
+              recommendations: r.recommendations,
+            })),
+            totalLatencyMs: swarmRes.totalLatencyMs,
+          },
+        };
+      }
+
+      case 'execute_specialist_task': {
+        const { agentId, instruction, contextPayload } = args;
+        if (!agentId || !instruction) {
+          return { success: false, result: null, error: 'agentId and instruction are required.' };
+        }
+        const { executeSubagentTask } = await import('./subagent-swarm');
+        const specialistRes = await executeSubagentTask({ agentId, instruction, contextPayload });
+        return {
+          success: specialistRes.status === 'SUCCESS',
+          result: {
+            agentId: specialistRes.agentId,
+            name: specialistRes.name,
+            role: specialistRes.role,
+            findings: specialistRes.findings,
+            recommendations: specialistRes.recommendations,
+            severityCounts: specialistRes.severityCounts,
+            toolsExecuted: specialistRes.toolsExecuted,
+            latencyMs: specialistRes.latencyMs,
+          },
         };
       }
 

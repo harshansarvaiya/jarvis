@@ -64,14 +64,64 @@ async function runCBMTool(toolName: string, flags: string = ''): Promise<GraphQu
  */
 export async function searchCodebaseGraph(query: string): Promise<GraphQueryResult> {
   const safeQuery = query.replace(/["']/g, '');
-  return runCBMTool('search_graph', `--query="${safeQuery}" --project="${PROJECT_NAME}"`);
+  const cbmRes = await runCBMTool('search_graph', `--query="${safeQuery}" --project="${PROJECT_NAME}"`);
+  if (cbmRes.success && cbmRes.output) {
+    return cbmRes;
+  }
+
+  // Graceful fallback to pure TypeScript AST Semantic Code Graph with Vertex vector embeddings
+  try {
+    const { searchCodeGraph } = await import('./codebase-graph');
+    const matches = await searchCodeGraph(query, { limit: 6 });
+    return {
+      success: true,
+      output: matches.map((m) => ({
+        id: m.symbol.id,
+        name: m.symbol.name,
+        kind: m.symbol.kind,
+        file: m.symbol.file,
+        line: m.symbol.line,
+        signature: m.symbol.signature,
+        score: m.score,
+        matchReason: m.matchReason,
+      })),
+      latencyMs: cbmRes.latencyMs,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      output: null,
+      error: err.message || String(err),
+      latencyMs: cbmRes.latencyMs,
+    };
+  }
 }
 
 /**
  * Get high-level architectural domain overview (nodes, edges, HTTP routes, language distribution)
  */
 export async function getCodebaseArchitecture(): Promise<GraphQueryResult> {
-  return runCBMTool('get_architecture', `--project="${PROJECT_NAME}"`);
+  const cbmRes = await runCBMTool('get_architecture', `--project="${PROJECT_NAME}"`);
+  if (cbmRes.success && cbmRes.output) {
+    return cbmRes;
+  }
+
+  try {
+    const { getCodeGraphSummary } = await import('./codebase-graph');
+    const summary = await getCodeGraphSummary();
+    return {
+      success: true,
+      output: summary,
+      latencyMs: cbmRes.latencyMs,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      output: null,
+      error: err.message || String(err),
+      latencyMs: cbmRes.latencyMs,
+    };
+  }
 }
 
 /**
@@ -79,7 +129,27 @@ export async function getCodebaseArchitecture(): Promise<GraphQueryResult> {
  */
 export async function getFileOutline(filePath: string): Promise<GraphQueryResult> {
   const safePath = path.isAbsolute(filePath) ? path.relative(REPO_PATH, filePath) : filePath;
-  return runCBMTool('get_file_outline', `--file="${safePath}" --project="${PROJECT_NAME}"`);
+  const cbmRes = await runCBMTool('get_file_outline', `--file="${safePath}" --project="${PROJECT_NAME}"`);
+  if (cbmRes.success && cbmRes.output) {
+    return cbmRes;
+  }
+
+  try {
+    const { searchCodeGraph } = await import('./codebase-graph');
+    const matches = await searchCodeGraph('', { fileFilter: safePath, limit: 30 });
+    return {
+      success: true,
+      output: matches.map((m) => m.symbol),
+      latencyMs: cbmRes.latencyMs,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      output: null,
+      error: err.message || String(err),
+      latencyMs: cbmRes.latencyMs,
+    };
+  }
 }
 
 /**
@@ -87,12 +157,53 @@ export async function getFileOutline(filePath: string): Promise<GraphQueryResult
  */
 export async function traceCodePath(symbol: string): Promise<GraphQueryResult> {
   const safeSymbol = symbol.replace(/["']/g, '');
-  return runCBMTool('trace_path', `--target="${safeSymbol}" --project="${PROJECT_NAME}"`);
+  const cbmRes = await runCBMTool('trace_path', `--target="${safeSymbol}" --project="${PROJECT_NAME}"`);
+  if (cbmRes.success && cbmRes.output) {
+    return cbmRes;
+  }
+
+  try {
+    const { traceSymbolDependencies } = await import('./codebase-graph');
+    const trace = traceSymbolDependencies(safeSymbol);
+    return {
+      success: true,
+      output: trace,
+      latencyMs: cbmRes.latencyMs,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      output: null,
+      error: err.message || String(err),
+      latencyMs: cbmRes.latencyMs,
+    };
+  }
 }
 
 /**
  * Trigger incremental index update on the repository
  */
 export async function updateCodebaseIndex(): Promise<GraphQueryResult> {
-  return runCBMTool('index_repository', `'{"repo_path":"${REPO_PATH}"}'`);
+  const cbmRes = await runCBMTool('index_repository', `'{"repo_path":"${REPO_PATH}"}'`);
+  if (cbmRes.success && cbmRes.output) {
+    return cbmRes;
+  }
+
+  try {
+    const { indexCodebaseGraph } = await import('./codebase-graph');
+    const summary = await indexCodebaseGraph({ embedWithVertex: true });
+    return {
+      success: true,
+      output: summary,
+      latencyMs: cbmRes.latencyMs,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      output: null,
+      error: err.message || String(err),
+      latencyMs: cbmRes.latencyMs,
+    };
+  }
 }
+
