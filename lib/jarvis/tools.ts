@@ -2347,24 +2347,23 @@ export async function executeJarvisTool(
       }
 
       case 'cloud_execute_command': {
-        const { command, taskId } = args;
-        // 1. Direct sub-second execution on this Google Cloud VM substrate
-        try {
-          const directResult = await runDirectShellCommand(command);
-          return {
-            success: directResult.exitCode === 0,
-            result: directResult,
-            error: directResult.exitCode !== 0 ? directResult.stderr : undefined,
-          };
-        } catch (directErr: any) {
-          // 2. Fallback to GitHub Actions Cloud Runner if direct shell fails
-          console.warn('[Tools] Direct VM execution failed, cascading to GitHub Actions runner:', directErr?.message);
-          const res = await executeGitHubMCP('dispatch_workflow_run', {
-            command,
-            taskId: taskId || `task-exec-${Date.now()}`,
-          });
-          return { success: res.success, result: res.output, error: res.error };
-        }
+        const { command, taskId, timeoutMs } = args;
+        const { dispatchVmRpcCommand } = await import('./vm-rpc');
+        const rpcRes = await dispatchVmRpcCommand(command, {
+          timeoutMs: timeoutMs || 30000,
+          requestedBy: taskId || 'Friday/PWA',
+        });
+        return {
+          success: rpcRes.exitCode === 0,
+          result: {
+            stdout: rpcRes.stdout,
+            stderr: rpcRes.stderr,
+            exitCode: rpcRes.exitCode,
+            durationMs: rpcRes.durationMs,
+            executedOn: rpcRes.executedOn,
+          },
+          error: rpcRes.exitCode !== 0 ? (rpcRes.stderr || rpcRes.error || `Exited with code ${rpcRes.exitCode}`) : undefined,
+        };
       }
 
       case 'read_web_page': {

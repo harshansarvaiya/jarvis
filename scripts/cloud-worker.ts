@@ -777,7 +777,13 @@ async function startWorkerLoop(isTestMode: boolean = false) {
   await checkScheduledReminders();
   await checkScheduledBriefings();
   await checkGlobalThreatSentry();
-  await checkGeopoliticalEscalationRadar({ silent: true });
+  // High-Frequency Sub-Second VM Remote Execution RPC Listener (1.5s interval)
+  setInterval(async () => {
+    try {
+      const { processNextVmRpcRequest } = await import('../lib/jarvis/vm-rpc');
+      await processNextVmRpcRequest();
+    } catch {}
+  }, 1500);
 
   let tickCount = 0;
   setInterval(async () => {
