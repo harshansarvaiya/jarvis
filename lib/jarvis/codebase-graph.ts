@@ -53,7 +53,16 @@ export interface CodeGraphSearchResult {
   matchReason: 'exact_name' | 'partial_name' | 'semantic_vector' | 'signature_match';
 }
 
-const REPO_ROOT = process.env.REPO_PATH || '/home/harshans279/jarvis';
+function getRepoRoot(): string {
+  if (process.env.REPO_PATH && fs.existsSync(process.env.REPO_PATH)) {
+    return process.env.REPO_PATH;
+  }
+  if (fs.existsSync('/home/harshans279/jarvis')) {
+    return '/home/harshans279/jarvis';
+  }
+  return process.cwd();
+}
+
 const REDIS_SUMMARY_KEY = 'jarvis:codegraph:summary';
 const REDIS_SYMBOLS_KEY = 'jarvis:codegraph:symbols';
 
@@ -348,7 +357,7 @@ export async function indexCodebaseGraph(options: {
   embedWithVertex?: boolean;
   repoRoot?: string;
 } = {}): Promise<CodeGraphSummary> {
-  const root = options.repoRoot || REPO_ROOT;
+  const root = options.repoRoot || getRepoRoot();
   const embed = options.embedWithVertex !== false && isVertexAIAvailable();
 
   const searchDirs = ['lib', 'components', 'app', 'scripts'].map((d) => path.join(root, d));
@@ -357,6 +366,26 @@ export async function indexCodebaseGraph(options: {
   for (const dir of searchDirs) {
     if (fs.existsSync(dir)) {
       allFiles.push(...scanSourceFiles(dir, root));
+    }
+  }
+
+  // Fallback protection: if zero source files discovered (e.g. on serverless Vercel runtime),
+  // NEVER overwrite Redis with empty data. Load the committed snapshot from data/
+  if (allFiles.length === 0) {
+    try {
+      const summaryFile = path.join(root, 'data/jarvis_codegraph_summary.json');
+      const symbolsFile = path.join(root, 'data/jarvis_codegraph_symbols.json');
+      if (fs.existsSync(summaryFile)) {
+        const sum = JSON.parse(fs.readFileSync(summaryFile, 'utf-8'));
+        if (fs.existsSync(symbolsFile)) {
+          const syms = JSON.parse(fs.readFileSync(symbolsFile, 'utf-8'));
+          cachedGraph.symbols = syms;
+        }
+        cachedGraph.summary = sum;
+        return sum;
+      }
+    } catch (fbErr) {
+      console.warn('[CodebaseGraph] Static fallback read error:', fbErr);
     }
   }
 
@@ -592,17 +621,33 @@ export function traceSymbolDependencies(symbolOrFileName: string): {
  * Retrieves the current summary of the codebase knowledge graph
  */
 export async function getCodeGraphSummary(): Promise<CodeGraphSummary> {
-  if (cachedGraph.summary) return cachedGraph.summary;
+  if (cachedGraph.summary && cachedGraph.summary.totalSymbols > 0) return cachedGraph.summary;
 
+  // 1. Try Storage
   try {
     const raw = await getStorage().execute('GET', REDIS_SUMMARY_KEY);
     if (raw) {
       const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      return parsed as CodeGraphSummary;
+      if (parsed && parsed.totalSymbols > 0) {
+        cachedGraph.summary = parsed as CodeGraphSummary;
+        return cachedGraph.summary;
+      }
     }
   } catch {}
 
-  return indexCodebaseGraph({ embedWithVertex: true });
+  // 2. Direct static file fallback (guaranteed in repo / Vercel bundle)
+  try {
+    const backupFile = path.join(getRepoRoot(), 'data/jarvis_codegraph_summary.json');
+    if (fs.existsSync(backupFile)) {
+      const parsed = JSON.parse(fs.readFileSync(backupFile, 'utf-8'));
+      if (parsed && parsed.totalSymbols > 0) {
+        cachedGraph.summary = parsed as CodeGraphSummary;
+        return cachedGraph.summary;
+      }
+    }
+  } catch {}
+
+  return indexCodebaseGraph({ embedWithVertex: false });
 }
 
 /**
@@ -612,6 +657,8 @@ export async function getAllCodeGraphSymbols(): Promise<CodeGraphSymbol[]> {
   if (cachedGraph.symbols && cachedGraph.symbols.length > 0) {
     return cachedGraph.symbols;
   }
+
+  // 1. Try Storage
   try {
     const raw = await getStorage().execute('GET', REDIS_SYMBOLS_KEY);
     if (raw) {
@@ -623,7 +670,20 @@ export async function getAllCodeGraphSymbols(): Promise<CodeGraphSymbol[]> {
     }
   } catch {}
 
+  // 2. Direct static file fallback (guaranteed in repo / Vercel bundle)
+  try {
+    const backupFile = path.join(getRepoRoot(), 'data/jarvis_codegraph_symbols.json');
+    if (fs.existsSync(backupFile)) {
+      const parsed = JSON.parse(fs.readFileSync(backupFile, 'utf-8'));
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        cachedGraph.symbols = parsed as CodeGraphSymbol[];
+        return cachedGraph.symbols;
+      }
+    }
+  } catch {}
+
   await indexCodebaseGraph({ embedWithVertex: false });
   return cachedGraph.symbols;
 }
+
 

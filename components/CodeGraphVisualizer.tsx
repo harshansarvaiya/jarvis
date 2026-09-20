@@ -416,7 +416,7 @@ export function CodeGraphVisualizer({
 
     const resize = () => {
       const parent = canvas.parentElement;
-      if (parent) {
+      if (parent && parent.clientWidth > 0 && parent.clientHeight > 0) {
         canvas.width = parent.clientWidth;
         canvas.height = parent.clientHeight;
       }
@@ -425,9 +425,12 @@ export function CodeGraphVisualizer({
     window.addEventListener('resize', resize);
 
     const render = () => {
+      if (canvas.width === 0 || canvas.height === 0) {
+        resize();
+      }
       pulseAngle += 0.03;
-      const width = canvas.width;
-      const height = canvas.height;
+      const width = canvas.width || 800;
+      const height = canvas.height || 600;
       const currentPan = panRef.current;
       const currentZoom = zoomRef.current;
 

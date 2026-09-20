@@ -36,5 +36,5 @@ next-env.d.ts
 # local logs and scratch
 /data/trajectories/
 /data/jarvis_knowledge*.json
-/data/jarvis_codegraph*.json
 scripts/inspect-chats.ts
+
