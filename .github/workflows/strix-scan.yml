@@ -8,9 +8,9 @@ on:
         required: false
         default: 'app/api'
       model:
-        description: 'LLM Model to power Strix (e.g. gemini/gemini-2.0-flash, gemini/gemini-1.5-flash)'
+        description: 'LLM Model to power Strix (e.g. gemini/gemini-2.5-flash, gemini/gemini-1.5-flash)'
         required: false
-        default: 'gemini/gemini-2.0-flash'
+        default: 'gemini/gemini-2.5-flash'
 
 jobs:
   strix-scan:
@@ -33,7 +33,7 @@ jobs:
         run: |
           strix -t ${{ github.event.inputs.target_path || 'app/api' }} -m quick -n
         env:
-          STRIX_LLM: ${{ github.event.inputs.model || 'gemini/gemini-2.0-flash' }}
+          STRIX_LLM: ${{ github.event.inputs.model || 'gemini/gemini-2.5-flash' }}
           LLM_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
