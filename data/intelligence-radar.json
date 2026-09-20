@@ -279,5 +279,23 @@
       "Cloud Fleets API Integration for Heavy Isolated Tasks"
     ],
     "addedAt": "2026-09-20T18:35:00Z"
+  },
+  {
+    "name": "elder-plinius/CL4R1T4S",
+    "url": "https://github.com/elder-plinius/CL4R1T4S",
+    "domain": "Frontier Prompt Scaffolding, Red-Teaming & Agent Schemas",
+    "status": "ACTIVE_EXTRACTION",
+    "extractedFeatures": [
+      "Anthropic XML Tag Isolation & Structured Delimiter Syntax (<claude_behavior>, {antml:cite})",
+      "Cursor & Windsurf Precise Atomic Code Mutation & AST Traversal Tool Schemas",
+      "Manus & Replit Resilient Agent Loop Scaffolding & Timeout Fallback Policies",
+      "OpenAI & xAI Delimiter Injection Defense & Anti-Sycophancy Rejection Rules"
+    ],
+    "futureRoadmap": [
+      "Assimilate Cursor file-editing schemas into CodeAct mutation harness",
+      "Integrate Anthropic citation schemas into J.A.R.V.I.S. anti-hallucination layer",
+      "Incorporate Pliny red-team evasion checks into Guardian Prompt Injection Defense"
+    ],
+    "addedAt": "2026-09-20T22:15:00Z"
   }
 ]
