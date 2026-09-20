@@ -1976,6 +1976,69 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: 'git_status',
+    description: 'Structured Git Status Sentry. Inspects the active branch, modified files, staged changes, and untracked files in the workspace.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'git_diff',
+    description: 'Inspects unified git diffs for unstaged or staged changes in the workspace.',
+    parameters: {
+      type: 'object',
+      properties: {
+        staged: {
+          type: 'boolean',
+          description: 'If true, shows cached/staged diff (--cached). Defaults to false.',
+        },
+        path: {
+          type: 'string',
+          description: 'Optional file path to filter diff.',
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'git_commit_and_push',
+    description: 'Autonomous Git Commit & Push Pipeline (Enforces Directive 05). Runs closed-loop compiler verification (npx tsc --noEmit), stages modified files, creates a semantic commit, and pushes directly to origin main.',
+    parameters: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          description: 'Semantic commit message (e.g. "feat(friday): ...").',
+        },
+        skipTypeCheck: {
+          type: 'boolean',
+          description: 'Bypass type check (defaults to false).',
+        },
+      },
+      required: ['message'],
+    },
+  },
+  {
+    name: 'list_workspace_directory',
+    description: 'Workspace Directory Explorer. Lists files and subdirectories with sizes, counts, and directory structure.',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description: 'Relative directory path to list (e.g. "lib/jarvis" or "components"). Defaults to project root.',
+        },
+        maxDepth: {
+          type: 'number',
+          description: 'Maximum recursion depth (defaults to 2).',
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 /**
@@ -3066,6 +3129,95 @@ export async function executeJarvisTool(
         const { globalTransactionBuffer } = await import('./harness');
         const rollbackRes = globalTransactionBuffer.rollback();
         return { success: rollbackRes.success, result: rollbackRes };
+      }
+
+      case 'git_status': {
+        const { dispatchVmRpcCommand } = await import('./vm-rpc');
+        const rpcRes = await dispatchVmRpcCommand('git status --short -b', { requestedBy: 'GitSentry' });
+        return {
+          success: rpcRes.exitCode === 0,
+          result: {
+            output: rpcRes.stdout || 'Clean working tree',
+            executedOn: rpcRes.executedOn,
+          },
+          error: rpcRes.exitCode !== 0 ? rpcRes.stderr : undefined,
+        };
+      }
+
+      case 'git_diff': {
+        const { staged, path: filePath } = args;
+        const { dispatchVmRpcCommand } = await import('./vm-rpc');
+        const cmd = `git diff ${staged ? '--cached ' : ''}${filePath ? JSON.stringify(filePath) : ''}`.trim();
+        const rpcRes = await dispatchVmRpcCommand(cmd, { requestedBy: 'GitDiff' });
+        return {
+          success: rpcRes.exitCode === 0,
+          result: {
+            diff: rpcRes.stdout || 'No diff detected',
+            executedOn: rpcRes.executedOn,
+          },
+          error: rpcRes.exitCode !== 0 ? rpcRes.stderr : undefined,
+        };
+      }
+
+      case 'git_commit_and_push': {
+        const { message, skipTypeCheck } = args;
+        if (!message) {
+          return { success: false, result: null, error: 'Commit message is required.' };
+        }
+        const { dispatchVmRpcCommand } = await import('./vm-rpc');
+        if (!skipTypeCheck) {
+          const typeCheck = await dispatchVmRpcCommand('npx tsc --noEmit', { timeoutMs: 35000, requestedBy: 'CompilerGate' });
+          if (typeCheck.exitCode !== 0) {
+            return {
+              success: false,
+              result: null,
+              error: `Compiler check failed under Directive 05. Fix errors before pushing: ${typeCheck.stderr || typeCheck.stdout}`,
+            };
+          }
+        }
+        const deployCmd = `git add -A && git commit -m ${JSON.stringify(message)} && git push origin main`;
+        const rpcRes = await dispatchVmRpcCommand(deployCmd, { timeoutMs: 40000, requestedBy: 'GitPush' });
+        return {
+          success: rpcRes.exitCode === 0,
+          result: {
+            output: rpcRes.stdout,
+            executedOn: rpcRes.executedOn,
+          },
+          error: rpcRes.exitCode !== 0 ? rpcRes.stderr : undefined,
+        };
+      }
+
+      case 'list_workspace_directory': {
+        const { path: relPath = '.', maxDepth = 2 } = args;
+        const targetDir = path.resolve(process.cwd(), relPath);
+        if (!targetDir.startsWith(process.cwd())) {
+          return { success: false, result: null, error: 'Path traversal outside workspace blocked.' };
+        }
+        if (!fs.existsSync(targetDir)) {
+          return { success: false, result: null, error: `Directory does not exist: ${relPath}` };
+        }
+        const scanDir = (dir: string, depth: number): any[] => {
+          if (depth > maxDepth) return [];
+          try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            return entries
+              .filter((e) => !e.name.startsWith('.git') && e.name !== 'node_modules')
+              .map((e) => {
+                const full = path.join(dir, e.name);
+                const isDir = e.isDirectory();
+                return {
+                  name: e.name,
+                  type: isDir ? 'directory' : 'file',
+                  path: path.relative(process.cwd(), full),
+                  children: isDir ? scanDir(full, depth + 1) : undefined,
+                };
+              });
+          } catch {
+            return [];
+          }
+        };
+        const tree = scanDir(targetDir, 1);
+        return { success: true, result: { path: relPath, entriesCount: tree.length, tree } };
       }
 
       default:
