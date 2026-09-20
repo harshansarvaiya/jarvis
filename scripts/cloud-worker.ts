@@ -316,20 +316,28 @@ async function checkScheduledBriefings() {
       const morningKey = `jarvis:briefing:morning:${todayDateStr}`;
       const alreadySent = await redis.get(morningKey);
       if (!alreadySent) {
-        const top3 = pendingTasks.slice(0, 3);
-        const taskHighlights = top3.length > 0
-          ? top3.map((t) => `• [${t.priority}] ${t.title}${t.dueDate ? ` (Due: ${t.dueDate})` : ''}`).join('\n')
-          : '• All radar objectives currently clear.';
+        console.log(`[Cloud Worker] 🌅 Generating Morning Voice Briefing for Sir (IST ${istHour}:${istMin})...`);
+        const { generateProactiveBriefing } = await import('../lib/jarvis/audio');
+        const briefing = await generateProactiveBriefing({ type: 'morning', synthesizeAudio: true, persona: 'jarvis' });
 
-        const message = `Good morning, Sir. Tactical radar initialized in Stage 5 Performance Mode.\n\n` +
-          `📋 *Active Objectives (${pendingTasks.length} pending):*\n${taskHighlights}\n\n` +
-          `🧠 *Substrate Health:*\n` +
-          `• Engine: Vertex AI Gemini 3.7 Flash & Groq LPU\n` +
-          `• Host VM & Telegram Uplink: Online\n\n` +
-          `Awaiting your sovereign command.`;
+        await dispatchPush('🌅 J.A.R.V.I.S. Morning Briefing', briefing.textReport, '/');
 
-        console.log(`[Cloud Worker] 🌅 Dispatching Morning Briefing to Sir (IST ${istHour}:${istMin})...`);
-        await dispatchPush('🌅 J.A.R.V.I.S. Morning Briefing', message, '/');
+        // Dispatch Voice Memo to Telegram
+        if (briefing.audioBuffer) {
+          try {
+            const { telegramGateway } = await import('../lib/jarvis/telegram');
+            const authChatId = (await telegramGateway.getAuthorizedChatId()) || ALLOWED_USER_ID;
+            if (authChatId) {
+              await telegramGateway.sendVoice(authChatId, briefing.audioBuffer, {
+                caption: `🎙️ *J.A.R.V.I.S. Morning Voice Briefing*\n${istTimeStr} IST`,
+              });
+              console.log('[Cloud Worker] 🎙️ Morning voice memo dispatched to Telegram.');
+            }
+          } catch (vErr: any) {
+            console.warn('[Cloud Worker] Morning voice dispatch warning:', vErr.message);
+          }
+        }
+
         await redis.set(morningKey, 'SENT');
       }
     }
@@ -341,18 +349,28 @@ async function checkScheduledBriefings() {
       const eveningKey = `jarvis:briefing:evening:${todayDateStr}`;
       const alreadySent = await redis.get(eveningKey);
       if (!alreadySent) {
-        const completedToday = completedTasks.filter((t) => t.completedAt && t.completedAt.startsWith(todayDateStr));
+        console.log(`[Cloud Worker] 🌙 Generating Evening Voice De-Brief for Sir (IST 21:30)...`);
+        const { generateProactiveBriefing } = await import('../lib/jarvis/audio');
+        const briefing = await generateProactiveBriefing({ type: 'evening', synthesizeAudio: true, persona: 'jarvis' });
 
-        const message = `Good evening, Sir. Tactical de-brief for ${todayDateStr}:\n\n` +
-          `✅ *Accomplished Today:*\n` +
-          (completedToday.length > 0
-            ? completedToday.map((t) => `• ${t.title}`).join('\n')
-            : '• Milestone engineering & substrate hardening accomplished.') +
-          `\n\n🎯 *Pending on Radar:* ${pendingTasks.length} items remaining.\n\n` +
-          `All defensive sentries and 24/7 background daemons remain on active watch. Rest well, Sir.`;
+        await dispatchPush('🌙 J.A.R.V.I.S. Evening De-Brief', briefing.textReport, '/');
 
-        console.log(`[Cloud Worker] 🌙 Dispatching Evening De-Brief to Sir (IST 21:30)...`);
-        await dispatchPush('🌙 J.A.R.V.I.S. Evening De-Brief', message, '/');
+        // Dispatch Voice Memo to Telegram
+        if (briefing.audioBuffer) {
+          try {
+            const { telegramGateway } = await import('../lib/jarvis/telegram');
+            const authChatId = (await telegramGateway.getAuthorizedChatId()) || ALLOWED_USER_ID;
+            if (authChatId) {
+              await telegramGateway.sendVoice(authChatId, briefing.audioBuffer, {
+                caption: `🎙️ *J.A.R.V.I.S. Evening Voice De-Brief*\n${istTimeStr} IST`,
+              });
+              console.log('[Cloud Worker] 🎙️ Evening voice memo dispatched to Telegram.');
+            }
+          } catch (vErr: any) {
+            console.warn('[Cloud Worker] Evening voice dispatch warning:', vErr.message);
+          }
+        }
+
         await redis.set(eveningKey, 'SENT');
       }
     }
