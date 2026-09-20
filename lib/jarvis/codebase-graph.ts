@@ -604,3 +604,26 @@ export async function getCodeGraphSummary(): Promise<CodeGraphSummary> {
 
   return indexCodebaseGraph({ embedWithVertex: true });
 }
+
+/**
+ * Retrieves all indexed code symbols from cache, Redis, or triggers dynamic parse
+ */
+export async function getAllCodeGraphSymbols(): Promise<CodeGraphSymbol[]> {
+  if (cachedGraph.symbols && cachedGraph.symbols.length > 0) {
+    return cachedGraph.symbols;
+  }
+  try {
+    const raw = await getStorage().execute('GET', REDIS_SYMBOLS_KEY);
+    if (raw) {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        cachedGraph.symbols = parsed as CodeGraphSymbol[];
+        return cachedGraph.symbols;
+      }
+    }
+  } catch {}
+
+  await indexCodebaseGraph({ embedWithVertex: false });
+  return cachedGraph.symbols;
+}
+

@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import {
   getCodeGraphSummary,
+  getAllCodeGraphSymbols,
   searchCodeGraph,
   traceSymbolDependencies,
   indexCodebaseGraph,
   SymbolKind,
 } from '@/lib/jarvis/codebase-graph';
-import { getStorage } from '@/lib/jarvis/storage';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,7 +31,7 @@ export async function GET(req: Request) {
     // 2. Semantic & Vector Symbol Search
     if (query && query.trim().length > 0) {
       const results = await searchCodeGraph(query, {
-        limit: 15,
+        limit: 25,
         kind: kind || undefined,
         fileFilter,
       });
@@ -54,21 +54,25 @@ export async function GET(req: Request) {
       });
     }
 
-    // 3. Full Graph Summary & Node Topologies
+    // 3. Full Graph Summary & Complete Node Topologies
     const summary = await getCodeGraphSummary();
-    const rawSymbols = await getStorage().execute('GET', 'jarvis:codegraph:symbols');
-    let symbols = [];
-    if (rawSymbols) {
-      try {
-        symbols = typeof rawSymbols === 'string' ? JSON.parse(rawSymbols) : rawSymbols;
-      } catch {}
-    }
+    const symbols = await getAllCodeGraphSymbols();
 
     return NextResponse.json({
       success: true,
       summary,
       symbolsCount: symbols.length,
-      symbols: symbols.slice(0, 300), // optimized payload size for fast mobile rendering
+      symbols: symbols.map((s) => ({
+        id: s.id,
+        name: s.name,
+        kind: s.kind,
+        file: s.file,
+        line: s.line,
+        exported: s.exported,
+        signature: s.signature,
+        doc: s.doc,
+        dependencies: s.dependencies,
+      })),
       topHubs: summary.topHubs,
     });
   } catch (err: any) {
