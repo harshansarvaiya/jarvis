@@ -1,5 +1,3 @@
-import { google } from 'googleapis';
-
 export interface GmailMessage {
   id: string;
   threadId: string;
@@ -10,49 +8,42 @@ export interface GmailMessage {
 }
 
 export class GmailAgentEngine {
-  private oAuth2Client: any;
+  private clientId: string;
+  private clientSecret: string;
+  private redirectUri: string;
 
   constructor() {
-    const clientId = process.env.GMAIL_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GMAIL_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = process.env.GMAIL_REDIRECT_URI || 'https://developers.google.com/oauthplayground';
-
-    if (clientId && clientSecret) {
-      this.oAuth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-    }
+    this.clientId = process.env.GMAIL_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || '';
+    this.clientSecret = process.env.GMAIL_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET || '';
+    this.redirectUri = process.env.GMAIL_REDIRECT_URI || 'https://developers.google.com/oauthplayground';
   }
 
-  public setCredentials(tokens: { access_token?: string; refresh_token?: string }) {
-    if (this.oAuth2Client) {
-      this.oAuth2Client.setCredentials(tokens);
-    }
-  }
-
-  public async listMessages(query: string = 'in:inbox', maxResults: number = 5): Promise<GmailMessage[]> {
-    if (!this.oAuth2Client) {
-      throw new Error('Gmail OAuth2 client is not initialized with client ID and secret.');
-    }
-
-    const gmail = google.gmail({ version: 'v1', auth: this.oAuth2Client });
-    const res = await gmail.users.messages.list({
-      userId: 'me',
-      q: query,
-      maxResults,
+  public async listMessages(accessToken: string, query: string = 'in:inbox', maxResults: number = 5): Promise<GmailMessage[]> {
+    const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
     });
 
-    const messages = res.data.messages || [];
+    if (!res.ok) {
+      throw new Error(`Gmail API error: ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    const messages = data.messages || [];
     const detailedMessages: GmailMessage[] = [];
 
     for (const msg of messages) {
       if (!msg.id) continue;
-      const detail = await gmail.users.messages.get({
-        userId: 'me',
-        id: msg.id,
-        format: 'metadata',
-        metadataHeaders: ['Subject', 'From', 'Date'],
+      const detailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
 
-      const headers = detail.data.payload?.headers || [];
+      if (!detailRes.ok) continue;
+      const detail = await detailRes.json();
+      const headers = detail.payload?.headers || [];
       const subject = headers.find((h: any) => h.name === 'Subject')?.value;
       const from = headers.find((h: any) => h.name === 'From')?.value;
       const date = headers.find((h: any) => h.name === 'Date')?.value;
@@ -60,7 +51,7 @@ export class GmailAgentEngine {
       detailedMessages.push({
         id: msg.id,
         threadId: msg.threadId || '',
-        snippet: detail.data.snippet || '',
+        snippet: detail.snippet || '',
         subject,
         from,
         date,
@@ -68,40 +59,6 @@ export class GmailAgentEngine {
     }
 
     return detailedMessages;
-  }
-
-  public async sendDraftReply(threadId: string, recipient: string, subject: string, body: string) {
-    if (!this.oAuth2Client) {
-      throw new Error('Gmail OAuth2 client is not initialized.');
-    }
-
-    const gmail = google.gmail({ version: 'v1', auth: this.oAuth2Client });
-    const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
-    const messageParts = [
-      `To: ${recipient}`,
-      `Subject: ${utf8Subject}`,
-      'Content-Type: text/plain; charset=utf-8',
-      'MIME-Version: 1.0',
-      '',
-      body,
-    ];
-
-    const message = messageParts.join('\n');
-    const encodedMessage = Buffer.from(message)
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-
-    const res = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: {
-        raw: encodedMessage,
-        threadId,
-      },
-    });
-
-    return res.data;
   }
 }
 
