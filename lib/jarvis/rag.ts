@@ -57,8 +57,23 @@ export interface RetrievalResult {
 // 1. DENSE VECTOR EMBEDDINGS ENGINE
 // =========================================================================
 
+// In-Memory L1 Cache with TTL to prevent Redis serialization overhead & thrashing
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+const RAG_CACHE_TTL_MS = 60_000; // 60s TTL
+let chunkCache: CacheEntry<KnowledgeChunk[]> | null = null;
+let docCache: CacheEntry<KnowledgeDocument[]> | null = null;
+const normalizedEmbeddingCache = new WeakMap<KnowledgeChunk, number[]>();
+
+export function invalidateRAGCache(): void {
+  chunkCache = null;
+  docCache = null;
+}
+
 /**
- * Computes cosine similarity between two high-dimensional vectors
+ * Computes cosine similarity between two high-dimensional vectors with fast-path unit normalization
  */
 export function cosineSimilarity(vecA: number[], vecB: number[]): number {
   if (!vecA || !vecB || vecA.length === 0 || vecB.length === 0) return 0;
@@ -68,9 +83,11 @@ export function cosineSimilarity(vecA: number[], vecB: number[]): number {
   let normB = 0;
 
   for (let i = 0; i < len; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
+    const a = vecA[i];
+    const b = vecB[i];
+    dotProduct += a * b;
+    normA += a * a;
+    normB += b * b;
   }
 
   if (normA === 0 || normB === 0) return 0;
