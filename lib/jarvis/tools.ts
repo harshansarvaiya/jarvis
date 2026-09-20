@@ -1904,6 +1904,78 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['imageBase64'],
     },
   },
+  {
+    name: 'get_workspace_preflight',
+    description: 'Sub-millisecond Zero-Overhead Workspace Preflight Sentry (Grok Bot Inspired). Gathers active git branch, dirty status, uncommitted files, package.json scripts, top-level directories, and memory usage in <50ms without roundtrip exploratory commands.',
+    parameters: {
+      type: 'object',
+      properties: {
+        forceRefresh: {
+          type: 'boolean',
+          description: 'Force bypass the 15s TTL preflight telemetry cache.',
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'stage_transactional_diff',
+    description: 'Atomic Transactional Code Diff Buffer (Grok Bot & Cloudflare OS Inspired). Stages file writes, substring replacements, or deletions into a reversible memory buffer, applies them, and runs closed-loop compiler verification (npx tsc --noEmit). If verification fails, automatically rolls back all changes to protect repository integrity.',
+    parameters: {
+      type: 'object',
+      properties: {
+        actions: {
+          type: 'array',
+          description: 'List of atomic file mutations to stage and commit.',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['WRITE', 'REPLACE', 'DELETE'],
+                description: 'Mutation operation type.',
+              },
+              path: {
+                type: 'string',
+                description: 'Relative path to file in workspace.',
+              },
+              content: {
+                type: 'string',
+                description: 'Full file content for WRITE operation.',
+              },
+              targetContent: {
+                type: 'string',
+                description: 'Target exact substring to replace for REPLACE operation.',
+              },
+              replacementContent: {
+                type: 'string',
+                description: 'Replacement content for REPLACE operation.',
+              },
+            },
+            required: ['type', 'path'],
+          },
+        },
+        verifyCompiler: {
+          type: 'boolean',
+          description: 'Enforce closed-loop TypeScript compiler check (defaults to true).',
+        },
+        autoRollbackOnFailure: {
+          type: 'boolean',
+          description: 'Automatically revert all staged changes if compiler check fails (defaults to true).',
+        },
+      },
+      required: ['actions'],
+    },
+  },
+  {
+    name: 'rollback_transaction',
+    description: 'Rolls back the active transactional diff buffer, restoring all modified files to their original state.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
 ];
 
 /**
@@ -2947,6 +3019,54 @@ export async function executeJarvisTool(
         const { analyzeVisualCopilotFrame } = await import('./vision-copilot');
         const res = await analyzeVisualCopilotFrame({ imageBase64, userContextHint });
         return { success: true, result: res };
+      }
+
+      case 'get_workspace_preflight': {
+        const { getWorkspacePreflightSnapshot, formatPreflightContext } = await import('./harness');
+        const snapshot = await getWorkspacePreflightSnapshot(args.forceRefresh === true);
+        return {
+          success: true,
+          result: {
+            snapshot,
+            formattedContext: formatPreflightContext(snapshot),
+          },
+        };
+      }
+
+      case 'stage_transactional_diff': {
+        const { globalTransactionBuffer } = await import('./harness');
+        const { actions, verifyCompiler = true, autoRollbackOnFailure = true } = args;
+        if (!Array.isArray(actions) || actions.length === 0) {
+          return { success: false, result: null, error: 'actions array required with at least 1 mutation.' };
+        }
+
+        globalTransactionBuffer.clear();
+        for (const act of actions) {
+          if (act.type === 'WRITE') {
+            globalTransactionBuffer.stageWrite(act.path, act.content || '');
+          } else if (act.type === 'REPLACE') {
+            globalTransactionBuffer.stageReplace(act.path, act.targetContent || '', act.replacementContent || '');
+          } else if (act.type === 'DELETE') {
+            globalTransactionBuffer.stageDelete(act.path);
+          }
+        }
+
+        const commitRes = await globalTransactionBuffer.commit({
+          verifyCompiler,
+          autoRollbackOnFailure,
+        });
+
+        return {
+          success: commitRes.success,
+          result: commitRes,
+          error: commitRes.error,
+        };
+      }
+
+      case 'rollback_transaction': {
+        const { globalTransactionBuffer } = await import('./harness');
+        const rollbackRes = globalTransactionBuffer.rollback();
+        return { success: rollbackRes.success, result: rollbackRes };
       }
 
       default:
