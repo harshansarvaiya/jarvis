@@ -36,6 +36,7 @@ import { MemoryVault } from '@/components/MemoryVault';
 import { SystemHealthMatrix } from '@/components/SystemHealthMatrix';
 import { BillingDashboard } from '@/components/BillingDashboard';
 import { TacticalRadar } from '@/components/TacticalRadar';
+import { CodeGraphVisualizer } from '@/components/CodeGraphVisualizer';
 import { SettingsModal } from '@/components/SettingsModal';
 import { SecurityGateModal } from '@/components/SecurityGateModal';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
@@ -174,8 +175,8 @@ export default function JarvisDashboard() {
   // Tab State: Separate mobile tabs from desktop view
   const [mobileTab, setMobileTab] = useState<'COMMS' | 'VAULT' | 'RADAR' | 'SYSTEM'>('COMMS');
   const [mobileVaultSubTab, setMobileVaultSubTab] = useState<'TASKS' | 'MEMORY' | 'DIRECTIVES'>('TASKS');
-  const [mobileSystemSubTab, setMobileSystemSubTab] = useState<'HEALTH' | 'BILLING'>('HEALTH');
-  const [desktopTab, setDesktopTab] = useState<'TASKS' | 'MEMORY' | 'REACTOR' | 'SYSTEM' | 'BILLING' | 'RADAR'>('TASKS');
+  const [mobileSystemSubTab, setMobileSystemSubTab] = useState<'HEALTH' | 'BILLING' | 'CODEGRAPH'>('HEALTH');
+  const [desktopTab, setDesktopTab] = useState<'TASKS' | 'MEMORY' | 'REACTOR' | 'SYSTEM' | 'BILLING' | 'RADAR' | 'CODEGRAPH'>('TASKS');
   const [isReactorExpanded, setIsReactorExpanded] = useState(false);
 
   // Quick Action Prompts for horizontal ribbons
@@ -1455,7 +1456,7 @@ export default function JarvisDashboard() {
         {mobileTab === 'SYSTEM' && (
           <div className="flex-1 flex flex-col space-y-3 animate-fadeIn pb-24 min-h-0">
             {/* Top Segmented Sub-Tab Switcher */}
-            <div className="flex border border-cyan-500/30 rounded-xl p-1 bg-slate-950/90 font-mono text-xs shrink-0 shadow-lg">
+            <div className="flex border border-cyan-500/30 rounded-xl p-1 bg-slate-950/90 font-mono text-[11px] shrink-0 shadow-lg gap-1">
               <button
                 onClick={() => setMobileSystemSubTab('HEALTH')}
                 className={`flex-1 py-1.5 px-2 rounded-lg transition-all flex items-center justify-center space-x-1 ${
@@ -1465,7 +1466,7 @@ export default function JarvisDashboard() {
                 }`}
               >
                 <Activity className="w-3.5 h-3.5" />
-                <span>TELEMETRY MATRIX</span>
+                <span>TELEMETRY</span>
               </button>
               <button
                 onClick={() => setMobileSystemSubTab('BILLING')}
@@ -1476,11 +1477,28 @@ export default function JarvisDashboard() {
                 }`}
               >
                 <Coins className="w-3.5 h-3.5 text-amber-400" />
-                <span>CREDITS & CIRCUIT BREAKER</span>
+                <span>CREDITS</span>
+              </button>
+              <button
+                onClick={() => setMobileSystemSubTab('CODEGRAPH')}
+                className={`flex-1 py-1.5 px-2 rounded-lg transition-all flex items-center justify-center space-x-1 ${
+                  mobileSystemSubTab === 'CODEGRAPH'
+                    ? 'bg-cyan-500 text-black font-bold shadow-[0_0_10px_rgba(0,229,255,0.4)]'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Brain className="w-3.5 h-3.5 text-purple-400" />
+                <span>GRAPH</span>
               </button>
             </div>
 
-            {mobileSystemSubTab === 'HEALTH' ? <SystemHealthMatrix /> : <BillingDashboard />}
+            {mobileSystemSubTab === 'HEALTH' && <SystemHealthMatrix />}
+            {mobileSystemSubTab === 'BILLING' && <BillingDashboard />}
+            {mobileSystemSubTab === 'CODEGRAPH' && (
+              <div className="flex-1 min-h-[450px]">
+                <CodeGraphVisualizer />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1842,6 +1860,15 @@ export default function JarvisDashboard() {
               <Globe className="w-3.5 h-3.5 text-cyan-400" />
               <span>RADAR</span>
             </button>
+            <button
+              onClick={() => setDesktopTab('CODEGRAPH')}
+              className={`flex-1 py-1.5 rounded transition-colors flex items-center justify-center space-x-1 ${
+                desktopTab === 'CODEGRAPH' ? 'bg-cyan-500 text-black font-bold shadow-[0_0_10px_rgba(0,229,255,0.4)]' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Brain className="w-3.5 h-3.5 text-purple-400" />
+              <span>GRAPH</span>
+            </button>
           </div>
 
           <div className={`flex-1 min-h-0 ${desktopTab === 'TASKS' ? 'flex flex-col' : 'hidden'}`}>
@@ -1876,6 +1903,11 @@ export default function JarvisDashboard() {
           {/* Tactical Situational Radar OSINT Tab */}
           <div className={`flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar ${desktopTab === 'RADAR' ? 'flex flex-col' : 'hidden'}`}>
             <TacticalRadar />
+          </div>
+
+          {/* AST Semantic Code Graph Visualizer Tab */}
+          <div className={`flex-1 min-h-0 ${desktopTab === 'CODEGRAPH' ? 'flex flex-col' : 'hidden'}`}>
+            <CodeGraphVisualizer />
           </div>
 
           {/* Full Cinematic Arc Reactor in Right Column Tab */}
