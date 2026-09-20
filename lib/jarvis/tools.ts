@@ -2139,30 +2139,6 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['agentId', 'instruction'],
     },
   },
-  {
-    name: 'generate_proactive_briefing',
-    description: 'Generates a structured morning, evening, or tactical briefing with high-fidelity Google Cloud Neural2 British voice synthesis and optional dispatch to Sir\'s Telegram.',
-    parameters: {
-      type: 'object',
-      properties: {
-        type: {
-          type: 'string',
-          enum: ['morning', 'evening', 'tactical'],
-          description: 'Briefing type (defaults to "tactical").',
-        },
-        persona: {
-          type: 'string',
-          enum: ['jarvis', 'friday'],
-          description: 'Voice persona ("jarvis" British male Neural2-B or "friday" British female Neural2-F).',
-        },
-        sendTelegramVoice: {
-          type: 'boolean',
-          description: 'Whether to dispatch the synthesized voice note directly to Sir\'s Telegram channel.',
-        },
-      },
-      required: [],
-    },
-  },
 ];
 
 /**
@@ -3466,45 +3442,6 @@ export async function executeJarvisTool(
             severityCounts: specialistRes.severityCounts,
             toolsExecuted: specialistRes.toolsExecuted,
             latencyMs: specialistRes.latencyMs,
-          },
-        };
-      }
-
-      case 'generate_proactive_briefing': {
-        const { type = 'tactical', persona = 'jarvis', sendTelegramVoice = false } = args;
-        const { generateProactiveBriefing } = await import('./audio');
-        const briefing = await generateProactiveBriefing({
-          type,
-          persona,
-          synthesizeAudio: true,
-        });
-
-        let telegramSent = false;
-        if (sendTelegramVoice && briefing.audioBuffer) {
-          try {
-            const { telegramGateway } = await import('./telegram');
-            const authChatId = (await telegramGateway.getAuthorizedChatId()) || process.env.TELEGRAM_ALLOWED_USER_ID || '864360540';
-            if (authChatId) {
-              await telegramGateway.sendMessage(authChatId, briefing.textReport, { parseMode: 'Markdown' });
-              await telegramGateway.sendVoice(authChatId, briefing.audioBuffer, {
-                caption: `🎙️ *J.A.R.V.I.S. ${type.toUpperCase()} AUDIO BRIEFING*`,
-              });
-              telegramSent = true;
-            }
-          } catch (tErr: any) {
-            console.warn('[Briefing] Telegram voice memo error:', tErr.message);
-          }
-        }
-
-        return {
-          success: true,
-          result: {
-            type: briefing.type,
-            textReport: briefing.textReport,
-            vocalScript: briefing.vocalScript,
-            hasAudio: Boolean(briefing.audioBuffer),
-            audioBytes: briefing.audioBuffer ? briefing.audioBuffer.length : 0,
-            telegramDispatched: telegramSent,
           },
         };
       }
