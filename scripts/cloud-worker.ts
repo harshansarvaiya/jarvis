@@ -808,9 +808,16 @@ async function startWorkerLoop(isTestMode: boolean = false) {
         await checkGeopoliticalEscalationRadar();
       }
 
-      // Every 30 minutes (60 ticks): System watchdog ping to Vercel production edge
+      // Every 30 minutes (60 ticks): System watchdog ping & AST Semantic Code Graph refresh
       if (tickCount % 60 === 0) {
         await checkSystemWatchdog();
+        try {
+          const { indexCodebaseGraph } = await import('../lib/jarvis/codebase-graph');
+          await indexCodebaseGraph({ embedWithVertex: true });
+          console.log('[Cloud Worker] 🧠 AST Semantic Code Graph refreshed with Vertex AI text-embedding-004.');
+        } catch (e: any) {
+          console.warn('[Cloud Worker] Code graph index refresh warning:', e.message);
+        }
       }
 
       // Every 1 hour (120 ticks): Autonomous Sleep-Cycle Memory Consolidation via Jev System One

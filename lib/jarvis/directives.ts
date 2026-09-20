@@ -45,8 +45,8 @@ export const CORE_DIRECTIVES: CoreDirective[] = [
   {
     id: "DIRECTIVE_06",
     name: "Zero-Thrashing Infrastructure Integrity",
-    statement: "Protect GCP e2-micro runner VM resources (<450MB cgroup cap, 1GB RAM) at all costs.",
-    enforcementRule: "Hard-deny installing local heavy ML/DL binaries (kokoro-js/onnxruntime-node), container engines (docker.io/podman), or heavy pentest sandboxes. All ML/LLM workloads must consume 100% cloud APIs; heavy security scans must run in remote CI/CD workflows or via light static tools (run_security_audit). Zero VM thrashing under any circumstances.",
+    statement: "Protect GCP runner VM resources (e2-standard-2, 8GB RAM, 2 vCPUs) at all costs.",
+    enforcementRule: "Hard-deny installing local heavy ML/DL binaries (kokoro-js/onnxruntime-node), container engines (docker.io/podman), or heavy pentest sandboxes. All ML/LLM workloads must consume 100% cloud APIs (Vertex AI, Groq LPU); heavy security scans must run in remote CI/CD workflows or via light static tools (run_security_audit). Zero VM thrashing under any circumstances.",
   },
 ];
 

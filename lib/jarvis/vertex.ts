@@ -175,3 +175,58 @@ export async function callVertexAIGenerate(options: VertexGenerateOptions): Prom
     signal: options.signal || AbortSignal.timeout(180000),
   });
 }
+
+/**
+ * Computes dense vector embeddings (768-dim) via Google Cloud Vertex AI text-embedding-004.
+ * Batches inputs up to 20 instances per call to optimize throughput and credit utilization.
+ */
+export async function callVertexAIEmbeddings(texts: string[], location: string = 'us-central1'): Promise<number[][]> {
+  const token = await getVertexAccessToken();
+  if (!token) {
+    throw new Error('Vertex AI authentication failed: No valid Bearer token for embeddings.');
+  }
+
+  const projectId = process.env.GCP_PROJECT_ID || 'antigravity-cloud-runner';
+  const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/text-embedding-004:predict`;
+
+  const batchSize = 50;
+  const chunks: string[][] = [];
+  for (let i = 0; i < texts.length; i += batchSize) {
+    chunks.push(texts.slice(i, i + batchSize));
+  }
+
+  const batchPromises = chunks.map(async (chunk, batchIdx) => {
+    const bodyPayload = {
+      instances: chunk.map((text) => ({ content: text.slice(0, 4000) })),
+    };
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bodyPayload),
+        signal: AbortSignal.timeout(20000),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.warn(`[Vertex Embeddings] Failed batch ${batchIdx}: HTTP ${res.status} - ${errText}`);
+        return chunk.map(() => []);
+      }
+
+      const data = await res.json();
+      const predictions = data.predictions || [];
+      return chunk.map((_, idx) => predictions[idx]?.embeddings?.values || []);
+    } catch (err: any) {
+      console.warn(`[Vertex Embeddings] Exception batch ${batchIdx}:`, err.message);
+      return chunk.map(() => []);
+    }
+  });
+
+  const resolvedBatches = await Promise.all(batchPromises);
+  return resolvedBatches.flat();
+}
+

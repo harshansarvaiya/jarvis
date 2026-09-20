@@ -2039,6 +2039,70 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: 'search_code_graph',
+    description: 'Semantic & AST-Level Code Graph Search. Queries indexed TypeScript functions, classes, interfaces, types, and routes using hybrid lexical + Vertex AI dense vector similarity (text-embedding-004).',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Semantic query or symbol name (e.g. "executeSubagentTask", "auth middleware", "circuit breaker").',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of results to return (default: 8).',
+        },
+        kind: {
+          type: 'string',
+          enum: ['function', 'class', 'interface', 'type', 'variable', 'enum', 'component', 'route'],
+          description: 'Optional filter by symbol kind.',
+        },
+        fileFilter: {
+          type: 'string',
+          description: 'Optional file path substring to filter results (e.g. "lib/jarvis").',
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'trace_symbol_dependencies',
+    description: 'Traces incoming and outgoing dependencies, imports, and caller relationships for a given symbol or file.',
+    parameters: {
+      type: 'object',
+      properties: {
+        target: {
+          type: 'string',
+          description: 'Symbol name or file path to trace (e.g. "callVertexAIGenerate" or "lib/jarvis/vertex.ts").',
+        },
+      },
+      required: ['target'],
+    },
+  },
+  {
+    name: 'index_codebase_graph',
+    description: 'Triggers AST semantic graph indexing across all workspace files with Vertex AI text-embedding-004 vector generation.',
+    parameters: {
+      type: 'object',
+      properties: {
+        forceEmbed: {
+          type: 'boolean',
+          description: 'Whether to force dense vector embedding computation with Vertex AI.',
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_codegraph_summary',
+    description: 'Retrieves high-level architectural metrics of the codebase (total files, symbol counts, top hub modules, index coverage).',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
 ];
 
 /**
@@ -3218,6 +3282,85 @@ export async function executeJarvisTool(
         };
         const tree = scanDir(targetDir, 1);
         return { success: true, result: { path: relPath, entriesCount: tree.length, tree } };
+      }
+
+      case 'search_code_graph': {
+        const { query, limit = 8, kind, fileFilter } = args;
+        if (!query) {
+          return { success: false, result: null, error: 'Query string is required.' };
+        }
+        const { searchCodeGraph } = await import('./codebase-graph');
+        const matches = await searchCodeGraph(query, { limit, kind, fileFilter });
+        return {
+          success: true,
+          result: {
+            query,
+            totalMatches: matches.length,
+            results: matches.map((m) => ({
+              id: m.symbol.id,
+              name: m.symbol.name,
+              kind: m.symbol.kind,
+              file: m.symbol.file,
+              line: m.symbol.line,
+              signature: m.symbol.signature,
+              doc: m.symbol.doc,
+              score: Math.round(m.score * 100) / 100,
+              matchReason: m.matchReason,
+            })),
+          },
+        };
+      }
+
+      case 'trace_symbol_dependencies': {
+        const { target } = args;
+        if (!target) {
+          return { success: false, result: null, error: 'Target symbol or file is required.' };
+        }
+        const { traceSymbolDependencies } = await import('./codebase-graph');
+        const trace = traceSymbolDependencies(target);
+        return {
+          success: true,
+          result: {
+            target,
+            found: Boolean(trace.symbol),
+            symbol: trace.symbol
+              ? {
+                  name: trace.symbol.name,
+                  kind: trace.symbol.kind,
+                  file: trace.symbol.file,
+                  line: trace.symbol.line,
+                  signature: trace.symbol.signature,
+                }
+              : null,
+            importedByCount: trace.importedBy.length,
+            importedBy: trace.importedBy,
+            importsCount: trace.imports.length,
+            imports: trace.imports,
+            siblingSymbols: trace.relatedSymbols.map((s) => `${s.kind} ${s.name} (line ${s.line})`),
+          },
+        };
+      }
+
+      case 'index_codebase_graph': {
+        const { forceEmbed = true } = args;
+        const { indexCodebaseGraph } = await import('./codebase-graph');
+        const summary = await indexCodebaseGraph({ embedWithVertex: forceEmbed });
+        return {
+          success: true,
+          result: {
+            message: 'AST Semantic Code Graph successfully indexed and synchronized.',
+            summary,
+          },
+        };
+      }
+
+      case 'get_codegraph_summary': {
+        const { getCodeGraphSummary } = await import('./codebase-graph');
+        const summary = await getCodeGraphSummary();
+        return {
+          success: true,
+          result: summary,
+        };
       }
 
       default:
