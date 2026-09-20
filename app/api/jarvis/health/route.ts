@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStorage } from '@/lib/jarvis/storage';
 import { getAllKnowledgeChunks, getAllKnowledgeDocs } from '@/lib/jarvis/rag';
 import { formatISTTime, formatFullISTDateTime } from '@/lib/jarvis/time';
+import { verifyHmacSession } from '@/lib/jarvis/security/auth-gate';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,10 @@ export interface SystemNodeHealth {
 }
 
 export async function GET(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   const startTime = Date.now();
   const nodes: SystemNodeHealth[] = [];
 

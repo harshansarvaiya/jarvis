@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { scanCveThreats, traceCryptoSanctions, inspectIpRecon, fetchGeopoliticalThreatRadar } from '@/lib/jarvis/osint';
+import { verifyHmacSession } from '@/lib/jarvis/security/auth-gate';
 
 // Strategic Maritime Naval Chokepoints (OSIRIS-aligned)
 const MARITIME_CHOKEPOINTS = [
@@ -12,7 +13,11 @@ const MARITIME_CHOKEPOINTS = [
   { id: 'bosporus', name: 'Bosporus Strait', lat: 41.11, lon: 29.07, status: 'NORMAL', transitShare: 'Black Sea Access' },
 ];
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   const startTime = Date.now();
   let earthquakes: any[] = [];
   let spaceWeather: any[] = [];
@@ -97,6 +102,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body = await req.json();
     const { action, query, asset, ecosystem } = body;

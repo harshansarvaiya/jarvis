@@ -5,8 +5,13 @@ import {
   getAllKnowledgeDocs,
   deleteKnowledgeDocument,
 } from '@/lib/jarvis/rag';
+import { verifyHmacSession } from '@/lib/jarvis/security/auth-gate';
 
 export async function GET(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   try {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get('q');
@@ -30,6 +35,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body = await req.json();
     const { title, content, source, category, tags } = body;
@@ -64,6 +73,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   try {
     const { searchParams } = new URL(req.url);
     const docId = searchParams.get('id');

@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStorage } from '@/lib/jarvis/storage';
+import { verifyHmacSession } from '@/lib/jarvis/security/auth-gate';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body = await req.json();
     const { title, message, priority = 'NORMAL', delaySeconds = 0, category = 'GENERAL', actionUrl = '/' } = body;
@@ -50,7 +55,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   try {
     const storage = getStorage();
     let notifications: any[] = [];

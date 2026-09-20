@@ -1490,9 +1490,9 @@ export async function executePlaywrightMCP(
   try {
     let chromium: any;
     try {
-      // Dynamic non-webpack import to prevent Next.js/Webpack from bundling optional native C++ modules on Vercel
-      const importDynamic = new Function('modulePath', 'return import(modulePath)');
-      const pw = await importDynamic('playwright-chromium');
+      // Safe dynamic import to prevent bundling optional native modules on cloud edge
+      const moduleName = 'playwright-chromium';
+      const pw = await import(/* webpackIgnore: true */ moduleName);
       chromium = pw.chromium;
     } catch {
       throw new Error('Playwright Chromium is not available on this environment.');

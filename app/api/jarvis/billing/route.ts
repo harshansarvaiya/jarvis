@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Redis } from '@upstash/redis';
+import { verifyHmacSession } from '@/lib/jarvis/security/auth-gate';
 
 const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -15,7 +16,11 @@ const BASELINE_TOTAL_POOL = 33435.00;
 const BASELINE_SANDBOX_DAYS = 90;
 const ESTIMATED_DAILY_BURN = 0.52; // e2-micro VM + Vertex AI inference
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   const startTime = Date.now();
   const now = new Date();
   const startDate = new Date(BASELINE_POOL_START);
@@ -66,6 +71,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body = await req.json();
     const { totalPool, customBurn } = body;

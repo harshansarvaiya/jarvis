@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTasks, addTask, updateTask, deleteTask, recordTaskExecution } from '@/lib/jarvis/memory';
+import { verifyHmacSession } from '@/lib/jarvis/security/auth-gate';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   try {
     const tasks = getTasks();
     return NextResponse.json({ tasks });
@@ -13,6 +18,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body = await req.json();
     const { title, description, priority, dueDate, tags, executionAudit } = body;
@@ -38,6 +47,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body = await req.json();
     const { id, auditRecord, ...updates } = body;
@@ -69,6 +82,10 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

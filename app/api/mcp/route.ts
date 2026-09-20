@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { mcpClient, MCPServerId } from '@/lib/jarvis/mcp-client';
+import { verifyHmacSession } from '@/lib/jarvis/security/auth-gate';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body = await req.json();
     const { server, action, params } = body;

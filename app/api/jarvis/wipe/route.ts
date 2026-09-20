@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { wipeSensitiveKnowledge, wipeAllKnowledge } from '@/lib/jarvis/rag';
 import { clearUniversalChatHistory, getUniversalStorage } from '@/lib/jarvis/storage';
 import { getMemories } from '@/lib/jarvis/memory';
+import { verifyHmacSession } from '@/lib/jarvis/security/auth-gate';
 
 export async function POST(req: NextRequest) {
+  const auth = verifyHmacSession(req);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body = await req.json().catch(() => ({}));
     const mode = body.mode || 'sensitive_only'; // 'sensitive_only' | 'nuclear_all'

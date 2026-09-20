@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Receiver } from '@upstash/qstash';
 import { getTasks, getMemories } from '@/lib/jarvis/memory';
+import { verifyHmacSession } from '@/lib/jarvis/security/auth-gate';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,26 +13,29 @@ const receiver = new Receiver({
 /**
  * POST /api/cron/execute
  * Upstash QStash Webhook Receiver for autonomous background cron jobs.
- * Cryptographically verifies incoming QStash signatures before execution.
+ * Cryptographically verifies incoming QStash signatures or HMAC session before execution.
  */
 export async function POST(req: NextRequest) {
   try {
     const signature = req.headers.get('upstash-signature');
     const rawBody = await req.text();
 
-    if (!signature) {
-      return NextResponse.json({ error: 'Missing Upstash signature header.' }, { status: 401 });
-    }
+    if (signature) {
+      // Cryptographic signature verification
+      const isValid = await receiver.verify({
+        signature,
+        body: rawBody,
+      });
 
-    // Cryptographic signature verification
-    const isValid = await receiver.verify({
-      signature,
-      body: rawBody,
-    });
-
-    if (!isValid) {
-      console.warn('[J.A.R.V.I.S. Cron] Rejected invalid QStash signature.');
-      return NextResponse.json({ error: 'Invalid Upstash signature.' }, { status: 401 });
+      if (!isValid) {
+        console.warn('[J.A.R.V.I.S. Cron] Rejected invalid QStash signature.');
+        return NextResponse.json({ error: 'Invalid Upstash signature.' }, { status: 401 });
+      }
+    } else {
+      const auth = verifyHmacSession(req);
+      if (!auth.authorized) {
+        return NextResponse.json({ error: 'Missing Upstash signature header or valid session auth.' }, { status: 401 });
+      }
     }
 
     let payload: any = {};
@@ -84,7 +88,7 @@ export async function POST(req: NextRequest) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'upstash-signature': signature, // Re-use verified signature
+            ...(signature ? { 'upstash-signature': signature } : {}),
           },
           body: JSON.stringify({
             title: payload.title || 'J.A.R.V.I.S. Scheduled Briefing',
