@@ -305,11 +305,24 @@ export async function runJarvisAgent(
     console.warn('[Agent] Profile load warning:', profErr);
   }
 
+  // 3.10. Auto-Inject Workspace Pre-flight Telemetry (Phase 2 Upgrade)
+  let workspacePreflightBlock = '';
+  if (persona === 'FRIDAY' || isGithubOrRepoQuery) {
+    try {
+      const { getWorkspacePreflightSnapshot, formatPreflightContext } = await import('./harness');
+      const preflight = await getWorkspacePreflightSnapshot();
+      workspacePreflightBlock = `\n${formatPreflightContext(preflight)}\n`;
+    } catch (preflightErr) {
+      console.warn('[Agent] Preflight snapshot warning:', preflightErr);
+    }
+  }
+
   const contextPrompt = `
 [CURRENT TEMPORAL CONTEXT]: ${new Date().toISOString()} (Local time: ${new Date().toLocaleString()})
 ${personaPromptBlock}
 ${specializedAgentBlock}
 ${dynamicDnaBlock}
+${workspacePreflightBlock}
 
 [TIER 1 - WORKING MEMORY & PRE-THOUGHT REASONING PASS]:
 - Unstated Motive: ${motivePass.unstatedMotive}
@@ -848,6 +861,82 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           }
         } catch (ghErr) {
           console.warn('[Orchestrator Failover] GitHub Models failover error:', ghErr);
+        }
+      }
+
+      // Tertiary Failover to NVIDIA NIM (Enterprise H100 Microservices)
+      if (nvidiaKey) {
+        try {
+          console.log('[Orchestrator Failover] Engaging NVIDIA NIM H100 GPU Microservices...');
+          const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+          const nimResult = await runOpenAICompatibleAgent(messages, {
+            endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
+            apiKey: nvidiaKey,
+            model: 'meta/llama-3.3-70b-instruct',
+            systemPrompt: fullSystemPrompt,
+          });
+
+          if (nimResult && !nimResult.error && nimResult.reply) {
+            const latencyMs = Date.now() - startTime;
+            return {
+              reply: `*(Sovereign Autonomous Failover to NVIDIA NIM Llama 3.3 70B)*\n\n${nimResult.reply}`,
+              vocalSummary: extractCinematicVocalSummary(nimResult.reply),
+              tacticalActions: generateTacticalNextActions(lastUserMessage.content, nimResult.reply, nimResult.toolCallsExecuted),
+              toolCallsExecuted: nimResult.toolCallsExecuted,
+              telemetry: {
+                engineUsed: 'NVIDIA NIM (Llama 3.3 70B)',
+                provider: 'groq',
+                model: 'meta/llama-3.3-70b-instruct',
+                latencyMs,
+                archetype,
+                failoverOccurred: true,
+                recalledEpisodesCount: recalledEpisodes.length,
+                persona,
+              },
+            };
+          }
+        } catch (nimErr) {
+          console.warn('[Orchestrator Failover] NVIDIA NIM failover error:', nimErr);
+        }
+      }
+
+      // Quaternary Failover to OpenRouter Universal Gateway
+      if (openrouterKey) {
+        try {
+          console.log('[Orchestrator Failover] Engaging OpenRouter Universal Gateway...');
+          const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+          const routerResult = await runOpenAICompatibleAgent(messages, {
+            endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+            apiKey: openrouterKey,
+            model: 'nvidia/nemotron-3-super-120b-a12b:free',
+            systemPrompt: fullSystemPrompt,
+            extraHeaders: {
+              'HTTP-Referer': 'https://github.com/harshansarvaiya/jarvis',
+              'X-Title': 'J.A.R.V.I.S. Mark II',
+            },
+          });
+
+          if (routerResult && !routerResult.error && routerResult.reply) {
+            const latencyMs = Date.now() - startTime;
+            return {
+              reply: `*(Sovereign Autonomous Failover to OpenRouter Nemotron)*\n\n${routerResult.reply}`,
+              vocalSummary: extractCinematicVocalSummary(routerResult.reply),
+              tacticalActions: generateTacticalNextActions(lastUserMessage.content, routerResult.reply, routerResult.toolCallsExecuted),
+              toolCallsExecuted: routerResult.toolCallsExecuted,
+              telemetry: {
+                engineUsed: 'OpenRouter (Nemotron 120B)',
+                provider: 'groq',
+                model: 'nvidia/nemotron-3-super-120b-a12b:free',
+                latencyMs,
+                archetype,
+                failoverOccurred: true,
+                recalledEpisodesCount: recalledEpisodes.length,
+                persona,
+              },
+            };
+          }
+        } catch (routerErr) {
+          console.warn('[Orchestrator Failover] OpenRouter failover error:', routerErr);
         }
       }
 

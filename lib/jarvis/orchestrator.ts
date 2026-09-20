@@ -332,3 +332,57 @@ export function generateTacticalNextActions(
 
   return Array.from(new Set(actions)).slice(0, 3);
 }
+
+// ============================================================================
+// 8. MULTI-TIER CIRCUIT BREAKER (Fault-Tolerant Dynamic Provider Routing)
+// ============================================================================
+
+export interface CircuitBreakerState {
+  failures: number;
+  lastFailureTime: number;
+  isOpen: boolean;
+}
+
+export class ProviderCircuitBreaker {
+  private breakers = new Map<string, CircuitBreakerState>();
+  private failureThreshold = 3;
+  private cooloffPeriodMs = 45000; // 45s cool-off
+
+  public isAvailable(providerName: string): boolean {
+    const state = this.breakers.get(providerName);
+    if (!state) return true;
+    if (!state.isOpen) return true;
+    if (Date.now() - state.lastFailureTime > this.cooloffPeriodMs) {
+      state.isOpen = false;
+      state.failures = 0;
+      return true;
+    }
+    return false;
+  }
+
+  public recordSuccess(providerName: string): void {
+    this.breakers.set(providerName, {
+      failures: 0,
+      lastFailureTime: 0,
+      isOpen: false,
+    });
+  }
+
+  public recordFailure(providerName: string): void {
+    const current = this.breakers.get(providerName) || {
+      failures: 0,
+      lastFailureTime: 0,
+      isOpen: false,
+    };
+    current.failures += 1;
+    current.lastFailureTime = Date.now();
+    if (current.failures >= this.failureThreshold) {
+      current.isOpen = true;
+      console.warn(`[CircuitBreaker] Provider "${providerName}" tripped OPEN (${current.failures} failures). Cooling off for ${this.cooloffPeriodMs / 1000}s.`);
+    }
+    this.breakers.set(providerName, current);
+  }
+}
+
+export const globalCircuitBreaker = new ProviderCircuitBreaker();
+
