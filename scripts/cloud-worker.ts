@@ -94,21 +94,28 @@ if (VAPID_PUB && VAPID_PRIV) {
 }
 
 // 2. Push Notification Dispatcher Helper (Web Push + Telegram Sentry)
-async function dispatchPush(title: string, body: string, actionUrl: string = '/') {
-  // Dual-channel: Dispatch proactive alert directly to Sir's Telegram
-  try {
-    const { telegramGateway } = await import('../lib/jarvis/telegram');
-    const authChatId = (await telegramGateway.getAuthorizedChatId()) || ALLOWED_USER_ID;
-    if (authChatId) {
-      await telegramGateway.sendMessage(
-        authChatId,
-        `🔔 *[J.A.R.V.I.S. PROACTIVE ALERT]*\n\n*${title}*\n${body}`,
-        { parseMode: 'Markdown' }
-      );
-      console.log(`[Cloud Worker] 📱 Telegram proactive alert sent to chat ID: ${authChatId}`);
+async function dispatchPush(
+  title: string,
+  body: string,
+  actionUrl: string = '/',
+  options: { skipTelegram?: boolean } = {}
+) {
+  // Dual-channel: Dispatch proactive alert directly to Sir's Telegram (unless suppressed)
+  if (!options.skipTelegram) {
+    try {
+      const { telegramGateway } = await import('../lib/jarvis/telegram');
+      const authChatId = (await telegramGateway.getAuthorizedChatId()) || ALLOWED_USER_ID;
+      if (authChatId) {
+        await telegramGateway.sendMessage(
+          authChatId,
+          `🔔 *[J.A.R.V.I.S. PROACTIVE ALERT]*\n\n*${title}*\n${body}`,
+          { parseMode: 'Markdown' }
+        );
+        console.log(`[Cloud Worker] 📱 Telegram proactive alert sent to chat ID: ${authChatId}`);
+      }
+    } catch (tgErr: any) {
+      console.warn('[Cloud Worker] Telegram dispatch warning:', tgErr.message);
     }
-  } catch (tgErr: any) {
-    console.warn('[Cloud Worker] Telegram dispatch warning:', tgErr.message);
   }
 
   if (!redis) {
@@ -225,11 +232,12 @@ Synthesize a top-tier executive intelligence briefing for Sir (Harshan Sarvaiya)
                 console.log(`[Cloud Worker] 📱 Intelligence briefing delivered to Telegram chat: ${authChatId}`);
               }
 
-              // Dispatch lockscreen push alert
+              // Dispatch lockscreen push alert (suppress Telegram to prevent duplicate alert)
               await dispatchPush(
                 `🌅 ${task.title}`,
                 result.vocalSummary || result.reply.slice(0, 180),
-                '/'
+                '/',
+                { skipTelegram: true }
               );
 
               task.executionAudit = task.executionAudit || [];

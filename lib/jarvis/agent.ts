@@ -1221,11 +1221,19 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 
     if (!finalReply) {
       if (toolCallsExecuted.length > 0) {
+        const hasMutatingTool = toolCallsExecuted.some((tc) =>
+          ['edit_workspace_file', 'cloud_write_file', 'create_workspace_file', 'manage_task', 'store_memory'].includes(tc.name)
+        );
         const toolSummaries = toolCallsExecuted.map((tc) => {
           const raw = tc.result?.output || tc.result?.stdout || tc.result?.message || (typeof tc.result === 'string' ? tc.result : JSON.stringify(tc.result || {}));
           return `- **\`${tc.name}\`**: ${String(raw).slice(0, 160)}`;
-        }).slice(0, 5).join('\n');
-        finalReply = `Sir, I completed the requested operations. Here is the operational summary of executed actions:\n\n${toolSummaries}\n\nAll tools completed cleanly and systems remain operational.`;
+        }).slice(0, 8).join('\n');
+
+        if (hasMutatingTool) {
+          finalReply = `Sir, I applied the requested workspace mutations. Operational audit trace:\n\n${toolSummaries}\n\nAll tools executed cleanly and systems remain operational.`;
+        } else {
+          finalReply = `Sir, I completed an investigative telemetry sweep across ${toolCallsExecuted.length} diagnostic steps:\n\n${toolSummaries}\n\nInspection is complete. Standing by for mutation directive.`;
+        }
       } else {
         finalReply = 'All systems green, Sir. Standing by for your directive.';
       }
