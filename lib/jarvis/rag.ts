@@ -14,12 +14,22 @@ import { getUniversalStorage } from './storage';
 import path from 'path';
 import fs from 'fs';
 
+export interface TurboQuantizedVector {
+  packed: string; // Base64 packed 4-bit nibbles (2 coordinates per byte)
+  minVal: number;
+  maxVal: number;
+  scale: number;
+  dim: number;
+  blockSize: number;
+}
+
 export interface KnowledgeChunk {
   id: string;
   docId: string;
   title: string;
   content: string;
   embedding: number[];
+  quantizedEmbedding?: TurboQuantizedVector;
   chunkIndex: number;
   totalChunks: number;
   category?: string;

@@ -1,5 +1,69 @@
 [
   {
+    "id": "doc-1789993386625-etwd",
+    "title": "SPARC Spec: SkillOpt Reflection Loop Integration",
+    "category": "SPARC_SPEC",
+    "totalChunks": 1,
+    "totalCharacters": 536,
+    "tags": [
+      "sparc",
+      "architecture",
+      "design-spec",
+      "skillopt-reflection-loop-integration"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-21T12:23:07.781Z",
+    "updatedAt": "2026-09-21T12:23:07.781Z"
+  },
+  {
+    "id": "doc-1789993383645-ww57",
+    "title": "SPARC Spec: SkillOpt Reflection Loop Integration",
+    "category": "SPARC_SPEC",
+    "totalChunks": 1,
+    "totalCharacters": 536,
+    "tags": [
+      "sparc",
+      "architecture",
+      "design-spec",
+      "skillopt-reflection-loop-integration"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-21T12:23:04.831Z",
+    "updatedAt": "2026-09-21T12:23:04.831Z"
+  },
+  {
+    "id": "doc-1789993380561-m9da",
+    "title": "SPARC Spec: SkillOpt Reflection Loop Integration",
+    "category": "SPARC_SPEC",
+    "totalChunks": 1,
+    "totalCharacters": 536,
+    "tags": [
+      "sparc",
+      "architecture",
+      "design-spec",
+      "skillopt-reflection-loop-integration"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-21T12:23:01.727Z",
+    "updatedAt": "2026-09-21T12:23:01.727Z"
+  },
+  {
+    "id": "doc-1789993376176-hbjh",
+    "title": "SPARC Spec: SkillOpt Reflection Loop Integration",
+    "category": "SPARC_SPEC",
+    "totalChunks": 1,
+    "totalCharacters": 536,
+    "tags": [
+      "sparc",
+      "architecture",
+      "design-spec",
+      "skillopt-reflection-loop-integration"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-21T12:22:57.561Z",
+    "updatedAt": "2026-09-21T12:22:57.561Z"
+  },
+  {
     "id": "doc-1789942538984-nb87",
     "title": "CL4R1T4S Frontier Agent Architectures & Guardrail Schemas",
     "category": "ARCHITECTURE",

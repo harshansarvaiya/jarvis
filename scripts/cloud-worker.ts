@@ -162,6 +162,46 @@ async function dispatchPush(
   }
 }
 
+
+// New helper function for SkillOpt reflection
+async function reflectAndRefineSkill(task: any, error: any, originalPrompt: string) {
+  console.log("[Cloud Worker] Initiating SkillOpt reflection for task: " + task.title);
+  try {
+    const { runJarvisAgent } = await import("../lib/jarvis/agent");
+    const { telegramGateway } = await import("../lib/jarvis/telegram");
+    const authChatId = (await telegramGateway.getAuthorizedChatId()) || ALLOWED_USER_ID;
+
+    const reflectionPrompt = [
+      "The following autonomous task execution failed:",
+      "Task Title: " + task.title,
+      "Task Description: " + (task.description || "N/A"),
+      "Original Prompt used for Agent: " + originalPrompt,
+      "Error encountered: " + error.message,
+      "As a highly experienced AI architect, analyze the error and suggest a refined version of the Original Prompt.",
+      "Provide ONLY the refined prompt, enclosed in triple backticks."
+    ].join("\n");
+
+    const reflectionResult = await runJarvisAgent(
+      [{ role: "user", content: reflectionPrompt }],
+      { model: "gemini-3.7-flash", orchestrationMode: "auto" }
+    );
+
+    const match = reflectionResult.reply.match(/```(?:\w+)?\n([\s\S]*?)\n```/);
+    const refinedPrompt = match ? match[1].trim() : null;
+
+    if (refinedPrompt && refinedPrompt !== originalPrompt.trim()) {
+      console.log("[Cloud Worker] SkillOpt critic suggested a refined prompt.");
+      await telegramGateway.sendMessage(
+        authChatId,
+        "[SkillOpt Refinement Suggestion]\n\nTask: " + task.title + "\nError: " + error.message + "\n\nOriginal Prompt:\n" + originalPrompt + "\n\nRefined Prompt Suggestion:\n" + refinedPrompt,
+        { parseMode: "Markdown" }
+      );
+    }
+  } catch (reflectErr: any) {
+    console.error("[Cloud Worker] SkillOpt reflection process failed:", reflectErr.message);
+  }
+}
+
 // 3. Routine A: Autonomous Scheduled Task & Cron Execution Engine
 async function checkScheduledReminders() {
   if (!redis) return;
@@ -220,12 +260,7 @@ async function checkScheduledReminders() {
 
           if (isCron) {
             // Autonomous AI Research & Synthesis Execution
-            try {
-              const { runJarvisAgent } = await import('../lib/jarvis/agent');
-              const { telegramGateway } = await import('../lib/jarvis/telegram');
-              const authChatId = (await telegramGateway.getAuthorizedChatId()) || ALLOWED_USER_ID;
-
-              const synthPrompt = `[SCHEDULED AUTONOMOUS CRON DIRECTIVE // 09:00 AM IST]:
+            const synthPrompt = `[SCHEDULED AUTONOMOUS CRON DIRECTIVE // 09:00 AM IST]:
 Task: "${task.title}"
 Details: "${task.description || ''}"
 
@@ -233,6 +268,11 @@ Synthesize a top-tier executive intelligence briefing for Sir (Harshan Sarvaiya)
 1. Top Frontier AI & Tech Breakthroughs / Product Releases
 2. Strategic Implications for Architecture & Distributed Systems
 3. High-Signal Action Items & Recommendations`;
+
+            try {
+              const { runJarvisAgent } = await import('../lib/jarvis/agent');
+              const { telegramGateway } = await import('../lib/jarvis/telegram');
+              const authChatId = (await telegramGateway.getAuthorizedChatId()) || ALLOWED_USER_ID;
 
               const result = await runJarvisAgent(
                 [{ role: 'user', content: synthPrompt }],
@@ -281,6 +321,8 @@ Synthesize a top-tier executive intelligence briefing for Sir (Harshan Sarvaiya)
             } catch (cronErr: any) {
               console.error('[Cloud Worker] Scheduled task synthesis failed:', cronErr.message);
               await dispatchPush('⚠️ Scheduled Task Warning', `Synthesis issue on: ${task.title} (${cronErr.message})`, '/', { skipTelegram: true });
+              // Initiate SkillOpt reflection
+              await reflectAndRefineSkill(task, cronErr, synthPrompt);
             }
           } else {
             // Standard Reminder Task
