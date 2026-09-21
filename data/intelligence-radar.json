@@ -21,5 +21,21 @@
     "threatLevel": "LOW",
     "recommendation": "Integrated with Upstash Redis memory engine",
     "ingestedAt": "2026-03-24T00:00:00.000Z"
+  },
+  {
+    "name": "trycua/cua",
+    "category": "Computer Use 2.0 & Headless OS Automation",
+    "threatLevel": "LOW",
+    "recommendation": "High Operational Leverage: Integrate non-cursor-stealing OS automation into VM-RPC for headless browser and GUI workflows.",
+    "ingestedAt": "2026-09-21T07:10:00.000Z",
+    "directivesCompliant": true
+  },
+  {
+    "name": "ryancodrai/turbovec",
+    "category": "Zero-Training Vector Indexing & Ultra-Dense Quantization (TurboQuant)",
+    "threatLevel": "LOW",
+    "recommendation": "Adopt algorithm pattern: Data-oblivious rotational quantization for high-compression in-memory embeddings without codebook training.",
+    "ingestedAt": "2026-09-21T08:41:00.000Z",
+    "directivesCompliant": true
   }
 ]
