@@ -186,8 +186,10 @@ async function checkScheduledReminders() {
       if ((task.status === 'PENDING' || task.status === 'IN_PROGRESS') && task.dueDate) {
         const dueTime = new Date(task.dueDate).getTime();
         
-        // Trigger if due time has arrived (within 24h window)
-        if (!isNaN(dueTime) && dueTime <= now && now - dueTime < 24 * 60 * 60 * 1000) {
+        if (!isNaN(dueTime) && dueTime <= now) {
+          const ageMs = now - dueTime;
+          const CRON_GRACE_WINDOW_MS = 15 * 60 * 1000; // 15 minutes strict execution tolerance
+
           const isCron =
             task.tags?.some((t: string) => ['cron', 'briefing', 'news', 'scheduled-routine', 'report', 'ai-news'].includes(t.toLowerCase())) ||
             task.title.toLowerCase().includes('cron') ||
@@ -195,6 +197,24 @@ async function checkScheduledReminders() {
             task.title.toLowerCase().includes('news');
           
           const isDaily = isCron || task.tags?.includes('daily') || task.title.toLowerCase().includes('daily');
+
+          // If recurring cron is stale (>15 minutes past due), auto-advance to next cycle without spamming catch-ups
+          if (isDaily && ageMs > CRON_GRACE_WINDOW_MS) {
+            let nextDue = dueTime;
+            while (nextDue <= now) {
+              nextDue += 24 * 60 * 60 * 1000;
+            }
+            const nextDueStr = new Date(nextDue).toISOString();
+            task.dueDate = nextDueStr;
+            task.status = 'PENDING';
+            stateModified = true;
+            console.log(`[Cloud Worker] ⏩ Stale recurring cron "${task.title}" auto-advanced to: ${nextDueStr}`);
+            continue;
+          }
+
+          // Trigger execution if within grace window (or for one-off tasks within 24h)
+          const shouldTrigger = isDaily ? ageMs <= CRON_GRACE_WINDOW_MS : ageMs < 24 * 60 * 60 * 1000;
+          if (!shouldTrigger) continue;
 
           console.log(`[Cloud Worker] ⏰ Scheduled Task Triggered: "${task.title}" (isCron=${isCron}, isDaily=${isDaily})`);
 
@@ -260,7 +280,7 @@ Synthesize a top-tier executive intelligence briefing for Sir (Harshan Sarvaiya)
               stateModified = true;
             } catch (cronErr: any) {
               console.error('[Cloud Worker] Scheduled task synthesis failed:', cronErr.message);
-              await dispatchPush('⚠️ Scheduled Task Warning', `Synthesis issue on: ${task.title} (${cronErr.message})`, '/');
+              await dispatchPush('⚠️ Scheduled Task Warning', `Synthesis issue on: ${task.title} (${cronErr.message})`, '/', { skipTelegram: true });
             }
           } else {
             // Standard Reminder Task
