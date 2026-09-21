@@ -369,11 +369,17 @@ async function processDirective(
       image: base64Image,
     });
 
-    // 2. Invoke J.A.R.V.I.S. Agent
+    // 2. Invoke J.A.R.V.I.S. / F.R.I.D.A.Y. Agent
+    const isFridayDirective = /friday/i.test(cleanUserText);
     const result = await runJarvisAgent(contextMessages, {
       model: requestedModel,
       orchestrationMode: requestedMode,
       specializedAgentId: delegatedAgentId,
+      persona: isFridayDirective ? 'FRIDAY' : undefined,
+      onProgress: async (stepText: string) => {
+        gateway.sendTypingAction(chatId).catch(() => {});
+        console.log(`[Telegram Worker] ${stepText}`);
+      },
     });
 
     // 3. Save Both Records to Universal Storage (Syncs to Web PWA in Real-Time)

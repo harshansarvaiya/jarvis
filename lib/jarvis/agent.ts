@@ -58,6 +58,8 @@ export interface JarvisAgentOptions {
   provider?: 'google' | 'groq' | 'github-models' | 'openai' | 'nvidia' | 'openrouter' | 'auto';
   orchestrationMode?: 'auto' | 'groq' | 'gemini' | 'nvidia' | 'openrouter' | 'manual';
   specializedAgentId?: string;
+  persona?: 'JARVIS' | 'FRIDAY';
+  onProgress?: (step: string) => Promise<void> | void;
 }
 
 export function normalizeModel(m?: string): string {
@@ -678,8 +680,11 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             generationConfig: {
               temperature: generationTemperature,
               maxOutputTokens: 4096,
+              ...(persona === 'FRIDAY' || isGithubOrRepoQuery || archetype === 'DEEP_SYNTHESIS'
+                ? { thinkingConfig: { thinkingBudget: 2048 } }
+                : {}),
             },
-            signal: AbortSignal.timeout(isExplicitPro ? 45000 : 25000),
+            signal: AbortSignal.timeout(isExplicitPro || persona === 'FRIDAY' ? 45000 : 30000),
           });
 
           if (vRes.ok) {
@@ -1064,6 +1069,14 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           consecutiveReadCount = 0;
         }
 
+        if (options.onProgress) {
+          try {
+            const detail = call.args?.path || call.args?.command || call.args?.query || '';
+            const detailShort = detail ? ` (${String(detail).slice(0, 32)})` : '';
+            await options.onProgress(`⚡ [${persona}] ${call.name}${detailShort}...`);
+          } catch {}
+        }
+
         const toolResult = await executeJarvisTool(call.name, call.args || {});
 
         toolCallsExecuted.push({
@@ -1088,6 +1101,36 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           };
         }
 
+        // Pillar 3: Autonomous Self-Healing Compiler Guard
+        const isMutatingFile = ['edit_workspace_file', 'cloud_write_file'].includes(call.name);
+        const targetFile = String(call.args?.path || '');
+        const isTsOrCode = targetFile.endsWith('.ts') || targetFile.endsWith('.tsx') || targetFile.endsWith('.js');
+
+        if (isMutatingFile && (isTsOrCode || !targetFile)) {
+          try {
+            const { exec } = await import('child_process');
+            const { promisify } = await import('util');
+            const execAsync = promisify(exec);
+            await execAsync('./node_modules/.bin/tsc --noEmit', { timeout: 45000, cwd: process.cwd() });
+            console.log('[Compiler Sentry] 🛡️ Autonomous compile check passed (0 errors).');
+            toolResponsePayload = {
+              ...toolResponsePayload,
+              compilerVerification: 'PASSED (0 TypeScript errors)',
+            };
+          } catch (tscErr: any) {
+            const tscOutput = (tscErr.stdout || tscErr.stderr || tscErr.message || '').trim();
+            if (tscOutput) {
+              console.warn('[Compiler Sentry] ⚠️ TypeScript compilation regression detected:', tscOutput.slice(0, 160));
+              toolResponsePayload = {
+                ...toolResponsePayload,
+                compilerVerification: 'FAILED',
+                compilerError: tscOutput.slice(0, 1200),
+                selfHealingMandate: `[AUTONOMOUS COMPILER SENTRY - DIRECTIVE 05 MANDATE]: Your mutation caused the following TypeScript compilation errors:\n\n${tscOutput.slice(0, 1200)}\n\nYou MUST immediately analyze this error and execute 'edit_workspace_file' to fix the syntax, variable scope, or missing imports before concluding your response.`,
+              };
+            }
+          }
+        }
+
         toolResponseParts.push({
           functionResponse: {
             name: call.name,
@@ -1107,8 +1150,11 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       });
 
       const toolGenerationConfig = {
-        temperature: 0.3,
+        temperature: 0.2,
         maxOutputTokens: 4096,
+        ...(persona === 'FRIDAY' || isGithubOrRepoQuery || archetype === 'DEEP_SYNTHESIS'
+          ? { thinkingConfig: { thinkingBudget: 2048 } }
+          : {}),
       };
 
       try {
@@ -1119,7 +1165,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             systemInstruction,
             tools: geminiTools,
             generationConfig: toolGenerationConfig,
-            signal: AbortSignal.timeout(25000),
+            signal: AbortSignal.timeout(persona === 'FRIDAY' ? 45000 : 30000),
           });
         } else {
           response = await fetch(activeApiUrl, {
@@ -1131,7 +1177,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
               tools: geminiTools,
               generationConfig: toolGenerationConfig,
             }),
-            signal: AbortSignal.timeout(25000),
+            signal: AbortSignal.timeout(persona === 'FRIDAY' ? 45000 : 30000),
           });
         }
 

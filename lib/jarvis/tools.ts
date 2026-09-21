@@ -674,6 +674,91 @@ async function handleReadWorkspaceFile(args: { path: string; startLine?: number;
   };
 }
 
+function fuzzyFindAndReplace(
+  fullText: string,
+  target: string,
+  replacement: string
+): { success: boolean; result?: string; reason?: string } {
+  // 1. Direct exact match
+  if (fullText.includes(target)) {
+    const parts = fullText.split(target);
+    if (parts.length > 2) {
+      return { success: false, reason: `Target content occurs ${parts.length - 1} times in file. Provide more surrounding context to match uniquely.` };
+    }
+    return { success: true, result: fullText.replace(target, replacement) };
+  }
+
+  // 2. Line ending normalized match (CRLF -> LF)
+  const normFull = fullText.replace(/\r\n/g, '\n');
+  const normTarget = target.replace(/\r\n/g, '\n');
+  const normReplacement = replacement.replace(/\r\n/g, '\n');
+
+  if (normFull.includes(normTarget)) {
+    const parts = normFull.split(normTarget);
+    if (parts.length === 2) {
+      return { success: true, result: normFull.replace(normTarget, normReplacement) };
+    }
+  }
+
+  // 3. Trailing-whitespace normalized line matching
+  const linesFull = normFull.split('\n');
+  const linesTarget = normTarget.split('\n').map((l) => l.trimEnd());
+  const targetLen = linesTarget.length;
+
+  let matchIndex = -1;
+  let matchesCount = 0;
+
+  for (let i = 0; i <= linesFull.length - targetLen; i++) {
+    let match = true;
+    for (let j = 0; j < targetLen; j++) {
+      if (linesFull[i + j].trimEnd() !== linesTarget[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      matchIndex = i;
+      matchesCount++;
+    }
+  }
+
+  if (matchesCount === 1 && matchIndex !== -1) {
+    const replacementLines = normReplacement.split('\n');
+    linesFull.splice(matchIndex, targetLen, ...replacementLines);
+    return { success: true, result: linesFull.join('\n') };
+  }
+
+  // 4. Loose indentation trimmed matching (if block is >= 2 lines and uniquely identified)
+  const trimmedTargetLines = linesTarget.map((l) => l.trim()).filter(Boolean);
+  if (trimmedTargetLines.length >= 2) {
+    let looseIndex = -1;
+    let looseMatches = 0;
+    for (let i = 0; i <= linesFull.length - trimmedTargetLines.length; i++) {
+      let match = true;
+      for (let j = 0; j < trimmedTargetLines.length; j++) {
+        if (linesFull[i + j].trim() !== trimmedTargetLines[j]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) {
+        looseIndex = i;
+        looseMatches++;
+      }
+    }
+    if (looseMatches === 1 && looseIndex !== -1) {
+      const replacementLines = normReplacement.split('\n');
+      linesFull.splice(looseIndex, trimmedTargetLines.length, ...replacementLines);
+      return { success: true, result: linesFull.join('\n') };
+    }
+  }
+
+  return {
+    success: false,
+    reason: `Target content block could not be matched. Verify targetContent against the file lines using read_workspace_file.`,
+  };
+}
+
 async function handleEditWorkspaceFile(args: { path: string; targetContent?: string; replacementContent: string; createIfMissing?: boolean }) {
   const rootDir = process.cwd();
   const relPath = args.path;
@@ -709,23 +794,20 @@ async function handleEditWorkspaceFile(args: { path: string; targetContent?: str
 
   const currentContent = fs.readFileSync(resolved, 'utf-8');
   if (args.targetContent) {
-    if (!currentContent.includes(args.targetContent)) {
-      throw new Error(`Target content not found in ${relPath}. Read the file first to get the exact lines to replace.`);
+    const matchRes = fuzzyFindAndReplace(currentContent, args.targetContent, args.replacementContent);
+    if (!matchRes.success || !matchRes.result) {
+      throw new Error(`Target content not found in ${relPath}: ${matchRes.reason || 'Check line indentation'}`);
     }
-    const occurrences = currentContent.split(args.targetContent).length - 1;
-    if (occurrences > 1) {
-      throw new Error(`Target content occurs ${occurrences} times in ${relPath}. Provide more surrounding context to match a unique block.`);
-    }
-    const newContent = currentContent.replace(args.targetContent, args.replacementContent);
-    fs.writeFileSync(resolved, newContent, 'utf-8');
+    fs.writeFileSync(resolved, matchRes.result, 'utf-8');
     return {
       path: relPath,
       action: 'content_replaced',
       success: true,
-      bytesWritten: Buffer.byteLength(newContent),
+      bytesWritten: Buffer.byteLength(matchRes.result),
       pipelineGuidance: getPipelineGuidance(relPath),
     };
   } else {
+    // Atomically overwrite full file
     fs.writeFileSync(resolved, args.replacementContent, 'utf-8');
     return {
       path: relPath,
