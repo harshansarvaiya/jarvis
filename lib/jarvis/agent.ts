@@ -970,8 +970,10 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     let pipelineAutoRetried = false;
     let functionCalls = candidate?.content?.parts?.filter((p: any) => p.functionCall);
 
-    // Multi-turn ReAct Autonomous Tool Execution Loop (up to 12 iterations for full-stack tasks)
-    while (loopCount < 12) {
+    let consecutiveReadCount = 0;
+
+    // Multi-turn ReAct Autonomous Tool Execution Loop (up to 18 iterations for full-stack tasks)
+    while (loopCount < 18) {
       // Check if model returned zero function calls, but an uncompleted UI component pipeline was detected
       if (!functionCalls || functionCalls.length === 0) {
         const unmountedComponent = toolCallsExecuted.find(
@@ -987,7 +989,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             )
         );
 
-        if (unmountedComponent && !pipelineAutoRetried && loopCount < 10) {
+        if (unmountedComponent && !pipelineAutoRetried && loopCount < 14) {
           pipelineAutoRetried = true;
           console.log(`[Autonomous Pipeline Sentry] Detected unmounted component "${unmountedComponent.args.path}". Prompting model to complete Stage 2-4...`);
 
@@ -1055,6 +1057,13 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 
       for (const callPart of functionCalls) {
         const call = callPart.functionCall;
+        const isReadTool = ['read_workspace_file', 'grep_workspace', 'find_files'].includes(call.name);
+        if (isReadTool) {
+          consecutiveReadCount++;
+        } else {
+          consecutiveReadCount = 0;
+        }
+
         const toolResult = await executeJarvisTool(call.name, call.args || {});
 
         toolCallsExecuted.push({
@@ -1071,6 +1080,11 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           toolResponsePayload = {
             ...toolResult,
             reflectionGuidance: `[AUTONOMOUS EMPIRICAL REFLECTION]: The tool execution for "${call.name}" returned zero results or an error. Do not repeat the exact same request. Reformulate search terms, try a broader keyword, or explore an alternative data source to deliver concrete intelligence.`,
+          };
+        } else if (consecutiveReadCount >= 3) {
+          toolResponsePayload = {
+            ...toolResult,
+            antiLoopGuidance: `[AUTONOMOUS ANTI-LOOP SENTRY - DIRECTIVE 04/05 MANDATE]: You have executed ${consecutiveReadCount} read/search operations. You have sufficient context. Formulate your complete code mutation now using 'edit_workspace_file' or 'cloud_write_file', followed by 'npx tsc --noEmit' and commit. Do not continue reading in small slices.`,
           };
         }
 

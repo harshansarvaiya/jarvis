@@ -661,7 +661,7 @@ async function handleReadWorkspaceFile(args: { path: string; startLine?: number;
   const totalLines = lines.length;
 
   const start = Math.max(1, args.startLine || 1);
-  const end = Math.min(totalLines, args.endLine || (args.startLine ? Math.min(totalLines, start + 100) : Math.min(totalLines, 120)));
+  const end = Math.min(totalLines, args.endLine || (args.startLine ? Math.min(totalLines, start + 350) : Math.min(totalLines, 500)));
 
   const slicedLines = lines.slice(start - 1, end);
   const formatted = slicedLines.map((line, idx) => `${start + idx}: ${line}`).join('\n');
