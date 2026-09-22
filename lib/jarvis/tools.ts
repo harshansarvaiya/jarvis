@@ -2355,6 +2355,51 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['action'],
     },
   },
+  {
+    name: 'execute_composio_action',
+    description: 'Execute any action across 500+ SaaS platforms (Linear, Notion, Slack, Google Calendar, Discord, Jira, Stripe, GitHub, etc.) via Composio managed OAuth session broker. 100% cloud executed with zero local VM thrashing.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          description: 'The Composio action identifier (e.g. "LINEAR_CREATE_ISSUE", "NOTION_CREATE_PAGE", "SLACK_SEND_MESSAGE", "GOOGLECALENDAR_CREATE_EVENT", "JIRA_CREATE_ISSUE").',
+        },
+        params: {
+          type: 'object',
+          description: 'JSON object payload of input parameters matching the target action schema.',
+        },
+        entityId: {
+          type: 'string',
+          description: 'User entity ID (default: "default" or "harshan").',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_composio_integrations',
+    description: 'List active connected SaaS apps or initiate an OAuth connection link for Sir to connect a new platform (Notion, Linear, Slack, Google Calendar, Discord, etc.).',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['list_connected', 'connect_app'],
+          description: 'Action to execute.',
+        },
+        appName: {
+          type: 'string',
+          description: 'Name of the SaaS application to connect (e.g. "notion", "linear", "slack", "googlecalendar", "discord", "jira", "stripe"). Required for connect_app.',
+        },
+        entityId: {
+          type: 'string',
+          description: 'User entity ID (default: "default").',
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 /**
@@ -3699,6 +3744,31 @@ export async function executeJarvisTool(
         }
 
         return { success: false, result: null, error: `Unsupported blueprint action: ${action}` };
+      }
+
+      case 'execute_composio_action': {
+        const { action: composioAction, params: composioParams, entityId } = args;
+        const { globalComposioGateway } = await import('./composio');
+        const res = await globalComposioGateway.executeAction(composioAction, composioParams || {}, entityId);
+        return { success: res.success, result: res.data || res, error: res.error };
+      }
+
+      case 'manage_composio_integrations': {
+        const { action: compAction, appName, entityId } = args;
+        const { globalComposioGateway } = await import('./composio');
+
+        if (compAction === 'list_connected') {
+          const res = await globalComposioGateway.listConnectedAccounts(entityId);
+          return { success: res.success, result: res.accounts, error: res.error };
+        }
+
+        if (compAction === 'connect_app') {
+          if (!appName) return { success: false, result: null, error: 'appName is required to initiate connection.' };
+          const res = await globalComposioGateway.initiateConnection(appName, entityId);
+          return { success: res.success, result: res, error: res.error };
+        }
+
+        return { success: false, result: null, error: `Unsupported composio management action: ${compAction}` };
       }
 
       default:
