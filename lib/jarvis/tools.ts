@@ -3747,25 +3747,33 @@ export async function executeJarvisTool(
       }
 
       case 'execute_composio_action': {
-        const { action: composioAction, params: composioParams, entityId } = args;
+        const { action: composioAction, params: composioParams } = args;
         const { globalComposioGateway } = await import('./composio');
-        const res = await globalComposioGateway.executeAction(composioAction, composioParams || {}, entityId);
+        const res = await globalComposioGateway.executeAction(composioAction, composioParams || {});
         return { success: res.success, result: res.data || res, error: res.error };
       }
 
       case 'manage_composio_integrations': {
-        const { action: compAction, appName, entityId } = args;
+        const { action: compAction, appName, query, toolSlugs } = args;
         const { globalComposioGateway } = await import('./composio');
 
         if (compAction === 'list_connected') {
-          const res = await globalComposioGateway.listConnectedAccounts(entityId);
-          return { success: res.success, result: res.accounts, error: res.error };
+          const res = await globalComposioGateway.listConnectedAccounts();
+          return { success: res.success, result: res.tools, error: res.error };
         }
 
-        if (compAction === 'connect_app') {
-          if (!appName) return { success: false, result: null, error: 'appName is required to initiate connection.' };
-          const res = await globalComposioGateway.initiateConnection(appName, entityId);
-          return { success: res.success, result: res, error: res.error };
+        if (compAction === 'search_tools' || compAction === 'connect_app') {
+          const searchQuery = query || appName;
+          if (!searchQuery) return { success: false, result: null, error: 'query or appName is required to search tools.' };
+          const res = await globalComposioGateway.searchTools(searchQuery);
+          return { success: res.success, result: res.tools || res.rawSummary, error: res.error };
+        }
+
+        if (compAction === 'get_schemas') {
+          const slugs = toolSlugs || (appName ? [appName] : []);
+          if (!slugs || slugs.length === 0) return { success: false, result: null, error: 'toolSlugs array required' };
+          const res = await globalComposioGateway.getToolSchemas(slugs);
+          return { success: res.success, result: res.schemas, error: res.error };
         }
 
         return { success: false, result: null, error: `Unsupported composio management action: ${compAction}` };
