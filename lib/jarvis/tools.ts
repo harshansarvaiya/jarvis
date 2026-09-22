@@ -1861,8 +1861,8 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       properties: {
         action: {
           type: 'string',
-          enum: ['list_files', 'search_files', 'get_file_metadata', 'read_file_content', 'create_file', 'create_folder', 'delete_file'],
-          description: 'list_files: browse files | search_files: search query across filenames & text | get_file_metadata: file details | read_file_content: read doc/txt content | create_file: create or upload document | create_folder: create directory | delete_file: trash or delete file',
+          enum: ['list_files', 'search_files', 'get_file_metadata', 'read_file_content', 'create_file', 'update_file', 'create_folder', 'delete_file'],
+          description: 'list_files: browse files | search_files: search query across filenames & text | get_file_metadata: file details | read_file_content: read doc/txt content | create_file: create or upload document | update_file: update existing file content | create_folder: create directory | delete_file: trash or delete file',
         },
         query: { type: 'string', description: 'Search term or custom Drive API query string.' },
         term: { type: 'string', description: 'Keyword to search for in filenames and contents.' },

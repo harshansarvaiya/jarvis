@@ -77,11 +77,40 @@ export async function syncVaultToGoogleDrive(targetFolderId?: string): Promise<{
       };
     }
 
-    // 3. Upload to Google Drive
+    // 3. Check if an existing vault file already exists in the folder
+    const listInside = await executeGoogleDriveMCP('list_files', { folderId });
+    const existingFiles = listInside.output?.files || [];
+    const targetFile = existingFiles.find((f: any) => f.name.toLowerCase().includes('vault') || f.name.toLowerCase().includes('chat') || f.name.toLowerCase().includes('history')) || existingFiles[0];
+
     const fileName = `JARVIS_Private_Vault_${new Date().toISOString().slice(0, 10)}.json`;
+    const payload = JSON.stringify(privateVault, null, 2);
+
+    if (targetFile?.id) {
+      console.log(`📝 Existing vault destination detected: "${targetFile.name}" (${targetFile.id}). Updating directly...`);
+      const updateRes = await executeGoogleDriveMCP('update_file', {
+        fileId: targetFile.id,
+        content: payload,
+        mimeType: 'application/json',
+      });
+
+      if (!updateRes.success) {
+        return {
+          success: false,
+          error: updateRes.error || 'Failed to update vault file in Google Drive.',
+        };
+      }
+
+      console.log(`✅ Sovereign Vault successfully synced to Google Drive file: "${targetFile.name}" (ID: ${targetFile.id})`);
+      return {
+        success: true,
+        fileId: targetFile.id,
+      };
+    }
+
+    // Attempt creation of new file
     const uploadRes = await executeGoogleDriveMCP('create_file', {
       name: fileName,
-      content: JSON.stringify(privateVault, null, 2),
+      content: payload,
       mimeType: 'application/json',
       folderId,
     });
@@ -89,11 +118,11 @@ export async function syncVaultToGoogleDrive(targetFolderId?: string): Promise<{
     if (!uploadRes.success) {
       return {
         success: false,
-        error: uploadRes.error || 'Failed to upload vault archive to Google Drive.',
+        error: `${uploadRes.error}. (Tip: In Google Drive, inside "JARVIS Vault", create a blank file named "vault.json" or a blank Google Doc so your user quota applies, then rerun the sync!)`,
       };
     }
 
-    console.log(`✅ Sovereign Vault successfully uploaded to Google Drive: "${fileName}" (ID: ${uploadRes.output?.id})`);
+    console.log(`✅ Sovereign Vault successfully created in Google Drive: "${fileName}" (ID: ${uploadRes.output?.id})`);
     return {
       success: true,
       fileId: uploadRes.output?.id,

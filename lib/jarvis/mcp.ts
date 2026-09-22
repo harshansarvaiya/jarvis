@@ -1689,6 +1689,35 @@ export async function executeGoogleDriveMCP(
         };
       }
 
+      case 'update_file': {
+        const fileId = params.fileId;
+        if (!fileId) throw new Error('Parameter "fileId" is required for update_file');
+        const content = typeof params.content === 'string' ? params.content : JSON.stringify(params.content, null, 2);
+        const mimeType = params.mimeType || 'application/json';
+
+        const updateUrl = `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(fileId)}?uploadType=media&supportsAllDrives=true`;
+        const res = await fetch(updateUrl, {
+          method: 'PATCH',
+          headers: {
+            Authorization: authHeader,
+            'Content-Type': mimeType,
+          },
+          body: content,
+          signal: AbortSignal.timeout(15000),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Google Drive update_file failed: ${res.status}`);
+
+        return {
+          success: true,
+          server: 'mcp:drive',
+          action,
+          output: data,
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
       case 'create_folder': {
         const name = params.name || 'New Folder';
         const parents = params.folderId ? [params.folderId] : undefined;
