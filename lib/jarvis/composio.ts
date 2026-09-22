@@ -27,7 +27,7 @@ export interface ComposioConnectedAccount {
 
 export class ComposioGateway {
   private apiKey: string;
-  private baseUrl = 'https://backend.composio.dev/api/v1';
+  private baseUrl = 'https://backend.composio.dev/api/v3';
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey || process.env.COMPOSIO_API_KEY || '';
@@ -46,12 +46,12 @@ export class ComposioGateway {
   }
 
   /**
-   * Executes a specific Composio action (e.g. "LINEAR_CREATE_ISSUE", "NOTION_CREATE_PAGE", "SLACK_SEND_MESSAGE").
+   * Executes a specific Composio tool action (e.g. "LINEAR_CREATE_ISSUE", "NOTION_CREATE_PAGE", "SLACK_SEND_MESSAGE").
    */
   public async executeAction(
     actionName: string,
     params: Record<string, any> = {},
-    entityId = 'default'
+    connectedAccountId?: string
   ): Promise<ComposioActionExecutionResult> {
     const startTime = Date.now();
     if (!this.isConfigured()) {
@@ -64,16 +64,20 @@ export class ComposioGateway {
     }
 
     try {
-      const normalizedAction = actionName.toUpperCase().replace(/-/g, '_');
-      const url = `${this.baseUrl}/actions/${encodeURIComponent(normalizedAction)}/execute`;
+      const normalizedAction = actionName.toLowerCase().replace(/_/g, '-');
+      const url = `${this.baseUrl}/tools/execute/${encodeURIComponent(normalizedAction)}`;
+
+      const payload: Record<string, any> = {
+        arguments: params,
+      };
+      if (connectedAccountId && connectedAccountId !== 'default') {
+        payload.connected_account_id = connectedAccountId;
+      }
 
       const res = await fetch(url, {
         method: 'POST',
         headers: this.getHeaders(),
-        body: JSON.stringify({
-          entityId,
-          input: params,
-        }),
+        body: JSON.stringify(payload),
         signal: AbortSignal.timeout(15000),
       });
 
@@ -83,16 +87,16 @@ export class ComposioGateway {
         return {
           success: false,
           actionName: normalizedAction,
-          error: data.message || data.error || `Composio action execution failed with HTTP ${res.status}`,
+          error: data.message || data.error?.message || `Composio action execution failed with HTTP ${res.status}`,
           latencyMs: Date.now() - startTime,
         };
       }
 
       return {
-        success: data.successful !== false,
+        success: data.successful !== false && !data.error,
         actionName: normalizedAction,
-        data: data.data || data.response_data || data,
-        error: data.error,
+        data: data.data || data.response_data || data.result || data,
+        error: data.error?.message || data.error,
         latencyMs: Date.now() - startTime,
       };
     } catch (err: any) {
@@ -106,15 +110,19 @@ export class ComposioGateway {
   }
 
   /**
-   * Lists all active connected accounts (e.g. Linear, Slack, Notion) for the given user entity.
+   * Lists all active connected accounts (e.g. Linear, Slack, Notion) for the authenticated Composio account.
    */
-  public async listConnectedAccounts(entityId = 'default'): Promise<{ success: boolean; accounts: ComposioConnectedAccount[]; error?: string }> {
+  public async listConnectedAccounts(userFilter?: string): Promise<{ success: boolean; accounts: ComposioConnectedAccount[]; error?: string }> {
     if (!this.isConfigured()) {
       return { success: false, accounts: [], error: 'COMPOSIO_API_KEY is not configured.' };
     }
 
     try {
-      const url = `${this.baseUrl}/connectedAccounts?entityId=${encodeURIComponent(entityId)}`;
+      let url = `${this.baseUrl}/connected_accounts`;
+      if (userFilter) {
+        url += `?user_ids=${encodeURIComponent(userFilter)}`;
+      }
+
       const res = await fetch(url, {
         method: 'GET',
         headers: this.getHeaders(),
@@ -123,17 +131,23 @@ export class ComposioGateway {
 
       if (!res.ok) {
         const errText = await res.text();
-        return { success: false, accounts: [], error: `Failed to list accounts: HTTP ${res.status} (${errText.slice(0, 100)})` };
+        return { success: false, accounts: [], error: `Failed to list accounts: HTTP ${res.status} (${errText.slice(0, 150)})` };
       }
 
       const data = await res.json();
-      const rawAccounts = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : []);
+      const rawAccounts = Array.isArray(data.items)
+        ? data.items
+        : Array.isArray(data.connected_accounts)
+        ? data.connected_accounts
+        : Array.isArray(data)
+        ? data
+        : [];
 
       const accounts: ComposioConnectedAccount[] = rawAccounts.map((a: any) => ({
-        id: a.id || a.connectionId,
-        appName: a.appName || a.appUniqueId || a.integrationId || 'unknown',
-        status: a.status === 'ACTIVE' ? 'ACTIVE' : 'INITIATED',
-        createdAt: a.createdAt,
+        id: a.id || a.connected_account_id || a.connectionId,
+        appName: a.appName || a.app_unique_id || a.toolkit_slug || a.integrationId || 'unknown',
+        status: a.status === 'ACTIVE' || a.status === 'ENABLED' ? 'ACTIVE' : 'INITIATED',
+        createdAt: a.createdAt || a.created_at,
       }));
 
       return { success: true, accounts };
@@ -155,25 +169,25 @@ export class ComposioGateway {
     }
 
     try {
-      const url = `${this.baseUrl}/connectedAccounts`;
+      const url = `${this.baseUrl}/connected_accounts/link`;
       const res = await fetch(url, {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify({
-          appName: appName.toLowerCase(),
-          entityId,
-          redirectUrl: redirectUrl || 'https://jarvis-iota-beige.vercel.app',
+          toolkit_slug: appName.toLowerCase(),
+          user_id: entityId,
+          callback_url: redirectUrl || 'https://jarvis-iota-beige.vercel.app',
         }),
         signal: AbortSignal.timeout(8000),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        return { success: false, error: data.message || `Failed to initiate connection: HTTP ${res.status}` };
+        return { success: false, error: data.message || data.error?.message || `Failed to initiate connection: HTTP ${res.status}` };
       }
 
-      const connectionUrl = data.connectionUrl || data.redirectUrl || data.url;
-      const connectionId = data.connectionId || data.id;
+      const connectionUrl = data.redirect_url || data.connectionUrl || data.url || data.link;
+      const connectionId = data.connected_account_id || data.connectionId || data.id;
 
       return { success: true, connectionUrl, connectionId };
     } catch (err: any) {
