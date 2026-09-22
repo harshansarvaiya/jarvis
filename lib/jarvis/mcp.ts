@@ -1533,6 +1533,11 @@ export async function executeGoogleDriveMCP(
       'Content-Type': 'application/json',
     };
 
+    const defaultVaultFolderId =
+      params.folderId ||
+      process.env.GOOGLE_DRIVE_VAULT_FOLDER_ID ||
+      '1lYxUQjwSkZeBl2wpqq4Neh2PSvqFKA6l';
+
     switch (action) {
       case 'list_files': {
         const pageSize = params.pageSize || 20;
