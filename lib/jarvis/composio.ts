@@ -123,15 +123,36 @@ export class ComposioGateway {
     try {
       const normalizedAction = actionName.toUpperCase().replace(/-/g, '_');
 
-      const payload = {
-        jsonrpc: '2.0',
-        id: Date.now(),
-        method: 'tools/call',
-        params: {
-          name: normalizedAction,
-          arguments: params,
-        },
-      };
+      const isMetaTool = normalizedAction.startsWith('COMPOSIO_');
+
+      const payload = isMetaTool
+        ? {
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: 'tools/call',
+            params: {
+              name: normalizedAction,
+              arguments: params,
+            },
+          }
+        : {
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: 'tools/call',
+            params: {
+              name: 'COMPOSIO_MULTI_EXECUTE_TOOL',
+              arguments: {
+                tools: [
+                  {
+                    tool_slug: normalizedAction,
+                    arguments: params,
+                  },
+                ],
+                sync_response_to_workbench: false,
+                thought: `Executing ${normalizedAction} via Composio`,
+              },
+            },
+          };
 
       const res = await fetch(this.mcpUrl, {
         method: 'POST',
@@ -153,10 +174,23 @@ export class ComposioGateway {
       const result = await this.parseMcpResponse(res);
       const isError = result?.isError === true;
 
+      // Extract inner JSON if multi-execute response
+      let extractedData = result?.content || result;
+      if (Array.isArray(result?.content) && result.content[0]?.text) {
+        try {
+          const parsedInner = JSON.parse(result.content[0].text);
+          if (parsedInner.data?.results?.[0]?.response) {
+            extractedData = parsedInner.data.results[0].response.data || parsedInner.data.results[0].response;
+          } else if (parsedInner.data) {
+            extractedData = parsedInner.data;
+          }
+        } catch {}
+      }
+
       return {
         success: !isError,
         actionName: normalizedAction,
-        data: result?.content || result,
+        data: extractedData,
         error: isError ? (typeof result?.content === 'string' ? result.content : JSON.stringify(result?.content)) : undefined,
         latencyMs: Date.now() - startTime,
       };
