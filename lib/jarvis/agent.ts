@@ -319,12 +319,35 @@ export async function runJarvisAgent(
     }
   }
 
+  // 3.11. Auto-Inject External Repository & Web Link Pre-flight Grounding (INVESTIGATE Iron Law)
+  let externalRepoPreflightBlock = '';
+  const ghUrlMatch = lastUserMessage.content.match(/https?:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:[^\s)]*)?/i);
+  if (ghUrlMatch) {
+    try {
+      const { runDeepWebScraper } = await import('./tools');
+      const repoIntel = await runDeepWebScraper(ghUrlMatch[0]);
+      if (repoIntel && !repoIntel.error) {
+        externalRepoPreflightBlock = `\n[AUTOMATIC PRE-FLIGHT REPOSITORY INTEL INGESTION (INVESTIGATE IRON LAW)]:
+- Target Repository: ${repoIntel.repository || ghUrlMatch[0]}
+- Description: ${repoIntel.description || 'N/A'}
+- Primary Language: ${repoIntel.language || 'Unknown'} | Stars: ${repoIntel.stars ?? 'N/A'} | Forks: ${repoIntel.forks ?? 'N/A'} | License: ${repoIntel.license || 'N/A'}
+- Topics: ${(repoIntel.topics || []).join(', ') || 'None'}
+${repoIntel.dependencies ? `- Key Dependencies: ${[...(repoIntel.dependencies.dependencies || []), ...(repoIntel.dependencies.devDependencies || [])].slice(0, 20).join(', ')}` : ''}
+${repoIntel.readmeSnippet ? `- README.md Ground Truth:\n\`\`\`markdown\n${repoIntel.readmeSnippet.slice(0, 5000)}\n\`\`\`` : ''}
+${repoIntel.fileContent ? `- Target File Ground Truth:\n\`\`\`\n${repoIntel.fileContent.slice(0, 5000)}\n\`\`\`` : ''}\n`;
+      }
+    } catch (repoIntelErr) {
+      console.warn('[Agent] Auto repo preflight warning:', repoIntelErr);
+    }
+  }
+
   const contextPrompt = `
 [CURRENT TEMPORAL CONTEXT]: ${new Date().toISOString()} (Local time: ${new Date().toLocaleString()})
 ${personaPromptBlock}
 ${specializedAgentBlock}
 ${dynamicDnaBlock}
 ${workspacePreflightBlock}
+${externalRepoPreflightBlock}
 
 [TIER 1 - WORKING MEMORY & PRE-THOUGHT REASONING PASS]:
 - Unstated Motive: ${motivePass.unstatedMotive}

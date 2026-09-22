@@ -59,7 +59,9 @@ export async function executeGitHubMCP(
     'User-Agent': 'JARVIS-Mark-I-Autonomous-Agent',
   };
 
-  const baseUrl = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}`;
+  const targetOwner = params.owner || GITHUB_REPO_OWNER;
+  const targetRepo = params.repo || GITHUB_REPO_NAME;
+  const baseUrl = `https://api.github.com/repos/${targetOwner}/${targetRepo}`;
 
   try {
     switch (action) {

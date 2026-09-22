@@ -356,9 +356,98 @@ async function runWebSearch(query: string): Promise<any> {
   };
 }
 
-async function runDeepWebScraper(url: string): Promise<any> {
+export async function runDeepWebScraper(url: string): Promise<any> {
   try {
     const targetUrl = url.startsWith('http') ? url : `https://${url}`;
+
+    // Specialized GitHub Repository Intelligence Engine (Pillar 4 Recon)
+    const ghMatch = targetUrl.match(/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:\/(?:tree|blob)\/([^/]+)\/(.*))?/i);
+    if (ghMatch) {
+      const owner = ghMatch[1];
+      const repo = ghMatch[2].replace(/\.git$/, '');
+      const branch = ghMatch[3] || 'main';
+      const subPath = ghMatch[4];
+
+      const token = process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_TOKEN;
+      const ghHeaders: Record<string, string> = {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'JARVIS-Mark-II-Friday-Substrate',
+      };
+      if (token) ghHeaders['Authorization'] = `Bearer ${token}`;
+
+      try {
+        const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+          headers: ghHeaders,
+          signal: AbortSignal.timeout(6000),
+        });
+        let repoData: any = {};
+        if (repoRes.ok) {
+          repoData = await repoRes.json();
+        }
+
+        // Fetch raw README across default branches
+        let readmeText = '';
+        const rawReadmeUrls = [
+          `https://raw.githubusercontent.com/${owner}/${repo}/${repoData.default_branch || branch}/README.md`,
+          `https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`,
+          `https://raw.githubusercontent.com/${owner}/${repo}/master/README.md`,
+        ];
+        for (const rUrl of rawReadmeUrls) {
+          try {
+            const rRes = await fetch(rUrl, { signal: AbortSignal.timeout(4000) });
+            if (rRes.ok) {
+              readmeText = await rRes.text();
+              break;
+            }
+          } catch {}
+        }
+
+        // If subpath specified, fetch that specific raw file
+        let fileContent = '';
+        if (subPath) {
+          const rawFileUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${repoData.default_branch || branch}/${subPath}`;
+          try {
+            const fRes = await fetch(rawFileUrl, { signal: AbortSignal.timeout(4000) });
+            if (fRes.ok) fileContent = await fRes.text();
+          } catch {}
+        }
+
+        // Inspect package.json / manifest if available to extract dependencies
+        let dependencies: any = undefined;
+        try {
+          const pkgRes = await fetch(
+            `https://raw.githubusercontent.com/${owner}/${repo}/${repoData.default_branch || 'main'}/package.json`,
+            { signal: AbortSignal.timeout(3000) }
+          );
+          if (pkgRes.ok) {
+            const pkg = await pkgRes.json();
+            dependencies = {
+              dependencies: pkg.dependencies ? Object.keys(pkg.dependencies) : [],
+              devDependencies: pkg.devDependencies ? Object.keys(pkg.devDependencies) : [],
+            };
+          }
+        } catch {}
+
+        return {
+          url: targetUrl,
+          repository: `${owner}/${repo}`,
+          description: repoData.description || 'No description provided.',
+          stars: repoData.stargazers_count ?? 0,
+          forks: repoData.forks_count ?? 0,
+          language: repoData.language || 'Unknown',
+          topics: repoData.topics || [],
+          defaultBranch: repoData.default_branch || 'main',
+          license: repoData.license?.spdx_id || repoData.license?.name || 'Unlicensed',
+          readmeSnippet: readmeText ? readmeText.slice(0, 6000) : 'No README.md discovered.',
+          fileContent: fileContent ? fileContent.slice(0, 6000) : undefined,
+          dependencies,
+          source: 'GitHub API & Raw Markdown Extraction Engine',
+        };
+      } catch (ghErr: any) {
+        console.warn('[Scraper] GitHub specialized fetch failed, falling back to standard scraper:', ghErr?.message);
+      }
+    }
+
     const res = await fetch(targetUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -1085,7 +1174,7 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'mcp_github',
-    description: 'Execute GitHub actions (get_repo, list_commits, get_file, list_issues, create_issue, create_or_update_file) via Octokit.',
+    description: 'Execute GitHub actions (get_repo, list_commits, get_file, list_issues, create_issue, create_or_update_file) via Octokit / REST API. Supports inspecting ANY public repository by specifying owner and repo.',
     parameters: {
       type: 'object',
       properties: {
@@ -1094,7 +1183,9 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
           enum: ['get_repo', 'list_commits', 'get_file', 'list_issues', 'create_issue', 'create_or_update_file'],
           description: 'GitHub action to execute.',
         },
-        path: { type: 'string', description: 'File path in repo (e.g. "package.json", "lib/jarvis/mcp.ts").' },
+        owner: { type: 'string', description: 'GitHub repo owner/organization (e.g. "milind-soni", "facebook", or defaults to Sir\'s repo).' },
+        repo: { type: 'string', description: 'GitHub repo name (e.g. "OpenMausBot", "react", or defaults to "jarvis").' },
+        path: { type: 'string', description: 'File path in repo (e.g. "package.json", "README.md", "lib/jarvis/mcp.ts").' },
         content: { type: 'string', description: 'Content when creating or updating a file.' },
         message: { type: 'string', description: 'Commit message.' },
         limit: { type: 'number', description: 'Number of items to retrieve.' },
