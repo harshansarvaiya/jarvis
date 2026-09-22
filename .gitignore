@@ -33,8 +33,16 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local logs and scratch
+# local logs, private chat history, and scratch
 /data/trajectories/
 /data/jarvis_knowledge*.json
+/data/jarvis-chats.json
+/data/sir-profile.json
+/data/autonomous_log.json
+/data/*chat*.json
+/data/chat-history*.json
+/data/private/
+/data/backups/
+/data/vault/
 scripts/inspect-chats.ts
 
