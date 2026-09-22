@@ -1508,6 +1508,7 @@ export async function executeGoogleDriveMCP(
     | 'get_file_metadata'
     | 'read_file_content'
     | 'create_file'
+    | 'update_file'
     | 'create_folder'
     | 'delete_file',
   params: Record<string, any> = {}
