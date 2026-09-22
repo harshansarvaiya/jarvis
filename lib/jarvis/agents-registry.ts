@@ -111,15 +111,36 @@ export const TOP_HIGH_ROI_AGENTS: AgentProfile[] = [
   },
 ];
 
+const DYNAMIC_AGENT_REGISTRY: Map<string, AgentProfile> = new Map();
+
+export function registerDynamicAgentProfile(profile: AgentProfile): void {
+  DYNAMIC_AGENT_REGISTRY.set(profile.id.toLowerCase(), profile);
+}
+
+export function registerDynamicAgentProfiles(profiles: AgentProfile[]): void {
+  for (const p of profiles) {
+    DYNAMIC_AGENT_REGISTRY.set(p.id.toLowerCase(), p);
+  }
+}
+
 export function getSpecializedAgentProfile(idOrRole: string): AgentProfile | undefined {
   const query = idOrRole.toLowerCase();
+  if (DYNAMIC_AGENT_REGISTRY.has(query)) {
+    return DYNAMIC_AGENT_REGISTRY.get(query);
+  }
+  const dynamicMatch = Array.from(DYNAMIC_AGENT_REGISTRY.values()).find(
+    (a) => a.id.toLowerCase() === query || a.role.toLowerCase() === query || a.name.toLowerCase().includes(query)
+  );
+  if (dynamicMatch) return dynamicMatch;
+
   return TOP_HIGH_ROI_AGENTS.find(
     (a) => a.id.toLowerCase() === query || a.role.toLowerCase() === query || a.name.toLowerCase().includes(query)
   );
 }
 
 export function listSpecializedAgents(): AgentProfile[] {
-  return [...TOP_HIGH_ROI_AGENTS];
+  const dynamic = Array.from(DYNAMIC_AGENT_REGISTRY.values());
+  return [...TOP_HIGH_ROI_AGENTS, ...dynamic];
 }
 
 /**

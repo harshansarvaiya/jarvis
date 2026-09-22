@@ -2328,6 +2328,33 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['agentId', 'instruction'],
     },
   },
+  {
+    name: 'manage_blueprint',
+    description: 'Import, parse, apply, or export a portable Team Blueprint (Markdown + YAML Frontmatter) to dynamically deploy specialized autonomous squads and scheduled routines.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['import_url', 'parse_markdown', 'apply', 'list'],
+          description: 'The blueprint action to execute.',
+        },
+        url: {
+          type: 'string',
+          description: 'Public URL or GitHub raw link to the .md blueprint file (required for import_url).',
+        },
+        markdown: {
+          type: 'string',
+          description: 'Raw Markdown content with YAML frontmatter to parse or apply.',
+        },
+        filePath: {
+          type: 'string',
+          description: 'Relative path to local blueprint file (e.g. "blueprints/cloud-sre-security-squad.md").',
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 /**
@@ -3633,6 +3660,45 @@ export async function executeJarvisTool(
             latencyMs: specialistRes.latencyMs,
           },
         };
+      }
+
+      case 'manage_blueprint': {
+        const { action, url, markdown, filePath } = args;
+        const { parseTeamBlueprint, fetchBlueprintFromUrl, applyTeamBlueprint } = await import('./blueprints');
+
+        if (action === 'import_url') {
+          if (!url) return { success: false, result: null, error: 'URL required for import_url' };
+          const blueprint = await fetchBlueprintFromUrl(url);
+          const applyRes = await applyTeamBlueprint(blueprint);
+          return { success: applyRes.success, result: { blueprint, deployment: applyRes }, error: applyRes.errors?.join(', ') };
+        }
+
+        if (action === 'parse_markdown' || action === 'apply') {
+          let rawMd = markdown;
+          if (!rawMd && filePath) {
+            const fs = await import('fs');
+            const path = await import('path');
+            const abs = path.resolve(process.cwd(), filePath);
+            if (fs.existsSync(abs)) rawMd = fs.readFileSync(abs, 'utf8');
+          }
+          if (!rawMd) return { success: false, result: null, error: 'Markdown content or valid filePath required' };
+          const blueprint = parseTeamBlueprint(rawMd);
+          if (action === 'apply') {
+            const applyRes = await applyTeamBlueprint(blueprint);
+            return { success: applyRes.success, result: { blueprint, deployment: applyRes }, error: applyRes.errors?.join(', ') };
+          }
+          return { success: true, result: { blueprint } };
+        }
+
+        if (action === 'list') {
+          const { getUniversalStorage } = await import('./storage');
+          const storage = getUniversalStorage();
+          const raw = await storage.execute('get', 'jarvis:custom_agents');
+          const customAgents = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : [];
+          return { success: true, result: { customAgentsCount: customAgents.length, customAgents } };
+        }
+
+        return { success: false, result: null, error: `Unsupported blueprint action: ${action}` };
       }
 
       default:
