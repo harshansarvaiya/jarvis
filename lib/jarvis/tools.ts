@@ -544,6 +544,21 @@ async function runAdvancedBrowserAction(
       .replace(/\s+/g, ' ')
       .trim();
 
+    // Dense interactive action map distillation (inspired by only-cli/oc primitives)
+    const actionMap: Array<{ index: number; type: 'link' | 'form' | 'input'; label: string; action: string }> = [];
+    links.slice(0, 10).forEach((link, idx) => {
+      actionMap.push({ index: idx + 1, type: 'link', label: link.text, action: link.href });
+    });
+    forms.slice(0, 3).forEach((form, fIdx) => {
+      const formNum = links.slice(0, 10).length + fIdx + 1;
+      actionMap.push({
+        index: formNum,
+        type: 'form',
+        label: `Form (${form.inputs?.join(', ') || 'action'})`,
+        action: form.action || targetUrl,
+      });
+    });
+
     const maxLen = options.maxContentLength || 4000;
     let contentSnippet = cleanText.slice(0, maxLen);
 
@@ -580,6 +595,7 @@ async function runAdvancedBrowserAction(
       title,
       status: res.status,
       contentSnippet,
+      actionMap: actionMap.length > 0 ? actionMap : undefined,
       extractedFormsCount: forms.length,
       forms: forms.length > 0 ? forms : undefined,
       extractedTablesCount: tables.length,
@@ -587,7 +603,7 @@ async function runAdvancedBrowserAction(
       extractedLinksCount: links.length,
       links: links.length > 0 ? links : undefined,
       totalLength: cleanText.length,
-      source: 'Autonomous Browser Engine (Project Hands)',
+      source: 'Autonomous Browser Engine (Project Hands & OC Distillation)',
     };
   } catch (err: any) {
     // If standard fetch fails (e.g. SSL or blocked UA), attempt Playwright Chromium fallback

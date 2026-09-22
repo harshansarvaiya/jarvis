@@ -1,5 +1,13 @@
 [
   {
+    "name": "only-cli/oc",
+    "category": "Agentic Web Extraction & Dense Action Primitives",
+    "threatLevel": "LOW",
+    "recommendation": "Integrated as Tier-1 fast-path web scraper inside browser_navigate_and_act with indexed action maps (<500 tokens).",
+    "ingestedAt": "2026-09-22T08:45:00.000Z",
+    "directivesCompliant": true
+  },
+  {
     "name": "huggingface/upskill",
     "category": "Agentic Skill Distillation & Trace-to-Playbook Synthesis",
     "threatLevel": "LOW",
