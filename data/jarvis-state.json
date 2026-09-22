@@ -1,6 +1,6 @@
 {
   "version": "2.0.0",
-  "lastActive": "2026-09-22T06:09:07.432Z",
+  "lastActive": "2026-09-22T06:33:38.487Z",
   "evolutionStage": 6,
   "tasks": [
     {
@@ -713,6 +713,31 @@
   ],
   "memories": [
     {
+      "id": "mem-1790058818487-0pxr",
+      "tier": "SEMANTIC",
+      "category": "ARCHITECTURAL_FACT",
+      "content": "Sir's Mandate: \"friday due hardware incompatibility we can not run on our hw\"",
+      "confidence": 0.9,
+      "context": "Directive 03 Jev Epistemic Sieve",
+      "createdAt": "2026-09-22T06:33:38.487Z",
+      "updatedAt": "2026-09-22T06:33:38.487Z"
+    },
+    {
+      "id": "mem-1790058231761-6te9",
+      "tier": "SEMANTIC",
+      "category": "PREFERENCE",
+      "content": "Sir's Android TV is located on the local Wi-Fi subnet with local IP ending in .9 (e.g. 192.168.1.9 or 192.168.0.9).",
+      "confidence": 0.95,
+      "context": "User confirmed Android TV local IP address configuration for direct network control.",
+      "triggers": [
+        "android tv",
+        "tv ip",
+        "local subnet"
+      ],
+      "createdAt": "2026-09-22T06:23:51.761Z",
+      "updatedAt": "2026-09-22T06:23:51.761Z"
+    },
+    {
       "id": "mem-1790057347431-cixj",
       "tier": "SEMANTIC",
       "category": "ARCHITECTURAL_FACT",
@@ -1365,6 +1390,18 @@
     }
   ],
   "logs": [
+    {
+      "id": "log-1790058818487-3wwu",
+      "timestamp": "2026-09-22T06:33:38.487Z",
+      "type": "EVOLUTION",
+      "message": "Memory assimilated [SEMANTIC:ARCHITECTURAL_FACT]: Sir's Mandate: \"friday due hardware incompatibility we can n..."
+    },
+    {
+      "id": "log-1790058231761-uhgd",
+      "timestamp": "2026-09-22T06:23:51.761Z",
+      "type": "EVOLUTION",
+      "message": "Memory assimilated [SEMANTIC:PREFERENCE]: Sir's Android TV is located on the local Wi-Fi subnet with l..."
+    },
     {
       "id": "log-1790057347432-45ic",
       "timestamp": "2026-09-22T06:09:07.432Z",
