@@ -1473,6 +1473,308 @@ export async function executeGoogleCalendarMCP(
 }
 
 // ============================================================================
+// 9.1 GOOGLE DRIVE SOVEREIGN IN-HOUSE MCP ENGINE
+// Direct Google Drive API v3 bridge via GCP Service Account & Auth Library.
+// Enables reading/writing files, searching docs, folders, and workspace files.
+// ============================================================================
+
+async function getGoogleDriveAuthHeader(): Promise<string | null> {
+  const explicitToken = process.env.GOOGLE_DRIVE_ACCESS_TOKEN || process.env.GOOGLE_ACCESS_TOKEN;
+  if (explicitToken) return `Bearer ${explicitToken}`;
+
+  const credsPath =
+    process.env.GOOGLE_APPLICATION_CREDENTIALS ||
+    '/home/harshans279/.gcp/jarvis-vertex.json';
+
+  if (fs.existsSync(credsPath)) {
+    try {
+      const { GoogleAuth } = await import('google-auth-library');
+      const auth = new GoogleAuth({
+        keyFilename: credsPath,
+        scopes: ['https://www.googleapis.com/auth/drive'],
+      });
+      const client = await auth.getClient();
+      const token = await client.getAccessToken();
+      if (token?.token) return `Bearer ${token.token}`;
+    } catch {}
+  }
+  return null;
+}
+
+export async function executeGoogleDriveMCP(
+  action:
+    | 'list_files'
+    | 'search_files'
+    | 'get_file_metadata'
+    | 'read_file_content'
+    | 'create_file'
+    | 'create_folder'
+    | 'delete_file',
+  params: Record<string, any> = {}
+): Promise<MCPExecutionResult> {
+  const startTime = Date.now();
+  const baseUrl = 'https://www.googleapis.com/drive/v3';
+
+  try {
+    const authHeader = await getGoogleDriveAuthHeader();
+    if (!authHeader) {
+      return {
+        success: false,
+        server: 'mcp:drive',
+        action,
+        output: null,
+        error: 'Google Drive credentials not found. Provide GOOGLE_DRIVE_ACCESS_TOKEN or configure Google Cloud Service Account.',
+        latencyMs: Date.now() - startTime,
+      };
+    }
+
+    const headers: Record<string, string> = {
+      Authorization: authHeader,
+      'Content-Type': 'application/json',
+    };
+
+    switch (action) {
+      case 'list_files': {
+        const pageSize = params.pageSize || 20;
+        const orderBy = params.orderBy || 'modifiedTime desc';
+        let query = params.query || params.q || 'trashed = false';
+        if (params.folderId) {
+          query = `'${params.folderId}' in parents and trashed = false`;
+        }
+        const fields = 'files(id,name,mimeType,size,modifiedTime,createdTime,webViewLink,parents,owners)';
+        const url = `${baseUrl}/files?q=${encodeURIComponent(query)}&pageSize=${pageSize}&orderBy=${encodeURIComponent(orderBy)}&fields=${encodeURIComponent(fields)}&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+
+        const res = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Google Drive list_files failed: ${res.status}`);
+
+        return {
+          success: true,
+          server: 'mcp:drive',
+          action,
+          output: {
+            count: (data.files || []).length,
+            files: data.files || [],
+            nextPageToken: data.nextPageToken,
+          },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'search_files': {
+        const searchTerm = params.term || params.query || '';
+        const pageSize = params.pageSize || 20;
+        const query = searchTerm
+          ? `name contains '${searchTerm.replace(/'/g, "\\'")}' and trashed = false`
+          : 'trashed = false';
+        const fields = 'files(id,name,mimeType,size,modifiedTime,webViewLink,parents)';
+        const url = `${baseUrl}/files?q=${encodeURIComponent(query)}&pageSize=${pageSize}&fields=${encodeURIComponent(fields)}&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+
+        const res = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Google Drive search_files failed: ${res.status}`);
+
+        return {
+          success: true,
+          server: 'mcp:drive',
+          action,
+          output: {
+            query: searchTerm,
+            count: (data.files || []).length,
+            files: data.files || [],
+          },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'get_file_metadata': {
+        const fileId = params.fileId;
+        if (!fileId) throw new Error('Parameter "fileId" is required for get_file_metadata');
+        const fields = 'id,name,mimeType,size,modifiedTime,createdTime,description,webViewLink,webContentLink,parents,owners,shared';
+        const url = `${baseUrl}/files/${encodeURIComponent(fileId)}?fields=${encodeURIComponent(fields)}&supportsAllDrives=true`;
+
+        const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Google Drive get_file_metadata failed: ${res.status}`);
+
+        return {
+          success: true,
+          server: 'mcp:drive',
+          action,
+          output: data,
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'read_file_content': {
+        const fileId = params.fileId;
+        if (!fileId) throw new Error('Parameter "fileId" is required for read_file_content');
+
+        const metaRes = await fetch(`${baseUrl}/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,size&supportsAllDrives=true`, {
+          headers,
+          signal: AbortSignal.timeout(8000),
+        });
+        const meta = await metaRes.json();
+        if (!metaRes.ok) throw new Error(meta.error?.message || `Failed to fetch file metadata: ${metaRes.status}`);
+
+        let contentUrl = `${baseUrl}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`;
+        if (meta.mimeType === 'application/vnd.google-apps.document') {
+          contentUrl = `${baseUrl}/files/${encodeURIComponent(fileId)}/export?mimeType=text/plain`;
+        } else if (meta.mimeType === 'application/vnd.google-apps.spreadsheet') {
+          contentUrl = `${baseUrl}/files/${encodeURIComponent(fileId)}/export?mimeType=text/csv`;
+        }
+
+        const contentRes = await fetch(contentUrl, { headers, signal: AbortSignal.timeout(15000) });
+        if (!contentRes.ok) {
+          const errText = await contentRes.text();
+          throw new Error(`Google Drive read_file_content failed (${contentRes.status}): ${errText}`);
+        }
+
+        const text = await contentRes.text();
+        return {
+          success: true,
+          server: 'mcp:drive',
+          action,
+          output: {
+            fileId,
+            name: meta.name,
+            mimeType: meta.mimeType,
+            content: text,
+            length: text.length,
+          },
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'create_file': {
+        const name = params.name || `JARVIS_Doc_${Date.now()}.txt`;
+        const content = params.content || '';
+        const mimeType = params.mimeType || 'text/plain';
+        const parents = params.folderId ? [params.folderId] : undefined;
+
+        const metadata = { name, mimeType, parents };
+        const boundary = `-------314159265358979323846`;
+        const delimiter = `\r\n--${boundary}\r\n`;
+        const closeDelimiter = `\r\n--${boundary}--`;
+
+        const multipartBody =
+          delimiter +
+          'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+          JSON.stringify(metadata) +
+          delimiter +
+          `Content-Type: ${mimeType}\r\n\r\n` +
+          content +
+          closeDelimiter;
+
+        const uploadUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType,webViewLink,size,modifiedTime';
+        const uploadRes = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: authHeader,
+            'Content-Type': `multipart/related; boundary=${boundary}`,
+          },
+          body: multipartBody,
+          signal: AbortSignal.timeout(15000),
+        });
+
+        const data = await uploadRes.json();
+        if (!uploadRes.ok) throw new Error(data.error?.message || `Google Drive create_file failed: ${uploadRes.status}`);
+
+        return {
+          success: true,
+          server: 'mcp:drive',
+          action,
+          output: data,
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'create_folder': {
+        const name = params.name || 'New Folder';
+        const parents = params.folderId ? [params.folderId] : undefined;
+
+        const body = {
+          name,
+          mimeType: 'application/vnd.google-apps.folder',
+          parents,
+        };
+
+        const res = await fetch(`${baseUrl}/files?supportsAllDrives=true&fields=id,name,mimeType,webViewLink`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(8000),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || `Google Drive create_folder failed: ${res.status}`);
+
+        return {
+          success: true,
+          server: 'mcp:drive',
+          action,
+          output: data,
+          latencyMs: Date.now() - startTime,
+        };
+      }
+
+      case 'delete_file': {
+        const fileId = params.fileId;
+        if (!fileId) throw new Error('Parameter "fileId" is required for delete_file');
+
+        if (params.permanent === true) {
+          const res = await fetch(`${baseUrl}/files/${encodeURIComponent(fileId)}?supportsAllDrives=true`, {
+            method: 'DELETE',
+            headers,
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!res.ok && res.status !== 204) {
+            const err = await res.json();
+            throw new Error(err.error?.message || `Google Drive delete_file failed: ${res.status}`);
+          }
+          return {
+            success: true,
+            server: 'mcp:drive',
+            action,
+            output: { fileId, deleted: true, permanent: true },
+            latencyMs: Date.now() - startTime,
+          };
+        } else {
+          const res = await fetch(`${baseUrl}/files/${encodeURIComponent(fileId)}?supportsAllDrives=true`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ trashed: true }),
+            signal: AbortSignal.timeout(8000),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error?.message || `Google Drive trash_file failed: ${res.status}`);
+
+          return {
+            success: true,
+            server: 'mcp:drive',
+            action,
+            output: { fileId, trashed: true },
+            latencyMs: Date.now() - startTime,
+          };
+        }
+      }
+
+      default:
+        throw new Error(`Unsupported Google Drive action: ${action}`);
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      server: 'mcp:drive',
+      action,
+      output: null,
+      error: error.message || 'Google Drive MCP execution failure',
+      latencyMs: Date.now() - startTime,
+    };
+  }
+}
+
+// ============================================================================
 // 10. PLAYWRIGHT VISUAL WEB ACTUATION MCP ENGINE ("Project Hands")
 // Headless Chromium engine running on Linux VM for JavaScript rendering,
 // interactive clicking, form filling, and DOM evaluation.

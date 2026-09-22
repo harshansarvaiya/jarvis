@@ -16,6 +16,7 @@ import {
   executeVercelMCP,
   executeMemoryMCP,
   executeGoogleCalendarMCP,
+  executeGoogleDriveMCP,
   executePlaywrightMCP,
   MCPExecutionResult,
 } from './mcp';
@@ -30,6 +31,7 @@ export type MCPServerId =
   | 'vercel'
   | 'memory'
   | 'calendar'
+  | 'drive'
   | 'playwright';
 
 export interface MCPClientRequest {
@@ -82,6 +84,9 @@ export class JarvisMCPClient {
 
       case 'calendar':
         return await executeGoogleCalendarMCP(action as any, params);
+
+      case 'drive':
+        return await executeGoogleDriveMCP(action as any, params);
 
       case 'playwright':
         return await executePlaywrightMCP(action as any, params);

@@ -22,6 +22,7 @@ import {
   executeVercelMCP,
   executeMemoryMCP,
   executeGoogleCalendarMCP,
+  executeGoogleDriveMCP,
   executePlaywrightMCP,
   executeCodebaseMemoryMCP,
 } from './mcp';
@@ -1853,6 +1854,31 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'mcp_drive',
+    description: 'Google Drive Sovereign In-House MCP Engine — Access, search, read, create, and manage Google Drive files, Google Docs, and folders with zero third-party exposure.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['list_files', 'search_files', 'get_file_metadata', 'read_file_content', 'create_file', 'create_folder', 'delete_file'],
+          description: 'list_files: browse files | search_files: search query across filenames & text | get_file_metadata: file details | read_file_content: read doc/txt content | create_file: create or upload document | create_folder: create directory | delete_file: trash or delete file',
+        },
+        query: { type: 'string', description: 'Search term or custom Drive API query string.' },
+        term: { type: 'string', description: 'Keyword to search for in filenames and contents.' },
+        fileId: { type: 'string', description: 'Target Google Drive file ID.' },
+        folderId: { type: 'string', description: 'Parent folder ID for browsing or creating files.' },
+        name: { type: 'string', description: 'Filename or folder name to create.' },
+        content: { type: 'string', description: 'Text or markdown content for create_file.' },
+        mimeType: { type: 'string', description: 'MIME type (e.g. text/plain, application/json, text/markdown).' },
+        pageSize: { type: 'number', description: 'Max files to return (default: 20).' },
+        orderBy: { type: 'string', description: 'Order by field (default: "modifiedTime desc").' },
+        permanent: { type: 'boolean', description: 'If true, permanently deletes file instead of moving to trash.' },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'mcp_playwright',
     description: 'Playwright Visual Web Actuation MCP ("Project Hands") — Headless Chromium engine running on the Cloud Runner VM for client-side JavaScript rendering, capturing viewport screenshots, clicking interactive buttons, filling forms, and evaluating DOM scripts.',
     parameters: {
@@ -3012,6 +3038,12 @@ export async function executeJarvisTool(
       case 'mcp_calendar': {
         const { action, ...params } = args;
         const res = await executeGoogleCalendarMCP(action, params);
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'mcp_drive': {
+        const { action, ...params } = args;
+        const res = await executeGoogleDriveMCP(action, params);
         return { success: res.success, result: res.output, error: res.error };
       }
 
