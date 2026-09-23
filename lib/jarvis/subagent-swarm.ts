@@ -1,10 +1,10 @@
 /**
  * J.A.R.V.I.S. & F.R.I.D.A.Y. Mark II — Autonomous Subagent Swarm Execution Engine
  * 
- * Multi-threaded parallel cognitive swarm runner optimized for GCP e2-standard-2 (8GB RAM, 2 vCPUs).
+ * Multi-threaded parallel cognitive swarm runner optimized for GCP e2-medium (8GB RAM, 2 vCPUs).
  * Enables Friday & Jarvis to dynamically spawn concurrent domain specialists
  * with isolated Vertex AI reasoning budgets (2,048 tokens), AST Code Graph grounding,
- * and multi-perspective consensus synthesis.
+ * Agensh-inspired context pruning, and multi-perspective consensus synthesis.
  * 
  * Complies with Directive 01 (Guardian Protocol), Directive 04 (Sovereign Loyalty),
  * and Directive 06 (Zero-Thrashing Infrastructure Integrity).
@@ -23,6 +23,7 @@ export interface SubagentExecutionResult {
   status: 'SUCCESS' | 'FAILED';
   instruction: string;
   findings: string;
+  prunedSummary?: string;
   recommendations: string[];
   severityCounts?: { critical: number; high: number; medium: number; low: number };
   diagnostics?: any;
@@ -44,6 +45,40 @@ export interface SwarmSynthesisResult {
     fileTarget?: string;
   }>;
   totalLatencyMs: number;
+}
+
+/**
+ * Agensh Context-Pruner Utility
+ * Strips raw HTML, bulky stack traces, and repetitive markdown noise into high-density semantic diffs.
+ */
+export function pruneSubagentContext(rawOutput: string, maxChars: number = 1200): string {
+  if (!rawOutput) return '';
+  // 1. Remove HTML tags & heavy script tags if present
+  let cleaned = rawOutput.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\r\n/g, '\n');
+
+  // 2. Collapse excessive whitespace and repetitive blank lines
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n').replace(/[ \t]{2,}/g, ' ').trim();
+
+  // 3. If within budget, return directly
+  if (cleaned.length <= maxChars) return cleaned;
+
+  // 4. Bounded extraction prioritizing findings and action items
+  const lines = cleaned.split('\n');
+  const highPriorityLines: string[] = [];
+  let charCount = 0;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (charCount + trimmed.length > maxChars) break;
+    highPriorityLines.push(trimmed);
+    charCount += trimmed.length + 1;
+  }
+
+  return highPriorityLines.join('\n') + (cleaned.length > maxChars ? '\n[...Context Pruned for Swarm Isolation]' : '');
 }
 
 /**
@@ -233,6 +268,8 @@ Please provide your rigorous specialist evaluation:
   const mediumMatches = (subagentOutput.match(/\bMEDIUM\b/gi) || []).length;
   const lowMatches = (subagentOutput.match(/\bLOW\b/gi) || []).length;
 
+  const prunedSummary = pruneSubagentContext(subagentOutput, 1500);
+
   return {
     agentId: profile.id,
     name: profile.name,
@@ -241,6 +278,7 @@ Please provide your rigorous specialist evaluation:
     status: 'SUCCESS',
     instruction,
     findings: subagentOutput,
+    prunedSummary,
     recommendations: recommendations.length > 0 ? recommendations : ['Review specialist findings and apply diffs.'],
     severityCounts: {
       critical: criticalMatches,
