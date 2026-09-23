@@ -1810,6 +1810,59 @@ export async function executeGoogleDriveMCP(
 }
 
 // ============================================================================
+// 9.2 SOVEREIGN IN-HOUSE EMAIL MCP ENGINE
+// Direct Gmail SMTPS (TLS) / Gmail API v1 / Resend email dispatcher.
+// Enables Friday & Jarvis to compose and send emails directly.
+// ============================================================================
+
+export async function executeEmailMCP(
+  action: 'send_email',
+  params: Record<string, any> = {}
+): Promise<MCPExecutionResult> {
+  const startTime = Date.now();
+  const { sendEmail } = await import('./gmail');
+
+  try {
+    switch (action) {
+      case 'send_email': {
+        const { to, subject, body, from, cc, bcc } = params;
+        if (!to || !subject || !body) {
+          throw new Error('Parameters "to", "subject", and "body" are required for send_email');
+        }
+
+        const res = await sendEmail({ to, subject, body, from, cc, bcc });
+        return {
+          success: res.success,
+          server: 'mcp:email',
+          action,
+          output: {
+            sent: res.success,
+            messageId: res.messageId,
+            transport: res.transport,
+            recipient: to,
+            subject,
+          },
+          error: res.error,
+          latencyMs: res.latencyMs || Date.now() - startTime,
+        };
+      }
+
+      default:
+        throw new Error(`Unsupported Email action: ${action}`);
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      server: 'mcp:email',
+      action,
+      output: null,
+      error: error.message || 'Email MCP execution failure',
+      latencyMs: Date.now() - startTime,
+    };
+  }
+}
+
+// ============================================================================
 // 10. PLAYWRIGHT VISUAL WEB ACTUATION MCP ENGINE ("Project Hands")
 // Headless Chromium engine running on Linux VM for JavaScript rendering,
 // interactive clicking, form filling, and DOM evaluation.

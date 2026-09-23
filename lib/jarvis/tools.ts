@@ -23,6 +23,7 @@ import {
   executeMemoryMCP,
   executeGoogleCalendarMCP,
   executeGoogleDriveMCP,
+  executeEmailMCP,
   executePlaywrightMCP,
   executeCodebaseMemoryMCP,
 } from './mcp';
@@ -1879,6 +1880,41 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'mcp_email',
+    description: 'Sovereign In-House Email MCP Engine — Compose and send emails directly from Sir’s Gmail via SMTPS TLS or Gmail REST API. Supports recipient, subject, body, cc, and bcc.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['send_email'],
+          description: 'send_email: compose and dispatch an outbound email message',
+        },
+        to: { type: 'string', description: 'Destination email address (e.g. "recipient@example.com").' },
+        subject: { type: 'string', description: 'Subject line of the email.' },
+        body: { type: 'string', description: 'Plain text or markdown body content of the email.' },
+        from: { type: 'string', description: 'Optional custom display name or sender address.' },
+        cc: { type: 'string', description: 'Optional CC email address.' },
+        bcc: { type: 'string', description: 'Optional BCC email address.' },
+      },
+      required: ['action', 'to', 'subject', 'body'],
+    },
+  },
+  {
+    name: 'send_email',
+    description: 'Direct In-House Email Dispatcher — Send an email directly to any recipient via Gmail / SMTP. Use this whenever Sir says "send an email", "send a mail", "email X", or "dispatch message to X@example.com".',
+    parameters: {
+      type: 'object',
+      properties: {
+        to: { type: 'string', description: 'Recipient email address (e.g. "name@domain.com").' },
+        subject: { type: 'string', description: 'Subject line of the email.' },
+        body: { type: 'string', description: 'Full body text of the email message.' },
+        cc: { type: 'string', description: 'Optional CC recipient.' },
+      },
+      required: ['to', 'subject', 'body'],
+    },
+  },
+  {
     name: 'mcp_playwright',
     description: 'Playwright Visual Web Actuation MCP ("Project Hands") — Headless Chromium engine running on the Cloud Runner VM for client-side JavaScript rendering, capturing viewport screenshots, clicking interactive buttons, filling forms, and evaluating DOM scripts.',
     parameters: {
@@ -3044,6 +3080,17 @@ export async function executeJarvisTool(
       case 'mcp_drive': {
         const { action, ...params } = args;
         const res = await executeGoogleDriveMCP(action, params);
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'mcp_email': {
+        const { action, ...params } = args;
+        const res = await executeEmailMCP(action, params);
+        return { success: res.success, result: res.output, error: res.error };
+      }
+
+      case 'send_email': {
+        const res = await executeEmailMCP('send_email', args);
         return { success: res.success, result: res.output, error: res.error };
       }
 

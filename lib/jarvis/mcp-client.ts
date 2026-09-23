@@ -17,6 +17,7 @@ import {
   executeMemoryMCP,
   executeGoogleCalendarMCP,
   executeGoogleDriveMCP,
+  executeEmailMCP,
   executePlaywrightMCP,
   MCPExecutionResult,
 } from './mcp';
@@ -32,6 +33,7 @@ export type MCPServerId =
   | 'memory'
   | 'calendar'
   | 'drive'
+  | 'email'
   | 'playwright';
 
 export interface MCPClientRequest {
@@ -87,6 +89,9 @@ export class JarvisMCPClient {
 
       case 'drive':
         return await executeGoogleDriveMCP(action as any, params);
+
+      case 'email':
+        return await executeEmailMCP(action as any, params);
 
       case 'playwright':
         return await executePlaywrightMCP(action as any, params);
