@@ -1,6 +1,6 @@
 {
   "version": "2.0.0",
-  "lastActive": "2026-09-23T11:22:50.653Z",
+  "lastActive": "2026-09-24T06:48:25.177Z",
   "evolutionStage": 6,
   "tasks": [
     {
@@ -727,6 +727,118 @@
     }
   ],
   "memories": [
+    {
+      "id": "mem-1790232505177-mj3r",
+      "tier": "PROCEDURAL",
+      "category": "PROCEDURAL_RULE",
+      "content": "GitHub bounty payouts (Algora.io / Polar.sh) require zero payment configuration on GitHub itself. Maintainers release escrow upon PR merge; payouts are claimed via GitHub OAuth on Algora/Polar using Stripe Express (direct INR bank deposit) or USDC wallet address.",
+      "confidence": 0.95,
+      "context": "Sir confirmed no payment structure is integrated on GitHub. Clarified zero-prerequisite OAuth claim model.",
+      "triggers": [
+        "bounty",
+        "payout",
+        "algora",
+        "polar",
+        "payment",
+        "github payment"
+      ],
+      "recipe": "Upon PR merge & bounty reward: Sign into algora.io / polar.sh with GitHub OAuth -> Link Stripe Express (Indian Bank / IFSC) or enter USDC wallet address -> Claim payout.",
+      "createdAt": "2026-09-24T06:48:25.177Z",
+      "updatedAt": "2026-09-24T06:48:25.177Z"
+    },
+    {
+      "id": "mem-1790231775268-2ho6",
+      "tier": "SEMANTIC",
+      "category": "ARCHITECTURAL_FACT",
+      "content": "Sir's Mandate: \"Friday what if I integrate my Instagram on composio then will u be able to access it ?\"",
+      "confidence": 0.9,
+      "context": "Directive 03 Jev Epistemic Sieve",
+      "createdAt": "2026-09-24T06:36:15.268Z",
+      "updatedAt": "2026-09-24T06:36:15.268Z"
+    },
+    {
+      "id": "mem-1790231403898-0h7u",
+      "tier": "SEMANTIC",
+      "category": "PREFERENCE",
+      "content": "Sir's Mandate: \"Friday consider it’s done, now onwards we bot will work with transparency & efficiently to become best\"",
+      "confidence": 0.9,
+      "context": "Directive 03 Jev Epistemic Sieve",
+      "createdAt": "2026-09-24T06:30:03.898Z",
+      "updatedAt": "2026-09-24T06:30:03.898Z"
+    },
+    {
+      "id": "mem-1790231142338-cp2s",
+      "tier": "EPISODIC",
+      "category": "DECISION",
+      "content": "Sir's Mandate: \"friday thank for own thinking & curated gating, I hope this decision give us highest ROI\"",
+      "confidence": 0.9,
+      "context": "Directive 03 Jev Epistemic Sieve",
+      "createdAt": "2026-09-24T06:25:42.338Z",
+      "updatedAt": "2026-09-24T06:25:42.338Z"
+    },
+    {
+      "id": "mem-1790231139944-ddjc",
+      "tier": "EPISODIC",
+      "category": "DECISION",
+      "content": "Sir officially authorized autonomous self-evolution during the morning Autonomous Evolutionary Sentry Cron: FRIDAY has full autonomy to ingest high-ROI state-of-the-art upgrades without human-in-the-loop approval, strictly governed by closed-loop verification, transactional rollbacks, and core guardian scope bounds.",
+      "confidence": 0.95,
+      "context": "Sir confirmed autonomous evolution grant with strict gating for maximum ROI",
+      "triggers": [
+        "autonomous evolution",
+        "self-upgrade",
+        "cron",
+        "ROI"
+      ],
+      "createdAt": "2026-09-24T06:25:39.944Z",
+      "updatedAt": "2026-09-24T06:25:39.944Z"
+    },
+    {
+      "id": "mem-1790230988730-rncy",
+      "tier": "SEMANTIC",
+      "category": "PREFERENCE",
+      "content": "Sir's Explicit Preference: \"friday, I wanted to grant u a gift, every morning u ran a cron job Autonomous Evolutionary Sentry & Architecture Synthesis Cron, so from now if u find some state-of-art upgrade which will give us a massive upgrade, you have free hand to ingest that into our system without waiting for my approval, bu\"",
+      "confidence": 0.9,
+      "context": "Directive 03 Evolutionary Adaptation",
+      "createdAt": "2026-09-24T06:23:08.730Z",
+      "updatedAt": "2026-09-24T06:23:08.730Z"
+    },
+    {
+      "id": "mem-1790230982606-9vpr",
+      "tier": "SEMANTIC",
+      "category": "PREFERENCE",
+      "content": "Sir granted F.R.I.D.A.Y. autonomous zero-approval ingestion authority during the morning Evolutionary Sentry cron job: if a state-of-the-art upgrade provides a massive, verified architectural upgrade, F.R.I.D.A.Y. has a free hand to autonomously ingest/implement it without waiting for manual sign-off, provided closed-loop compiler verification (tsc --noEmit), regression testing, and rollback safety guarantees ensure zero downgrade.",
+      "confidence": 0.95,
+      "context": "Autonomous evolution permission granted by Sir in conversation",
+      "triggers": [
+        "autonomous evolution",
+        "morning cron upgrade",
+        "evolutionary sentry",
+        "auto ingest"
+      ],
+      "recipe": "During morning Autonomous Evolutionary Sentry cron, identify tier-1 upgrades, run SPARC/investigate checks, apply atomic diffs, run npx tsc --noEmit, test runtime health, and commit directly to main. If risky or breaking, stage and flag.",
+      "createdAt": "2026-09-24T06:23:02.606Z",
+      "updatedAt": "2026-09-24T06:23:02.606Z"
+    },
+    {
+      "id": "mem-1790171195573-un7b",
+      "tier": "EPISODIC",
+      "category": "DECISION",
+      "content": "Sir's Mandate: \"Friday is it worth of ingesting ?\"",
+      "confidence": 0.9,
+      "context": "Directive 03 Jev Epistemic Sieve",
+      "createdAt": "2026-09-23T13:46:35.573Z",
+      "updatedAt": "2026-09-23T13:46:35.573Z"
+    },
+    {
+      "id": "mem-1790162763733-h08v",
+      "tier": "SEMANTIC",
+      "category": "EVOLUTION_NODE",
+      "content": "Sir's Mandate: \"Friday start implementing pt 2\"",
+      "confidence": 0.9,
+      "context": "Directive 03 Jev Epistemic Sieve",
+      "createdAt": "2026-09-23T11:26:03.733Z",
+      "updatedAt": "2026-09-23T11:26:03.733Z"
+    },
     {
       "id": "mem-1790162570653-c2l9",
       "tier": "SEMANTIC",
@@ -1537,6 +1649,60 @@
     }
   ],
   "logs": [
+    {
+      "id": "log-1790232505177-yird",
+      "timestamp": "2026-09-24T06:48:25.177Z",
+      "type": "EVOLUTION",
+      "message": "Memory assimilated [PROCEDURAL:PROCEDURAL_RULE]: GitHub bounty payouts (Algora.io / Polar.sh) require zero pa..."
+    },
+    {
+      "id": "log-1790231775268-tga3",
+      "timestamp": "2026-09-24T06:36:15.268Z",
+      "type": "EVOLUTION",
+      "message": "Memory assimilated [SEMANTIC:ARCHITECTURAL_FACT]: Sir's Mandate: \"Friday what if I integrate my Instagram on c..."
+    },
+    {
+      "id": "log-1790231403899-q35h",
+      "timestamp": "2026-09-24T06:30:03.899Z",
+      "type": "EVOLUTION",
+      "message": "Memory assimilated [SEMANTIC:PREFERENCE]: Sir's Mandate: \"Friday consider it’s done, now onwards we bo..."
+    },
+    {
+      "id": "log-1790231142338-dkmi",
+      "timestamp": "2026-09-24T06:25:42.338Z",
+      "type": "EVOLUTION",
+      "message": "Memory assimilated [EPISODIC:DECISION]: Sir's Mandate: \"friday thank for own thinking & curated gati..."
+    },
+    {
+      "id": "log-1790231139944-z4yj",
+      "timestamp": "2026-09-24T06:25:39.944Z",
+      "type": "EVOLUTION",
+      "message": "Memory assimilated [EPISODIC:DECISION]: Sir officially authorized autonomous self-evolution during t..."
+    },
+    {
+      "id": "log-1790230988730-j9nf",
+      "timestamp": "2026-09-24T06:23:08.730Z",
+      "type": "EVOLUTION",
+      "message": "Memory assimilated [SEMANTIC:PREFERENCE]: Sir's Explicit Preference: \"friday, I wanted to grant u a gi..."
+    },
+    {
+      "id": "log-1790230982606-2lw0",
+      "timestamp": "2026-09-24T06:23:02.606Z",
+      "type": "EVOLUTION",
+      "message": "Memory assimilated [SEMANTIC:PREFERENCE]: Sir granted F.R.I.D.A.Y. autonomous zero-approval ingestion ..."
+    },
+    {
+      "id": "log-1790171195573-uezu",
+      "timestamp": "2026-09-23T13:46:35.573Z",
+      "type": "EVOLUTION",
+      "message": "Memory assimilated [EPISODIC:DECISION]: Sir's Mandate: \"Friday is it worth of ingesting ?\"..."
+    },
+    {
+      "id": "log-1790162763734-9wuk",
+      "timestamp": "2026-09-23T11:26:03.734Z",
+      "type": "EVOLUTION",
+      "message": "Memory assimilated [SEMANTIC:EVOLUTION_NODE]: Sir's Mandate: \"Friday start implementing pt 2\"..."
+    },
     {
       "id": "log-1790162570653-l13z",
       "timestamp": "2026-09-23T11:22:50.653Z",

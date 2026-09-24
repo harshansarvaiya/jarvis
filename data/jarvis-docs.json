@@ -1,5 +1,22 @@
 [
   {
+    "id": "doc-1790171189956-3pfo",
+    "title": "agent-substrate-architecture-teardown",
+    "category": "ARCHITECTURE",
+    "totalChunks": 3,
+    "totalCharacters": 1458,
+    "tags": [
+      "agent-substrate",
+      "actor-model",
+      "microvm",
+      "state-multiplexing",
+      "architecture-reference"
+    ],
+    "isSensitive": false,
+    "createdAt": "2026-09-23T13:46:31.645Z",
+    "updatedAt": "2026-09-23T13:46:31.645Z"
+  },
+  {
     "id": "doc-1789993386625-etwd",
     "title": "SPARC Spec: SkillOpt Reflection Loop Integration",
     "category": "SPARC_SPEC",

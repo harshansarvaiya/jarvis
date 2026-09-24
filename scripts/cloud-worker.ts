@@ -814,6 +814,41 @@ async function consolidateCognitiveMemoriesWithJev() {
   }
 }
 
+// 9.6 Autonomous Algora & Polar Funded Open-Source Bounty Radar Sentry
+async function checkFundedBountyOpportunities() {
+  console.log('[Cloud Worker:Bounty Sentry] 💎 Sweeping Algora & Polar for funded open-source bounties...');
+  try {
+    const { scanFundedBounties } = await import('../lib/jarvis/bounty-sentry');
+    const result = await scanFundedBounties();
+
+    if (result.bountiesFound > 0 && result.highRoiBounties.length > 0) {
+      const topBounties = result.highRoiBounties.slice(0, 3);
+      console.log(`[Cloud Worker:Bounty Sentry] 🎯 Found ${result.bountiesFound} funded bounties. Max Reward: ${result.telemetry.maxRewardUsd} USD.`);
+
+      // Update radar state in Redis
+      if (redis) {
+        await redis.set('jarvis:bounty-radar', JSON.stringify(result));
+      }
+
+      // Check if top bounty is high-yield (>= $100 USD) and not notified recently
+      const top = topBounties[0];
+      if (top && top.rewardUsd >= 100) {
+        const lastNotifiedId = redis ? await redis.get('jarvis:last-bounty-notified-id') : null;
+        if (lastNotifiedId !== top.id) {
+          if (redis) await redis.set('jarvis:last-bounty-notified-id', top.id);
+
+          await dispatchPush(
+            `💰 Bounty Radar: High-Yield Opportunity (${top.amount})`,
+            `🎯 ${top.title}\n📦 Repo: ${top.repo} (#${top.issueNumber})\n💵 Bounty: ${top.amount} (${top.source.toUpperCase()})\n🛠️ Stack: ${top.languages.join(', ')}\n🔗 ${top.url}`
+          );
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Cloud Worker:Bounty Sentry] Sweep warning:', err.message);
+  }
+}
+
 // 10. Master Worker Loop & Lifecycle Controller
 async function startWorkerLoop(isTestMode: boolean = false) {
   console.log(`
