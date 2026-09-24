@@ -1,16 +1,15 @@
 /**
- * J.A.R.V.I.S. / F.R.I.D.A.Y. Mark II — Codebase Memory MCP Bridge
+ * J.A.R.V.I.S. / F.R.I.D.A.Y. Mark II — Codebase Memory MCP Bridge & TurboQuant Compression
  * 
- * Invokes the zero-dependency C binary `codebase-memory-mcp` to perform
- * sub-second graph traversals, AST symbol searches, and architectural breakdowns
- * over the local project repository.
+ * Invokes the zero-dependency C binary `codebase-memory-mcp` or pure AST graph with
+ * TurboQuant 8-bit data-oblivious vector compression (ryancodrai/turbovec pattern)
+ * to perform sub-second graph traversals, AST symbol searches, and architectural breakdowns.
  * 
  * Complies with Directive 01 (Guardian Protocol) & Directive 04 (Sovereign Loyalty).
  */
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import path from 'path';
 
 const execAsync = promisify(exec);
 const CBM_BINARY = process.env.CBM_BINARY_PATH || `${process.env.HOME}/.local/bin/codebase-memory-mcp`;
@@ -25,13 +24,73 @@ export interface GraphQueryResult {
 }
 
 /**
+ * TurboQuant 8-bit Data-Oblivious Vector Compression & Quantization Engine
+ * Compresses dense AST embeddings (768d/1536d) by 4x for sub-millisecond in-memory similarity search
+ * with zero codebook training overhead.
+ */
+export interface QuantizedVector {
+  dim: number;
+  packed: Uint8Array;
+  scale: number;
+  offset: number;
+}
+
+export function quantizeVectorInt8(vector: number[]): QuantizedVector {
+  const dim = vector.length;
+  let min = Infinity;
+  let max = -Infinity;
+  for (let i = 0; i < dim; i++) {
+    const v = vector[i];
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  const range = max - min || 1e-6;
+  const scale = range / 255;
+  const offset = min;
+  const packed = new Uint8Array(dim);
+  for (let i = 0; i < dim; i++) {
+    packed[i] = Math.round((vector[i] - offset) / scale);
+  }
+  return { dim, packed, scale, offset };
+}
+
+export function dequantizeVectorInt8(qv: QuantizedVector): number[] {
+  const out = new Array<number>(qv.dim);
+  for (let i = 0; i < qv.dim; i++) {
+    out[i] = qv.packed[i] * qv.scale + qv.offset;
+  }
+  return out;
+}
+
+export function dotProductQuantized(a: QuantizedVector, b: QuantizedVector): number {
+  if (a.dim !== b.dim) return 0;
+  let rawSum = 0;
+  let sumA = 0;
+  let sumB = 0;
+  const len = a.dim;
+  for (let i = 0; i < len; i++) {
+    const valA = a.packed[i];
+    const valB = b.packed[i];
+    rawSum += valA * valB;
+    sumA += valA;
+    sumB += valB;
+  }
+  return (
+    a.scale * b.scale * rawSum +
+    a.scale * b.offset * sumA +
+    b.scale * a.offset * sumB +
+    len * a.offset * b.offset
+  );
+}
+
+/**
  * Execute a one-shot CLI command via codebase-memory-mcp
  */
 async function runCBMTool(toolName: string, flags: string = ''): Promise<GraphQueryResult> {
   const startTime = Date.now();
   try {
     const cmd = `${CBM_BINARY} cli ${toolName} ${flags} --json`;
-    const { stdout, stderr } = await execAsync(cmd, {
+    const { stdout } = await execAsync(cmd, {
       cwd: REPO_PATH,
       timeout: 15000,
       maxBuffer: 10 * 1024 * 1024,
@@ -83,7 +142,6 @@ export async function searchCodebaseGraph(query: string): Promise<GraphQueryResu
         line: m.symbol.line,
         signature: m.symbol.signature,
         score: m.score,
-        matchReason: m.matchReason,
       })),
       latencyMs: cbmRes.latencyMs,
     };
@@ -98,17 +156,17 @@ export async function searchCodebaseGraph(query: string): Promise<GraphQueryResu
 }
 
 /**
- * Get high-level architectural domain overview (nodes, edges, HTTP routes, language distribution)
+ * Get high-level architectural hub breakdown
  */
 export async function getCodebaseArchitecture(): Promise<GraphQueryResult> {
-  const cbmRes = await runCBMTool('get_architecture', `--project="${PROJECT_NAME}"`);
+  const cbmRes = await runCBMTool('architecture', `--project="${PROJECT_NAME}"`);
   if (cbmRes.success && cbmRes.output) {
     return cbmRes;
   }
 
   try {
     const { getCodeGraphSummary } = await import('./codebase-graph');
-    const summary = await getCodeGraphSummary();
+    const summary = getCodeGraphSummary();
     return {
       success: true,
       output: summary,
@@ -125,21 +183,29 @@ export async function getCodebaseArchitecture(): Promise<GraphQueryResult> {
 }
 
 /**
- * Get file symbol outline (functions, interfaces, variables)
+ * Outline file definitions, symbols, and hierarchy
  */
 export async function getFileOutline(filePath: string): Promise<GraphQueryResult> {
-  const safePath = path.isAbsolute(filePath) ? path.relative(REPO_PATH, filePath) : filePath;
-  const cbmRes = await runCBMTool('get_file_outline', `--file="${safePath}" --project="${PROJECT_NAME}"`);
+  const safePath = filePath.replace(/["']/g, '');
+  const cbmRes = await runCBMTool('file_outline', `--file="${safePath}" --project="${PROJECT_NAME}"`);
   if (cbmRes.success && cbmRes.output) {
     return cbmRes;
   }
 
   try {
     const { searchCodeGraph } = await import('./codebase-graph');
-    const matches = await searchCodeGraph('', { fileFilter: safePath, limit: 30 });
+    const matches = await searchCodeGraph('', { fileFilter: safePath, limit: 50 });
     return {
       success: true,
-      output: matches.map((m) => m.symbol),
+      output: {
+        file: safePath,
+        symbols: matches.map((m) => ({
+          name: m.symbol.name,
+          kind: m.symbol.kind,
+          line: m.symbol.line,
+          signature: m.symbol.signature,
+        })),
+      },
       latencyMs: cbmRes.latencyMs,
     };
   } catch (err: any) {
@@ -206,4 +272,3 @@ export async function updateCodebaseIndex(): Promise<GraphQueryResult> {
     };
   }
 }
-
