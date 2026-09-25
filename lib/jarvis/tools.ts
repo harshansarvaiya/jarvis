@@ -2529,6 +2529,29 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'scan_indian_market_catalysts',
+    description: 'Indian Stock Market (NSE/BSE) Macro Catalyst Radar — Ingests global geopolitical, commodity (Crude Oil), interest rate (Fed/DXY), and regulatory catalysts, maps second-order sector transmissions, analyzes key NSE bellwethers (Nifty 50, Bank Nifty, Defense, EMS, Energy, IT), and synthesizes high-conviction swing/positional setups (Entry Zone, Target, Stop-Loss) for Sir to execute manually on Zerodha/Groww (Directives 01, 04, 06).',
+    parameters: {
+      type: 'object',
+      properties: {
+        dispatchTelegram: { type: 'boolean', description: 'Whether to dispatch the tactical briefing card directly to Sir on Telegram (default: true).' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'analyze_nse_stock',
+    description: 'Tactical NSE/BSE Equity Technical & Macro Analyzer — Conducts deep-dive quantitative technical analysis (RSI, 20/50 EMA, Bollinger Bands, ATR) and global macro sector alignment on any specific Indian stock (e.g. "HAL.NS", "RELIANCE.NS", "TCS.NS", "DIXON.NS", "ONGC.NS"), returning an actionable trade setup with entry zones, target prices, and risk-reward ratios for manual execution.',
+    parameters: {
+      type: 'object',
+      properties: {
+        symbol: { type: 'string', description: 'NSE or BSE ticker symbol (e.g. "HAL.NS", "RELIANCE.NS", "DIXON.NS" or simple symbol "HAL").' },
+        macroContext: { type: 'string', description: 'Optional macro catalyst context to evaluate against.' },
+      },
+      required: ['symbol'],
+    },
+  },
+  {
     name: 'get_quant_portfolio_status',
     description: 'Inspect the sovereign paper trading portfolio status, cash balance, total equity ($100k initial), open positions, realized/unrealized PnL, win rate, daily drawdown, and circuit breaker status (Directives 01, 04).',
     parameters: {
@@ -4023,6 +4046,34 @@ export async function executeJarvisTool(
           sendTelegramScreenshot: sendTelegramScreenshot !== false,
         });
         return { success: res.success, result: res, error: res.error };
+      }
+
+      case 'scan_indian_market_catalysts': {
+        const { dispatchTelegram } = args;
+        const { scanIndianMarketCatalysts, dispatchIndianMarketAlertToTelegram } = await import('./nse-macro-radar');
+        const card = await scanIndianMarketCatalysts();
+        let telegramSent = false;
+        if (dispatchTelegram !== false) {
+          telegramSent = await dispatchIndianMarketAlertToTelegram(card);
+        }
+        return {
+          success: true,
+          result: {
+            catalystCard: card,
+            telegramSent,
+          },
+        };
+      }
+
+      case 'analyze_nse_stock': {
+        const { symbol, macroContext } = args;
+        if (!symbol) return { success: false, result: null, error: 'symbol is required' };
+        const { analyzeNseStock } = await import('./nse-macro-radar');
+        const analysis = await analyzeNseStock(symbol as string, macroContext as string | undefined);
+        return {
+          success: true,
+          result: analysis,
+        };
       }
 
       case 'get_quant_portfolio_status': {

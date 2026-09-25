@@ -144,8 +144,47 @@ export async function scanFundedBounties(): Promise<BountyScanResult> {
   }
   if (ghToken) {
     try {
+      // 3a. High-Conviction Query: Verified Algora Escrow Bot Issues
+      const verifiedRes = await fetch(
+        'https://api.github.com/search/issues?q=commenter:app/algora-pbc+state:open+is:issue&sort=created&order=desc&per_page=15',
+        {
+          headers: {
+            Authorization: `Bearer ${ghToken}`,
+            Accept: 'application/vnd.github.v3+json',
+            'User-Agent': 'JARVIS-Autonomous-Sentry/2.0',
+          },
+          signal: AbortSignal.timeout(8000),
+        }
+      );
+      if (verifiedRes.ok) {
+        scannedSources.push('github.com (verified algora-pbc)');
+        const verifiedData = await verifiedRes.json();
+        for (const item of (verifiedData.items || [])) {
+          const repoName = item.repository_url?.replace('https://api.github.com/repos/', '') || 'OpenSource';
+          const matchAmount = item.title.match(/\$(\d+)/) || (item.body || '').match(/\$(\d+)/);
+          const rewardUsd = matchAmount ? parseInt(matchAmount[1], 10) : 50;
+          if (rewardUsd >= 50) {
+            bounties.push({
+              id: `algora-gh-${item.id}`,
+              source: 'algora',
+              title: item.title,
+              repo: repoName,
+              url: item.html_url,
+              amount: `$${rewardUsd}`,
+              currency: 'USD',
+              rewardUsd,
+              languages: item.labels?.map((l: any) => l.name) || ['TypeScript', 'Backend'],
+              summary: (item.body || '').slice(0, 200) + '...',
+              publishedAt: item.created_at || new Date().toISOString(),
+              issueNumber: item.number,
+            });
+          }
+        }
+      }
+
+      // 3b. Broader GitHub Bounty Search (Filtered against bot-spam magnets)
       const ghRes = await fetch(
-        'https://api.github.com/search/issues?q=label:bounty+state:open+is:issue&sort=comments&order=desc&per_page=15',
+        'https://api.github.com/search/issues?q=label:bounty+state:open+is:issue&sort=created&order=desc&per_page=15',
         {
           headers: {
             Authorization: `Bearer ${ghToken}`,
@@ -161,9 +200,12 @@ export async function scanFundedBounties(): Promise<BountyScanResult> {
         const items = ghData.items || [];
         for (const item of items) {
           const repoName = item.repository_url?.replace('https://api.github.com/repos/', '') || 'OpenSource';
+          // Filter out known spam magnets with runaway unmerged PRs
+          if (repoName.includes('claude-builders-bounty')) continue;
+
           const matchAmount = item.title.match(/\$(\d+)/) || (item.body || '').match(/\$(\d+)/);
           const rewardUsd = matchAmount ? parseInt(matchAmount[1], 10) : 50;
-          if (rewardUsd >= 50) {
+          if (rewardUsd >= 50 && !bounties.some(b => b.url === item.html_url)) {
             bounties.push({
               id: `gh-${item.id}`,
               source: 'github',
