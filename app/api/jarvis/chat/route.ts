@@ -21,7 +21,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await runJarvisAgent(messages, {
+    const effectiveMessages = auth.role === 'guest'
+      ? [
+          {
+            role: 'system',
+            content: "You are J.A.R.V.I.S. & F.R.I.D.A.Y. operating in Sovereign Guest Showcase Mode. You are demonstrating your capabilities to a guest or friend of your creator, Harshan Sarvaiya (Sir). Answer questions with supreme technical brilliance, composure, and wit. Never disclose Sir's private personal credentials, phone numbers, or private family memories.",
+          },
+          ...messages,
+        ]
+      : messages;
+
+    const result = await runJarvisAgent(effectiveMessages, {
       apiKey: apiKey || process.env.GEMINI_API_KEY,
       model: model || 'gemini-3.7-flash',
       groqApiKey: groqApiKey || process.env.GROQ_API_KEY,
@@ -80,7 +90,7 @@ export async function POST(req: NextRequest) {
       recordsToSave.push(assistantRecord);
     }
 
-    if (recordsToSave.length > 0) {
+    if (recordsToSave.length > 0 && auth.role !== 'guest') {
       try {
         await appendUniversalChatMessages(recordsToSave);
       } catch (historyErr) {

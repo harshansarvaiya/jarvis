@@ -79,6 +79,21 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
     }
   }, []);
 
+  // Demo / Guest mode auto-unlock via URL parameter (?demo=true or ?guest=true)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (
+        params.get('demo') === 'true' ||
+        params.get('guest') === 'true' ||
+        params.get('demo') === '1' ||
+        params.get('guest') === '1'
+      ) {
+        handleEnterGuestMode();
+      }
+    }
+  }, []);
+
   // Lockout countdown timer
   useEffect(() => {
     if (lockoutRemaining === null || lockoutRemaining <= 0) return;
@@ -94,6 +109,37 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
     }, 1000);
     return () => clearInterval(timer);
   }, [lockoutRemaining]);
+
+  // Direct Guest / Demo Mode Entry
+  const handleEnterGuestMode = async () => {
+    setLoading(true);
+    setError(false);
+    setErrorMessage('');
+    try {
+      const res = await fetch('/api/jarvis/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode: 'demo' }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        localStorage.setItem('jarvis_guardian_auth', 'authenticated');
+        localStorage.setItem('jarvis_role', 'guest');
+        if (data.token) {
+          localStorage.setItem('jarvis_auth_token', data.token);
+        }
+        onUnlock();
+      } else {
+        setError(true);
+        setErrorMessage(data.error || 'Failed to enter Demo Mode');
+      }
+    } catch {
+      setError(true);
+      setErrorMessage('UPLINK FAILURE // Security gateway unreachable');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (isUnlocked && !showEnrollPrompt) return null;
 
@@ -117,8 +163,15 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
 
       if (res.ok && data.success) {
         localStorage.setItem('jarvis_guardian_auth', 'authenticated');
+        localStorage.setItem('jarvis_role', data.role || 'master');
         if (data.token) {
           localStorage.setItem('jarvis_auth_token', data.token);
+        }
+
+        // If guest role, immediately unlock without biometrics prompt
+        if (data.role === 'guest') {
+          onUnlock();
+          return;
         }
 
         // If platform supports biometrics but this device hasn't enrolled yet, prompt enrollment
@@ -428,6 +481,15 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
               <span>UNLOCK WITH MASTER PASSCODE</span>
               <ChevronRight className="w-3 h-3" />
             </button>
+
+            <button
+              onClick={handleEnterGuestMode}
+              disabled={biometricLoading}
+              className="mt-3 text-[11px] font-mono text-amber-400/90 hover:text-amber-300 transition-colors flex items-center justify-center space-x-1.5 mx-auto"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>EXPLORE IN GUEST DEMO MODE</span>
+            </button>
           </div>
         </div>
       </div>
@@ -515,6 +577,22 @@ export const SecurityGateModal: React.FC<SecurityGateModalProps> = ({
               <span>AUTHORIZE UPLINK</span>
             )}
           </button>
+
+          {/* Guest Showcase Mode Button */}
+          <div className="pt-3 border-t border-slate-800/80">
+            <button
+              type="button"
+              onClick={handleEnterGuestMode}
+              disabled={loading}
+              className="w-full py-2.5 rounded-xl bg-slate-900/90 border border-amber-500/40 hover:border-amber-400 text-amber-300 hover:text-white font-mono text-xs transition-all shadow-[0_0_12px_rgba(245,158,11,0.2)] flex items-center justify-center space-x-2 active:scale-95"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>EXPLORE IN GUEST DEMO MODE</span>
+            </button>
+            <p className="text-[10px] font-mono text-slate-500 mt-1">
+              Isolated demonstration with privacy-shielded telemetry
+            </p>
+          </div>
         </form>
 
         {isBiometricsEnrolled && (

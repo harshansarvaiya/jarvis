@@ -14,6 +14,7 @@ export interface AuthVerificationResult {
   reason?: string;
   source: 'SOVEREIGN_TOKEN' | 'SESSION_COOKIE' | 'LOCAL_ORIGIN' | 'CRON_SECRET' | 'ANONYMOUS';
   userId?: string;
+  role?: 'master' | 'guest';
 }
 
 const ALLOWED_USER_ID = process.env.TELEGRAM_ALLOWED_USER_ID || '864360540';
@@ -30,19 +31,36 @@ export function verifyHmacSession(req: Request | NextRequest): AuthVerificationR
     const cronHeader = req.headers.get('x-cron-secret') || '';
     const userIdHeader = req.headers.get('x-telegram-user-id') || '';
 
+    // Detect session role (master vs guest)
+    let role: 'master' | 'guest' = 'master';
+    const roleHeader = req.headers.get('x-jarvis-role');
+    if (roleHeader === 'guest') {
+      role = 'guest';
+    } else if (authHeader.startsWith('Bearer ')) {
+      try {
+        const rawToken = authHeader.replace(/^Bearer\s+/i, '');
+        const [payloadB64] = rawToken.split('.');
+        if (payloadB64) {
+          const json = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'));
+          const parsed = JSON.parse(json);
+          if (parsed.role === 'guest') role = 'guest';
+        }
+      } catch {}
+    }
+
     // 1. Cron Execution Secret Gate
     if (CRON_SECRET && (cronHeader === CRON_SECRET || authHeader === `Bearer ${CRON_SECRET}`)) {
-      return { authorized: true, source: 'CRON_SECRET' };
+      return { authorized: true, source: 'CRON_SECRET', role: 'master' };
     }
 
     // 2. Telegram / Remote Gateway Verified User ID Gate
     if (userIdHeader && userIdHeader === ALLOWED_USER_ID) {
-      return { authorized: true, source: 'SOVEREIGN_TOKEN', userId: ALLOWED_USER_ID };
+      return { authorized: true, source: 'SOVEREIGN_TOKEN', userId: ALLOWED_USER_ID, role: 'master' };
     }
 
     // 3. Jarvis Sovereign Master Key Gate
     if (JARVIS_AUTH_KEY && (jarvisKeyHeader === JARVIS_AUTH_KEY || authHeader === `Bearer ${JARVIS_AUTH_KEY}`)) {
-      return { authorized: true, source: 'SOVEREIGN_TOKEN' };
+      return { authorized: true, source: 'SOVEREIGN_TOKEN', role: 'master' };
     }
 
     // 4. Same-Origin Web PWA / Localhost Verification
@@ -54,7 +72,7 @@ export function verifyHmacSession(req: Request | NextRequest): AuthVerificationR
     const isVercelApp = host.includes('vercel.app') || origin.includes('vercel.app') || referer.includes('vercel.app');
 
     if (isLocalhost || isVercelApp) {
-      return { authorized: true, source: 'LOCAL_ORIGIN' };
+      return { authorized: true, source: 'LOCAL_ORIGIN', role };
     }
 
     // If no explicit auth key is set in development, permit local origin

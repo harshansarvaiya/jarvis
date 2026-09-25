@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   verifyMasterKey,
+  verifyGuestKey,
   createSessionToken,
   checkRateLimit,
   recordFailedAttempt,
@@ -44,9 +45,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Validate Master Key
-    const isMatch = verifyMasterKey(passcode);
-    if (!isMatch) {
+    // 2. Validate Master Key or Guest Key
+    const isMaster = verifyMasterKey(passcode);
+    const isGuest = !isMaster && verifyGuestKey(passcode);
+
+    if (!isMaster && !isGuest) {
       const failRecord = recordFailedAttempt(ip);
       if (failRecord.isLocked) {
         return NextResponse.json(
@@ -68,13 +71,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Success: Reset rate limits & Issue cryptographic session token
+    // 3. Success: Reset rate limits & Issue cryptographic session token with role
+    const role: 'master' | 'guest' = isMaster ? 'master' : 'guest';
     resetRateLimit(ip);
-    const sessionToken = await createSessionToken();
+    const sessionToken = await createSessionToken(role);
 
     const response = NextResponse.json({
       success: true,
-      message: 'AUTHENTICATION VERIFIED // GUARDIAN PROTOCOL UNLOCKED',
+      role,
+      message: role === 'master'
+        ? 'AUTHENTICATION VERIFIED // GUARDIAN PROTOCOL UNLOCKED'
+        : 'GUEST SHOWCASE VERIFIED // DEMO PROTOCOL ENGAGED',
       token: sessionToken,
     });
 

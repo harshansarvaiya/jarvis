@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/jarvis/auth';
+import { decodeSessionToken, SESSION_COOKIE_NAME } from '@/lib/jarvis/auth';
 import { getRegisteredCredentials } from '@/lib/jarvis/webauthn';
 
 export async function GET(req: NextRequest) {
@@ -8,11 +8,12 @@ export async function GET(req: NextRequest) {
     const authHeader = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
     const token = sessionCookie || authHeader;
 
-    const authenticated = await verifySessionToken(token);
+    const decoded = await decodeSessionToken(token);
     const credentials = getRegisteredCredentials();
 
     return NextResponse.json({
-      authenticated,
+      authenticated: decoded.valid,
+      role: decoded.valid ? decoded.role : 'master',
       biometricsEnabled: credentials.length > 0,
       registeredDevicesCount: credentials.length,
     });

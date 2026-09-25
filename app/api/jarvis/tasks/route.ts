@@ -10,6 +10,54 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
   }
   try {
+    if (auth.role === 'guest') {
+      const demoTasks = [
+        {
+          id: 'demo-task-1',
+          title: 'Autonomous Bounty Hunter: Algora/Polar scan & PR dispatch',
+          description: 'Tri-Vector Revenue Sentry scanning open-source bounties >= $50 and generating verification test harness in isolated sandbox.',
+          priority: 'HIGH',
+          status: 'IN_PROGRESS',
+          dueDate: new Date(Date.now() + 86400000).toISOString(),
+          tags: ['bounty', 'autonomous', 'github'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: 'demo-task-2',
+          title: 'Full-Duplex WebRTC Voice Uplink: Sub-200ms latency benchmark',
+          description: 'AirPods hands-free driving mode with instant barge-in interruption and Telegram Mini App bridge.',
+          priority: 'HIGH',
+          status: 'COMPLETED',
+          dueDate: new Date().toISOString(),
+          tags: ['voice', 'webrtc', 'telephony'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: 'demo-task-3',
+          title: 'Stage 5 Cloud Runner VM: Zero-thrashing resource sentry',
+          description: 'Protect GCP e2-standard-2 runner VM memory and verify subagent health.',
+          priority: 'MEDIUM',
+          status: 'PENDING',
+          tags: ['infra', 'gcp', 'guardian'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: 'demo-task-4',
+          title: 'Omni-Sponge Second Brain: Multimodal paper & video ingestion',
+          description: 'Download arXiv research papers and YouTube transcripts into TurboQuant memory.',
+          priority: 'LOW',
+          status: 'PENDING',
+          tags: ['second-brain', 'turboquant'],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ];
+      return NextResponse.json({ tasks: demoTasks, isDemoMode: true });
+    }
+
     const tasks = getTasks();
     return NextResponse.json({ tasks });
   } catch (error: any) {

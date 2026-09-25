@@ -173,6 +173,7 @@ export default function JarvisDashboard() {
   // Mount and Auth State
   const [isMounted, setIsMounted] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
+  const [isGuestMode, setIsGuestMode] = useState(false);
 
   // Tab State: Separate mobile tabs from desktop view
   const [mobileTab, setMobileTab] = useState<'COMMS' | 'VAULT' | 'RADAR' | 'SYSTEM'>('COMMS');
@@ -234,11 +235,13 @@ export default function JarvisDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Authenticated fetch wrapper ensuring Bearer token and tunnel bypass
+  // Authenticated fetch wrapper ensuring Bearer token, guest role, and tunnel bypass
   const authFetch = async (url: string, options: RequestInit = {}) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('jarvis_auth_token') || '' : '';
+    const role = typeof window !== 'undefined' ? localStorage.getItem('jarvis_role') || (isGuestMode ? 'guest' : 'master') : 'master';
     const headers: Record<string, string> = {
       'ngrok-skip-browser-warning': 'true',
+      'x-jarvis-role': role,
       ...((options.headers as Record<string, string>) || {}),
     };
     if (token) {
@@ -323,12 +326,16 @@ export default function JarvisDashboard() {
         const data = await res.json();
         if (res.ok && data.authenticated) {
           setIsUnlocked(true);
+          const role = data.role || localStorage.getItem('jarvis_role');
+          setIsGuestMode(role === 'guest');
           fetchChatHistory();
           fetchTasks();
           fetchMemories();
         } else {
           localStorage.removeItem('jarvis_guardian_auth');
+          localStorage.removeItem('jarvis_role');
           setIsUnlocked(false);
+          setIsGuestMode(false);
         }
       } catch (err) {
         setIsUnlocked(false);
@@ -1006,10 +1013,16 @@ export default function JarvisDashboard() {
               <span className="text-[10px] font-mono bg-cyan-950/80 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.2 rounded font-bold">
                 MARK II
               </span>
+              {isGuestMode && (
+                <span className="text-[9px] font-mono bg-amber-950/90 text-amber-300 border border-amber-500/50 px-2 py-0.5 rounded-full font-bold shadow-[0_0_10px_rgba(245,158,11,0.3)] flex items-center space-x-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping inline-block" />
+                  <span>GUEST SHOWCASE</span>
+                </span>
+              )}
             </div>
             <div className="text-[10px] font-mono text-emerald-400 flex items-center space-x-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />
-              <span>GUARDIAN PROTOCOL ONLINE</span>
+              <span>{isGuestMode ? 'GUEST PRIVACY SHIELD ACTIVE' : 'GUARDIAN PROTOCOL ONLINE'}</span>
             </div>
           </div>
         </div>
@@ -1058,6 +1071,22 @@ export default function JarvisDashboard() {
             <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
             <span className="hidden sm:inline">LIVE CALL</span>
           </a>
+
+          {isGuestMode && (
+            <button
+              onClick={() => {
+                localStorage.removeItem('jarvis_guardian_auth');
+                localStorage.removeItem('jarvis_auth_token');
+                localStorage.removeItem('jarvis_role');
+                setIsUnlocked(false);
+                setIsGuestMode(false);
+              }}
+              title="Exit Guest Showcase Mode"
+              className="px-2.5 py-1.5 rounded-lg bg-amber-950/80 border border-amber-500/50 hover:border-amber-400 text-amber-300 hover:text-white text-xs font-mono font-bold transition-all shadow-[0_0_10px_rgba(245,158,11,0.2)]"
+            >
+              EXIT DEMO
+            </button>
+          )}
 
           <button
             onClick={() => setIsSettingsOpen(true)}

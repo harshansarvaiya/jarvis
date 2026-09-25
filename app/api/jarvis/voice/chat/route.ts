@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
     const result = await executeVoiceDialogueTurn({
       userSpeech: speech.trim(),
       persona: persona === 'jarvis' ? 'jarvis' : 'friday',
+      role: auth.role || 'master',
       apiKey,
       groqApiKey,
     });

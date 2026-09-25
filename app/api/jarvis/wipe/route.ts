@@ -9,6 +9,13 @@ export async function POST(req: NextRequest) {
   if (!auth.authorized) {
     return NextResponse.json({ error: auth.reason || 'Unauthorized' }, { status: 401 });
   }
+
+  if (auth.role === 'guest') {
+    return NextResponse.json(
+      { error: 'SECURITY GUARDIAN: System wipe and sanitization functions are permanently blocked in Guest Demonstration Mode.' },
+      { status: 403 }
+    );
+  }
   try {
     const body = await req.json().catch(() => ({}));
     const mode = body.mode || 'sensitive_only'; // 'sensitive_only' | 'nuclear_all'

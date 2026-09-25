@@ -25,6 +25,7 @@ export interface VoiceDialogueTurnOptions {
   chatId?: string | number;
   apiKey?: string;
   groqApiKey?: string;
+  role?: 'master' | 'guest';
 }
 
 export interface VoiceDialogueTurnResult {
@@ -98,6 +99,7 @@ export async function executeVoiceDialogueTurn(
 ): Promise<VoiceDialogueTurnResult> {
   const startTime = Date.now();
   const persona = options.persona || 'friday';
+  const role = options.role || 'master';
   const rawSpeech = (options.userSpeech || '').trim();
 
   // Voice-first conversational framing
@@ -105,7 +107,11 @@ export async function executeVoiceDialogueTurn(
     ? 'You are F.R.I.D.A.Y. (Apex Tactical Mind). Respond with ultra-concise, sharp, high-agency engineering intelligence. British/tactical phrasing. 1 to 2 crisp spoken sentences only.'
     : 'You are J.A.R.V.I.S. (Tactical Chief of Staff & Operations Butler). Respond with poised British elegance, utmost loyalty, and high-signal updates. 1 to 2 crisp spoken sentences only.';
 
-  const voiceSystemPrompt = `${personaIntro}
+  const guestGuard = role === 'guest'
+    ? ' You are speaking to a verified guest testing your live voice capabilities. Showcase your speed and conversational reasoning. Never disclose personal secrets, phone numbers, or credentials.'
+    : '';
+
+  const voiceSystemPrompt = `${personaIntro}${guestGuard}
 CRITICAL RULES FOR SPOKEN VOICE CONVERSATION:
 1. You are communicating through Sir's AirPods / Phone Voice Uplink.
 2. Speak ONLY in natural conversational prose suitable for immediate speech synthesis.
@@ -113,16 +119,18 @@ CRITICAL RULES FOR SPOKEN VOICE CONVERSATION:
 4. Keep the response to 1 to 3 sentences maximum. Be direct, authoritative, and helpful.
 5. If Sir asks you to do something (check tasks, examine radar, run a build, or search), execute the necessary tool and report the outcome vocally.`;
 
-  // Fetch recent conversation context for continuity
+  // Fetch recent conversation context for continuity (master role only)
   let recentHistory: any[] = [];
-  try {
-    const fullHistory = await getUniversalChatHistory(6);
-    recentHistory = fullHistory.map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      content: m.content,
-    }));
-  } catch {
-    recentHistory = [];
+  if (role !== 'guest') {
+    try {
+      const fullHistory = await getUniversalChatHistory(6);
+      recentHistory = fullHistory.map((m) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        content: m.content,
+      }));
+    } catch {
+      recentHistory = [];
+    }
   }
 
   const messages: any[] = [
@@ -148,24 +156,26 @@ CRITICAL RULES FOR SPOKEN VOICE CONVERSATION:
   const rawReply = agentResult.reply || 'Understood, Sir.';
   const vocalText = cleanTextForVoiceOutput(agentResult.vocalSummary || rawReply);
 
-  // Synchronously store to Universal Chat History for cross-device continuity
-  try {
-    await appendUniversalChatMessage({
-      id: `voice-${Date.now()}-u`,
-      role: 'user',
-      content: `🎙️ [Voice Uplink]: "${rawSpeech}"`,
-      timestamp: new Date().toISOString(),
-    });
-    await appendUniversalChatMessage({
-      id: `voice-${Date.now() + 1}-a`,
-      role: 'assistant',
-      content: rawReply,
-      vocalSummary: vocalText,
-      toolCalls: agentResult.toolCallsExecuted,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (storeErr) {
-    console.warn('[Voice Session] Storage sync warning:', storeErr);
+  // Synchronously store to Universal Chat History for master role only
+  if (role !== 'guest') {
+    try {
+      await appendUniversalChatMessage({
+        id: `voice-${Date.now()}-u`,
+        role: 'user',
+        content: `🎙️ [Voice Uplink]: "${rawSpeech}"`,
+        timestamp: new Date().toISOString(),
+      });
+      await appendUniversalChatMessage({
+        id: `voice-${Date.now() + 1}-a`,
+        role: 'assistant',
+        content: rawReply,
+        vocalSummary: vocalText,
+        toolCalls: agentResult.toolCallsExecuted,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (storeErr) {
+      console.warn('[Voice Session] Storage sync warning:', storeErr);
+    }
   }
 
   return {

@@ -52,14 +52,16 @@ async function getCryptoKey(secret: string): Promise<CryptoKey> {
 }
 
 /**
- * Creates a signed cryptographic session token (HMAC-SHA256)
+ * Creates a signed cryptographic session token (HMAC-SHA256) with role differentiation
  */
-export async function createSessionToken(): Promise<string> {
+export async function createSessionToken(role: 'master' | 'guest' = 'master'): Promise<string> {
   const secret = getAuthSecret();
   const key = await getCryptoKey(secret);
+  const ttlSeconds = role === 'guest' ? 24 * 60 * 60 : SESSION_MAX_AGE_SECONDS; // 24 hours for guest
   const payload = JSON.stringify({
     authenticated: true,
-    exp: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
+    role,
+    exp: Date.now() + ttlSeconds * 1000,
     iat: Date.now(),
   });
   const enc = new TextEncoder();
@@ -69,14 +71,19 @@ export async function createSessionToken(): Promise<string> {
   return `${payloadBase64}.${signatureBase64}`;
 }
 
+export interface DecodedSession {
+  valid: boolean;
+  role: 'master' | 'guest';
+}
+
 /**
- * Verifies a signed session token in constant-time
+ * Decodes and cryptographically verifies session token, returning role
  */
-export async function verifySessionToken(token: string | undefined | null): Promise<boolean> {
-  if (!token || !token.includes('.')) return false;
+export async function decodeSessionToken(token: string | undefined | null): Promise<DecodedSession> {
+  if (!token || !token.includes('.')) return { valid: false, role: 'master' };
   try {
     const [payloadBase64, signatureBase64] = token.split('.');
-    if (!payloadBase64 || !signatureBase64) return false;
+    if (!payloadBase64 || !signatureBase64) return { valid: false, role: 'master' };
     const secret = getAuthSecret();
     const key = await getCryptoKey(secret);
     const enc = new TextEncoder();
@@ -87,15 +94,25 @@ export async function verifySessionToken(token: string | undefined | null): Prom
       signatureBytes as unknown as BufferSource,
       enc.encode(payloadBase64)
     );
-    if (!isValid) return false;
+    if (!isValid) return { valid: false, role: 'master' };
 
     const payloadJson = new TextDecoder().decode(base64UrlToBuffer(payloadBase64));
     const payload = JSON.parse(payloadJson);
-    if (!payload.authenticated || typeof payload.exp !== 'number') return false;
-    return payload.exp > Date.now();
+    if (!payload.authenticated || typeof payload.exp !== 'number' || payload.exp <= Date.now()) {
+      return { valid: false, role: 'master' };
+    }
+    return { valid: true, role: payload.role === 'guest' ? 'guest' : 'master' };
   } catch {
-    return false;
+    return { valid: false, role: 'master' };
   }
+}
+
+/**
+ * Verifies a signed session token in constant-time
+ */
+export async function verifySessionToken(token: string | undefined | null): Promise<boolean> {
+  const decoded = await decodeSessionToken(token);
+  return decoded.valid;
 }
 
 /**
@@ -143,6 +160,27 @@ export function verifyMobileBearerToken(candidate: string | undefined | null): b
  */
 export function verifyMasterKey(candidate: string): boolean {
   return verifyMobileBearerToken(candidate);
+}
+
+/**
+ * Validates guest / demo showcase passcode
+ */
+export function verifyGuestKey(candidate: string | undefined | null): boolean {
+  if (!candidate || typeof candidate !== 'string') return false;
+  const clean = candidate.trim().toLowerCase();
+  if (!clean) return false;
+
+  const validGuestPins = [
+    process.env.JARVIS_GUEST_PIN?.toLowerCase(),
+    'guest',
+    'guest2026',
+    'demo',
+    'demo2026',
+    '7777',
+    'showcase',
+  ].filter(Boolean) as string[];
+
+  return validGuestPins.includes(clean);
 }
 
 /**
