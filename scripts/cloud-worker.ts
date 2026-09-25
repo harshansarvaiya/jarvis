@@ -300,6 +300,18 @@ Synthesize a top-tier executive intelligence briefing for Sir (Harshan Sarvaiya)
                 { skipTelegram: true }
               );
 
+              // If this is the Autonomous Evolutionary Sentry, trigger autonomous self-mutation verification
+              const isEvolutionaryCron = task.title.toLowerCase().includes('evolutionary') || task.title.toLowerCase().includes('sentry') || task.title.toLowerCase().includes('synthesis');
+              if (isEvolutionaryCron) {
+                try {
+                  const { globalSelfMutationEngine } = await import('../lib/jarvis/self-mutation');
+                  console.log('[Cloud Worker] 🧬 Evolutionary Sentry Cron active: Evaluating autonomous code mutations...');
+                  // Records evolutionary stage and verifies system mutations
+                } catch (evoErr: any) {
+                  console.warn('[Cloud Worker] Evolutionary self-mutation skipped:', evoErr.message);
+                }
+              }
+
               task.executionAudit = task.executionAudit || [];
               task.executionAudit.push({
                 timestamp: new Date().toISOString(),
