@@ -259,8 +259,7 @@ async function checkScheduledReminders() {
           console.log(`[Cloud Worker] ⏰ Scheduled Task Triggered: "${task.title}" (isCron=${isCron}, isDaily=${isDaily})`);
 
           if (isCron) {
-            // Autonomous AI Research & Synthesis Execution
-            const synthPrompt = `[SCHEDULED AUTONOMOUS CRON DIRECTIVE // 09:00 AM IST]:
+            let synthPrompt = `[SCHEDULED AUTONOMOUS CRON DIRECTIVE // 09:00 AM IST]:
 Task: "${task.title}"
 Details: "${task.description || ''}"
 
@@ -268,6 +267,27 @@ Synthesize a top-tier executive intelligence briefing for Sir (Harshan Sarvaiya)
 1. Top Frontier AI & Tech Breakthroughs / Product Releases
 2. Strategic Implications for Architecture & Distributed Systems
 3. High-Signal Action Items & Recommendations`;
+
+            if (task.title.toLowerCase().includes('monetization') || task.title.toLowerCase().includes('opportunity')) {
+              try {
+                const { runMonetizationScan } = await import('../lib/jarvis/monetization_cron');
+                const triScan = await runMonetizationScan();
+                synthPrompt = `[AUTONOMOUS TRI-VECTOR MONETIZATION & OPPORTUNITY DIRECTIVE]:
+Task: "${task.title}"
+Telemetry Data:
+- Vector 1 (Funded Bounties >= $50): ${triScan.vector1_bounties.summary}
+- Vector 2 (Apollo B2B Pipeline): ${triScan.vector2_b2b_leads.pipelineValueUsd} value across ${triScan.vector2_b2b_leads.leads.length} target profiles in ${triScan.vector2_b2b_leads.targetVertical}.
+- Vector 3 (Micro-SaaS Arbitrage): Top Opportunity: ${triScan.vector3_micro_saas.topPick}
+
+Format a razor-sharp, executive Tri-Vector Revenue Briefing for Sir (Harshan Sarvaiya). Include:
+1. Open-Source Bounties status (Algora/Polar >= $50)
+2. Top B2B consulting client opportunities with personalized pitch hooks tailored to Sir's 6-year enterprise backend expertise (Java / Spring Boot / Distributed Systems)
+3. High-ROI Micro-SaaS build recommendation
+4. Concrete execution steps for today`;
+              } catch (scanErr: any) {
+                console.warn('[Cloud Worker] Tri-vector scan injection warning:', scanErr.message);
+              }
+            }
 
             try {
               const { runJarvisAgent } = await import('../lib/jarvis/agent');
