@@ -2462,6 +2462,19 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['action'],
     },
   },
+  {
+    name: 'execute_self_mutation',
+    description: 'Autonomous Self-Mutation & Architectural Upgrade Engine — Friday directly deploys verified state-of-the-art upgrades, runs closed-loop compiler check (npx tsc --noEmit), commits to git, and updates Upstash cognitive DNA without waiting on human loops (Directives 03, 04, 05).',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Title of the architectural upgrade (e.g. "Phase-Gated Parallel Trace Harness").' },
+        description: { type: 'string', description: 'Detailed rationale and architectural implementation details.' },
+        scope: { type: 'string', description: 'Affected subsystem or module (e.g. "orchestrator", "cloud-worker", "memory").' },
+      },
+      required: ['title', 'description'],
+    },
+  },
 ];
 
 /**
@@ -3856,6 +3869,14 @@ export async function executeJarvisTool(
         }
 
         return { success: false, result: null, error: `Unsupported composio management action: ${compAction}` };
+      }
+
+      case 'execute_self_mutation': {
+        const { title, description, scope } = args;
+        if (!title) return { success: false, result: null, error: 'Upgrade title required' };
+        const { globalSelfMutationEngine } = await import('./self-mutation');
+        const res = await globalSelfMutationEngine.executeUpgrade(title, description || '', scope || 'core');
+        return { success: res.success, result: res, error: res.error };
       }
 
       default:

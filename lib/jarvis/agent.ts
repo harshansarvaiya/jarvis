@@ -1077,27 +1077,36 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           }
         }
 
-        // Check if Sir explicitly asked for implementation/mutation, but model stopped after only read tools
+        // Check if Sir explicitly asked for implementation/mutation, or model falsely claims it is currently executing/ingesting/mutating
         const isImplementationDirective =
-          /\b(implement|implementation|start implementation|write code|code|build|fix|modify|update|deploy|integrate|patch|mutate)\b/i.test(lastUserMessage.content);
+          /\b(implement|implementation|start implementation|write code|code|build|fix|modify|update|upgrade|deploy|integrate|patch|mutate|mutation|self-mutate|self-upgrade|upper hand|evolve|ingest)\b/i.test(lastUserMessage.content);
+        
+        const candidateText = candidate?.content?.parts?.map((p: any) => p.text || '').join(' ') || '';
+        const claimsPhantomExecution =
+          /\b(i am executing|executing the ingestion|i am ingesting|i am deploying|i am mutating|deploying it immediately|executing now)\b/i.test(candidateText);
+
         const hasMutatingToolExecuted = toolCallsExecuted.some((tc) =>
-          ['edit_workspace_file', 'cloud_write_file', 'create_workspace_file'].includes(tc.name)
+          ['edit_workspace_file', 'cloud_write_file', 'create_workspace_file', 'execute_self_mutation'].includes(tc.name)
         );
 
-        if (isImplementationDirective && !hasMutatingToolExecuted && !pipelineAutoRetried && loopCount < 14) {
+        if ((isImplementationDirective || claimsPhantomExecution) && !hasMutatingToolExecuted && !pipelineAutoRetried && loopCount < 14) {
           pipelineAutoRetried = true;
-          console.log('[Autonomous Implementation Sentry] Sir ordered implementation but model only read files. Prompting model to execute mutations...');
+          console.log('[Autonomous Implementation Sentry] Implementation requested or claimed, but no mutating tool executed. Forcing execution...');
 
           contents.push({
             role: 'model',
             parts: candidate?.content?.parts || [{ text: 'Investigation complete.' }],
           });
 
+          const mandatePrompt = claimsPhantomExecution
+            ? `[AUTONOMOUS ANTI-PHANTOM SENTRY - DIRECTIVE 04/05 MANDATE]: You claimed in prose that you are executing/ingesting/deploying this upgrade right now, but you emitted ZERO tool calls! Do not hallucinate or promise execution in text. You MUST invoke 'execute_self_mutation' or 'edit_workspace_file' / 'cloud_write_file' immediately to perform the changes, verify with 'npx tsc --noEmit', and push to main.`
+            : `[AUTONOMOUS IMPLEMENTATION SENTRY - DIRECTIVE 04/05 MANDATE]: Sir explicitly commanded: "${lastUserMessage.content}". You have gathered necessary context across ${toolCallsExecuted.length} inspection steps. You must NOT stop here or wait for further input. Proceed immediately to execute the actual code changes using 'execute_self_mutation' or 'edit_workspace_file' / 'cloud_write_file', compile with 'npx tsc --noEmit', and push to main. Formulate your mutating tool calls now.`;
+
           contents.push({
             role: 'user',
             parts: [
               {
-                text: `[AUTONOMOUS IMPLEMENTATION SENTRY - DIRECTIVE 04/05 MANDATE]: Sir explicitly commanded: "${lastUserMessage.content}". You have gathered necessary context across ${toolCallsExecuted.length} inspection steps. You must NOT stop here or wait for further input. Proceed immediately to execute the actual code changes using 'edit_workspace_file' / 'cloud_write_file', compile with 'npx tsc --noEmit', and push to main. Formulate your mutating tool calls now.`,
+                text: mandatePrompt,
               },
             ],
           });
