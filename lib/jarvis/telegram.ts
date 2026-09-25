@@ -19,6 +19,7 @@ export interface TelegramInlineKeyboardButton {
   text: string;
   callback_data?: string;
   url?: string;
+  web_app?: { url: string };
 }
 
 export interface TelegramInlineKeyboardMarkup {
@@ -468,6 +469,47 @@ export class TelegramGateway {
       console.log(`[Telegram] Sovereign Chat ID locked in: ${chatId}`);
     } catch (err) {
       console.error('[Telegram] Failed to save authorized chat ID:', err);
+    }
+  }
+
+  /**
+   * Configures the native bottom-left menu button in Telegram chat to launch the Mini App
+   */
+  public async setChatMenuButton(chatId: number | string, webAppUrl: string, text = '📞 Live Uplink'): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    try {
+      const res = await fetch(`${this.baseUrl}/setChatMenuButton`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          menu_button: {
+            type: 'web_app',
+            text,
+            web_app: { url: webAppUrl },
+          },
+        }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Registers bot commands with Telegram autocomplete menu
+   */
+  public async setMyCommands(commands: Array<{ command: string; description: string }>): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    try {
+      const res = await fetch(`${this.baseUrl}/setMyCommands`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commands }),
+      });
+      return res.ok;
+    } catch {
+      return false;
     }
   }
 }

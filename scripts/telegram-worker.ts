@@ -346,6 +346,43 @@ async function processDirective(
         );
         return;
       }
+    } else if (
+      cleanUserText === '/call' ||
+      cleanUserText === '/live' ||
+      cleanUserText === '/voice' ||
+      cleanUserText.toLowerCase() === 'call' ||
+      cleanUserText.toLowerCase() === 'call friday' ||
+      cleanUserText.toLowerCase() === 'call jarvis' ||
+      cleanUserText.toLowerCase() === 'voice uplink' ||
+      cleanUserText.toLowerCase() === 'live uplink'
+    ) {
+      const liveUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jarvis-iota-beige.vercel.app/live';
+      const webAppUrl = liveUrl.endsWith('/live') ? liveUrl : `${liveUrl}/live`;
+      const keyboard: TelegramInlineKeyboardMarkup = {
+        inline_keyboard: [
+          [
+            {
+              text: '📞 Launch Full-Duplex Voice Sheet',
+              web_app: { url: webAppUrl },
+            },
+          ],
+          [
+            {
+              text: '🌐 Open in Safari / Chrome',
+              url: webAppUrl,
+            },
+          ],
+        ],
+      };
+      // Bind native Telegram menu button for 1-tap quick access
+      gateway.setChatMenuButton(chatId, webAppUrl, '📞 Call Friday').catch(() => {});
+
+      await gateway.sendMessage(
+        chatId,
+        `📞 **F.R.I.D.A.Y. & J.A.R.V.I.S. Full-Duplex Voice Uplink Ready**\n\n- **Sub-300ms Reflex**: Groq US LPU and Gemini Multimodal Live.\n- **Continuous Hands-Free**: Zero button holding required.\n- **Instant Barge-In**: Speak naturally to interrupt at any millisecond.\n- **AirPods Optimized**: Full background audio stream.\n\n_Tap below to launch the voice sheet directly inside Telegram, Sir:_`,
+        { replyToMessageId, replyMarkup: keyboard }
+      );
+      return;
     }
 
     if (!cleanUserText && rawText) {
@@ -713,7 +750,21 @@ async function startTelegramGateway() {
   const authorizedId = await gateway.getAuthorizedChatId();
   if (authorizedId) {
     console.log(`[Telegram Gateway] 🔒 Sovereign Channel Bound to Chat ID: ${authorizedId}`);
+    const liveUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jarvis-iota-beige.vercel.app/live';
+    const webAppUrl = liveUrl.endsWith('/live') ? liveUrl : `${liveUrl}/live`;
+    gateway.setChatMenuButton(authorizedId, webAppUrl, '📞 Call Friday').catch(() => {});
   }
+
+  // Register native Telegram autocomplete commands
+  gateway.setMyCommands([
+    { command: 'call', description: '📞 Launch Full-Duplex Voice Sheet (AirPods / TMA)' },
+    { command: 'friday', description: '🛡️ Apex Tactical Mind directive' },
+    { command: 'jarvis', description: '⚡ Tactical Chief of Staff & Butler' },
+    { command: 'agents', description: '🤖 Specialized Subagents Matrix' },
+    { command: 'radar', description: '📡 Tactical radar sweep' },
+    { command: 'persona', description: '🎭 Tune tone and sparring intensity' },
+    { command: 'status', description: '🩺 Cloud runner VM & infrastructure health' },
+  ]).catch(() => {});
 
   console.log('[Telegram Gateway] 🚀 Long-polling active with Voice + Callback support. Ready for directives...');
 

@@ -28,6 +28,8 @@ import {
   ChevronDown,
   Globe,
   Coins,
+  Radio,
+  PhoneCall,
 } from 'lucide-react';
 import { ArcReactorOrb } from '@/components/ArcReactorOrb';
 import { DirectiveBadge } from '@/components/DirectiveBadge';
@@ -1047,6 +1049,15 @@ export default function JarvisDashboard() {
               <Bell className="w-4 h-4" />
             )}
           </button>
+
+          <a
+            href="/live"
+            title="Launch Full-Duplex Voice Uplink (AirPods / Live Duplex)"
+            className="px-2.5 py-1.5 rounded-lg bg-cyan-950/80 border border-cyan-400/60 hover:border-cyan-300 text-cyan-300 hover:text-white transition-all shadow-[0_0_12px_rgba(0,229,255,0.25)] flex items-center space-x-1.5 text-xs font-mono font-bold"
+          >
+            <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+            <span className="hidden sm:inline">LIVE CALL</span>
+          </a>
 
           <button
             onClick={() => setIsSettingsOpen(true)}
