@@ -131,11 +131,17 @@ flowchart TD
 * **Sovereign In-House Operations**: Friday controls your personal infrastructure—sending authentic emails through your private Gmail without third-party email tracking, managing Google Cloud Storage vaults, and indexing your codebase dependency graph.
 
 ### 💰 3. Autonomous Revenue Hunter
-* **Hunting Cash Bounties on Autopilot**: Scans open-source ecosystems (Algora.io, Polar.sh) for active, escrowed cash bounties ($\ge \$50$ to $\$500+$ USD). She analyzes bug reports, drafts code fixes, and stages pull requests.
+* **Hunting Cash Bounties on Autopilot**: Scans open-source ecosystems (Algora.io, Polar.sh, GitHub) for active, escrowed cash bounties ($\ge \$50$ to $\$500+$ USD). She analyzes bug reports, drafts code fixes, and stages pull requests.
 * **B2B High-Intent Client Radar**: Scans market intelligence (Apollo.io) for enterprise companies migrating legacy backend systems (Java, Spring Boot, Kafka, Next.js) that match your exact skillset, preparing tailored consulting dossiers worth $\$9,500–\$23,000$.
 * **Micro-SaaS Opportunity Arbitrage**: Monitors developer communities for widespread software pain points, identifying 48-hour build opportunities that can be launched as profitable micro-services.
 
-### 🔒 4. Absolute Privacy, Zero-Trust Security & Sovereign Loyalty
+### 🧠 4. The "Omni-Sponge" Second Brain (One-Tap Content Assimilation)
+* **One-Tap Telegram Ingestion**: Forward any YouTube link, arXiv research paper, technical PDF, GitHub repository, or web article to your bot.
+* **Autonomous Intelligence Extraction**: J.A.R.V.I.S. downloads transcripts, parses PDFs natively with Gemini Multimodal, extracts counter-intuitive breakthroughs, mathematical primitives, and actionable vectors.
+* **TurboQuant Quantized Memory**: Automatically embeds insights into long-term 8-bit vector memory and Upstash Redis. Contradictions are resolved via the Jev Epistemic Memory Sieve.
+* **Instant Extraction Cards**: Immediately replies with a high-signal "Architectural Extraction Card" on Telegram. Days or weeks later, during technical discussions, Friday seamlessly cites and weaves these insights into your debates.
+
+### 🔒 5. Absolute Privacy, Zero-Trust Security & Sovereign Loyalty
 * **100% Western Foundation Models (Directive 01)**: By strict architectural law, your data is processed exclusively through vetted American foundation models (Google Vertex AI, Meta Llama, OpenAI). Zero Chinese models, zero third-party telemetry harvesting.
 * **Your Memory Never Degrades**: J.A.R.V.I.S. remembers your preferences, heuristics, past decisions, and working habits across months of conversation using 8-bit vector quantization that prevents memory corruption.
 * **Emergency Nuclear Wipe**: If a device is ever compromised, a single voice command triggers cryptographic data sanitization, instantly purging sensitive credentials while preserving the system's core DNA.

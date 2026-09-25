@@ -583,7 +583,8 @@ async function handleIncomingMessage(update: TelegramUpdate) {
   }
 
   const hasPhoto = Boolean(msg.photo && msg.photo.length > 0);
-  const hasDoc = Boolean(msg.document && msg.document.mime_type?.startsWith('image/'));
+  const hasImageDoc = Boolean(msg.document && msg.document.mime_type?.startsWith('image/'));
+  const hasNonImageDoc = Boolean(msg.document && !msg.document.mime_type?.startsWith('image/'));
   const hasVoice = Boolean(msg.voice);
   const hasAudio = Boolean(msg.audio);
 
@@ -617,11 +618,57 @@ async function handleIncomingMessage(update: TelegramUpdate) {
     }
   }
 
-  if (!userText && (hasPhoto || hasDoc)) {
+  // OMNI-SPONGE SECOND BRAIN: Automatic Document Ingestion (PDFs, Markdown, TXT, Code)
+  if (hasNonImageDoc && msg.document) {
+    gateway.sendTypingAction(chatId).catch(() => {});
+    console.log(`[Omni-Sponge] 🧽 Document packet received from Sir: "${msg.document.file_name}" (${msg.document.mime_type}). Initiating assimilation...`);
+    const downloaded = await gateway.downloadFileBuffer(msg.document.file_id);
+    if (downloaded) {
+      try {
+        const { assimilateContent } = await import('../lib/jarvis/omni-sponge');
+        await assimilateContent({
+          type: 'DOCUMENT',
+          fileBuffer: downloaded.buffer,
+          fileName: msg.document.file_name || downloaded.filePath,
+          mimeType: msg.document.mime_type || 'application/octet-stream',
+          userContext: userText,
+        });
+        return; // Card already broadcasted to Telegram
+      } catch (spongeErr: any) {
+        console.warn('[Omni-Sponge] Document assimilation warning:', spongeErr);
+      }
+    }
+  }
+
+  // OMNI-SPONGE SECOND BRAIN: Autonomous URL Link & Forwarded Content Ingestion
+  const urlMatch = userText.match(/https?:\/\/[^\s]+/i);
+  const isForwarded = Boolean((msg as any).forward_date || (msg as any).forward_from || (msg as any).forward_from_chat);
+  const isExplicitAssimilation =
+    isForwarded ||
+    /^(?:https?:\/\/[^\s]+)$/i.test(userText.trim()) ||
+    /\b(assimilate|sponge|absorb|read this|learn from this|study this|take note|save this|ingest)\b/i.test(userText);
+
+  if (urlMatch && isExplicitAssimilation) {
+    gateway.sendTypingAction(chatId).catch(() => {});
+    console.log(`[Omni-Sponge] 🧽 URL packet received from Sir: "${urlMatch[0]}". Initiating assimilation...`);
+    try {
+      const { assimilateContent } = await import('../lib/jarvis/omni-sponge');
+      await assimilateContent({
+        type: 'URL',
+        sourceUrl: urlMatch[0],
+        userContext: userText,
+      });
+      return; // Card already broadcasted to Telegram
+    } catch (spongeErr: any) {
+      console.warn('[Omni-Sponge] URL assimilation warning:', spongeErr);
+    }
+  }
+
+  if (!userText && (hasPhoto || hasImageDoc)) {
     userText = 'Please analyze this screenshot/image, Sir.';
   }
 
-  if (!userText && !hasPhoto && !hasDoc && !hasVoice && !hasAudio) return;
+  if (!userText && !hasPhoto && !hasImageDoc && !hasVoice && !hasAudio) return;
 
   // AgentShield Inbound Inspection
   const shield = sanitizeInboundText(userText);
@@ -642,7 +689,7 @@ async function handleIncomingMessage(update: TelegramUpdate) {
     const largestPhoto = msg.photo[msg.photo.length - 1];
     const b64 = await gateway.downloadFileAsBase64(largestPhoto.file_id);
     if (b64) base64Image = b64;
-  } else if (hasDoc && msg.document) {
+  } else if (hasImageDoc && msg.document) {
     const b64 = await gateway.downloadFileAsBase64(msg.document.file_id, msg.document.mime_type);
     if (b64) base64Image = b64;
   }

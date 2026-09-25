@@ -2500,6 +2500,20 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: 'omni_sponge_assimilate',
+    description: 'Omni-Sponge Second Brain Assimilator — Ingests YouTube videos, arXiv research papers, technical PDFs, GitHub repositories, and web articles. Extracts architectural breakthroughs and mental models, indexes them into TurboQuant 8-bit memory, and dispatches a Staff-level extraction card to Sir (Directives 01, 03, 06).',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'URL to assimilate (e.g. YouTube, arXiv, GitHub, or web article).' },
+        rawText: { type: 'string', description: 'Raw text or document markdown if assimilating text directly.' },
+        title: { type: 'string', description: 'Optional custom title for the intelligence card.' },
+        context: { type: 'string', description: 'Sir directive or specific context for what to focus on.' },
+      },
+      required: [],
+    },
+  },
 ];
 
 /**
@@ -3921,6 +3935,20 @@ export async function executeJarvisTool(
         const { minRewardUsd } = args;
         const { scanAndSolveTopBounty } = await import('./bounty-closer');
         const res = await scanAndSolveTopBounty(Number(minRewardUsd) || 50);
+        return { success: true, result: res };
+      }
+
+      case 'omni_sponge_assimilate': {
+        const { url, rawText, title, context } = args;
+        if (!url && !rawText) return { success: false, result: null, error: 'Either url or rawText is required.' };
+        const { assimilateContent } = await import('./omni-sponge');
+        const res = await assimilateContent({
+          type: url ? 'URL' : 'RAW_TEXT',
+          sourceUrl: url,
+          rawText,
+          fileName: title,
+          userContext: context,
+        });
         return { success: true, result: res };
       }
 
