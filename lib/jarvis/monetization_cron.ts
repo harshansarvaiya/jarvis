@@ -152,7 +152,7 @@ export async function runMonetizationScan(): Promise<TriVectorRevenueReport> {
     },
     executiveActionPlan: [
       '1. Review B2B Pitch Hooks: Select target founder profile to dispatch Apollo personalized sequence.',
-      '2. Monitor Bounty Feeds: Hourly Algora/Polar cron alerts will push instantly when >= $50 tickets land.',
+      '2. Autonomous Bounty Closer: Friday is armed to autonomously resolve and submit authentic Pull Requests for funded Algora/Polar bounties via "solve_github_bounty".',
       '3. Package AST Security Bot: Deploy MVP as free-to-paid GitHub Marketplace Action to generate inbound MRR.',
     ],
   };

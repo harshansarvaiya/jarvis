@@ -2475,6 +2475,31 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['title', 'description'],
     },
   },
+  {
+    name: 'solve_github_bounty',
+    description: 'Autonomous Bounty Closer Engine — Solves funded GitHub/Algora/Polar open-source bounties end-to-end: provisions isolated sandbox, synthesizes surgical code fix via Gemini 3.8/3.7 Strategic Mind, tests locally, forks target repo, pushes branch, and opens upstream Pull Request with "Fixes #issueNumber" to claim cash payout for Sir (Directives 04, 05, 06).',
+    parameters: {
+      type: 'object',
+      properties: {
+        repo: { type: 'string', description: 'Target GitHub repository in "owner/repo" format (e.g. "supabase/postgrest-js").' },
+        issueNumber: { type: 'number', description: 'Funded issue number (e.g. 184).' },
+        bountyAmount: { type: 'string', description: 'Escrow reward amount (e.g. "$150 USD").' },
+        autoSubmitPr: { type: 'boolean', description: 'Whether to automatically submit the upstream Pull Request (default: true).' },
+      },
+      required: ['repo', 'issueNumber'],
+    },
+  },
+  {
+    name: 'scan_and_solve_top_bounty',
+    description: 'Autonomous Bounty Hunter Sweep — Scans Algora & Polar for active funded open-source bounties meeting minimum reward threshold, selects top candidate, and triggers autonomous end-to-end resolution and PR dispatch.',
+    parameters: {
+      type: 'object',
+      properties: {
+        minRewardUsd: { type: 'number', description: 'Minimum bounty reward in USD to target (default: 50).' },
+      },
+      required: [],
+    },
+  },
 ];
 
 /**
@@ -3877,6 +3902,26 @@ export async function executeJarvisTool(
         const { globalSelfMutationEngine } = await import('./self-mutation');
         const res = await globalSelfMutationEngine.executeUpgrade(title, description || '', scope || 'core');
         return { success: res.success, result: res, error: res.error };
+      }
+
+      case 'solve_github_bounty': {
+        const { repo, issueNumber, bountyAmount, autoSubmitPr } = args;
+        if (!repo || !issueNumber) return { success: false, result: null, error: 'repo and issueNumber are required' };
+        const { executeBountyCloser } = await import('./bounty-closer');
+        const res = await executeBountyCloser({
+          repo,
+          issueNumber: Number(issueNumber),
+          bountyAmount: bountyAmount || '$50+ USD',
+          autoSubmitPr: autoSubmitPr !== false,
+        });
+        return { success: res.success, result: res, error: res.error };
+      }
+
+      case 'scan_and_solve_top_bounty': {
+        const { minRewardUsd } = args;
+        const { scanAndSolveTopBounty } = await import('./bounty-closer');
+        const res = await scanAndSolveTopBounty(Number(minRewardUsd) || 50);
+        return { success: true, result: res };
       }
 
       default:

@@ -71,6 +71,16 @@ export interface JarvisState {
   memories: MemoryItem[];
   logs: SystemLog[];
   evolutionStage: number;
+  bountySubmissions?: Array<{
+    id: string;
+    timestamp: string;
+    repo: string;
+    issueNumber: number;
+    bountyAmount: string;
+    prUrl: string;
+    branch: string;
+    status: string;
+  }>;
 }
 
 const DATA_DIR = path.join(process.cwd(), 'data');

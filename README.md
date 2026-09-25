@@ -296,7 +296,7 @@ flowchart LR
     TriVector -->|"Vector 3: Micro-SaaS Arbitrage"| V3["48-Hour Fast-Build Radar<br>AST Security Actions & KV Proxies<br>MRR Arbitrage Projections"]
 ```
 
-1. **Vector 1 (Algora & Polar Bounties)**: Scans open-source repositories for verified, escrowed cash bounties ($\ge \$50$ USD). Evaluates dependency graphs, generates unit tests, writes fixes, and stages PR branches autonomously.
+1. **Vector 1 (Autonomous Bounty Closer — Algora & Polar)**: Scans open-source repositories for verified, escrowed cash bounties ($\ge \$50$ to $\$500+$ USD). Friday provisions an isolated ephemeral sandbox on the GCP Runner VM, synthesizes the surgical fix with Gemini 3.8/3.7 Strategic Mind, runs local verification tests, forks the target repo, and submits an authentic GitHub Pull Request linking `Fixes #{issueNumber}` to automatically bind the cash payout to Sir upon maintainer merge.
 2. **Vector 2 (Apollo B2B High-Intent Consulting)**: Ingests intent telemetry for companies migrating legacy Java/Spring backends to high-throughput reactive architectures, preparing targeted architectural dossiers.
 3. **Vector 3 (48-Hour Micro-SaaS Arbitrage)**: Monitors developer community pain points across GitHub Discussions and Reddit to synthesize minimal, high-ROI developer tools (e.g., automated AST Secret Scanners, Edge KV Proxies).
 

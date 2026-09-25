@@ -121,6 +121,71 @@ export async function scanFundedBounties(): Promise<BountyScanResult> {
     console.warn('[Bounty Sentry] Polar live query warning:', err instanceof Error ? err.message : String(err));
   }
 
+  // 3. GitHub Native Funded & Bounty Issues Search API
+  let ghToken = process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_TOKEN || '';
+  if (!ghToken) {
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const envPath = path.resolve(process.cwd(), '.env.local');
+      if (fs.existsSync(envPath)) {
+        for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith('#')) {
+            const [k, ...rest] = trimmed.split('=');
+            if (k && rest.length > 0 && !process.env[k.trim()]) {
+              process.env[k.trim()] = rest.join('=').trim();
+            }
+          }
+        }
+      }
+      ghToken = process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_TOKEN || '';
+    } catch {}
+  }
+  if (ghToken) {
+    try {
+      const ghRes = await fetch(
+        'https://api.github.com/search/issues?q=label:bounty+state:open+is:issue&sort=comments&order=desc&per_page=15',
+        {
+          headers: {
+            Authorization: `Bearer ${ghToken}`,
+            Accept: 'application/vnd.github.v3+json',
+            'User-Agent': 'JARVIS-Autonomous-Sentry/2.0',
+          },
+          signal: AbortSignal.timeout(8000),
+        }
+      );
+      if (ghRes.ok) {
+        scannedSources.push('github.com (label:bounty)');
+        const ghData = await ghRes.json();
+        const items = ghData.items || [];
+        for (const item of items) {
+          const repoName = item.repository_url?.replace('https://api.github.com/repos/', '') || 'OpenSource';
+          const matchAmount = item.title.match(/\$(\d+)/) || (item.body || '').match(/\$(\d+)/);
+          const rewardUsd = matchAmount ? parseInt(matchAmount[1], 10) : 50;
+          if (rewardUsd >= 50) {
+            bounties.push({
+              id: `gh-${item.id}`,
+              source: 'github',
+              title: item.title,
+              repo: repoName,
+              url: item.html_url,
+              amount: `$${rewardUsd}`,
+              currency: 'USD',
+              rewardUsd,
+              languages: item.labels?.map((l: any) => l.name) || ['TypeScript', 'Backend'],
+              summary: (item.body || '').slice(0, 200) + '...',
+              publishedAt: item.created_at || new Date().toISOString(),
+              issueNumber: item.number,
+            });
+          }
+        }
+      }
+    } catch (ghErr) {
+      console.warn('[Bounty Sentry] GitHub native bounty search warning:', ghErr);
+    }
+  }
+
   // Filter bounties (>= $50 USD threshold) and sort by reward descending
   const sorted = bounties.filter(b => b.rewardUsd >= 50).sort((a, b) => b.rewardUsd - a.rewardUsd);
   const totalPool = sorted.reduce((sum, b) => sum + b.rewardUsd, 0);
