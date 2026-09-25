@@ -2528,6 +2528,52 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['initialUrl', 'goal'],
     },
   },
+  {
+    name: 'get_quant_portfolio_status',
+    description: 'Inspect the sovereign paper trading portfolio status, cash balance, total equity ($100k initial), open positions, realized/unrealized PnL, win rate, daily drawdown, and circuit breaker status (Directives 01, 04).',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'run_quant_market_scan',
+    description: 'Execute a quantitative multi-factor alpha scan across crypto (BTC, ETH, SOL) and mega-cap tech/indices (NVDA, AAPL, MSFT, SPY, QQQ). Evaluates Statistical Mean Reversion (Z-Score + RSI), Momentum Breakouts (EMA 9/21 cross), and Volatility Squeezes (Bollinger Band compression).',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'execute_paper_trade',
+    description: 'Execute a sovereign paper trade in the simulated $100k portfolio. Enforces Zero Ruin Risk Guardian: max 0.75% portfolio risk per trade, max 5.0% allocation cap per asset, and mandatory Stop-Loss/Take-Profit.',
+    parameters: {
+      type: 'object',
+      properties: {
+        symbol: { type: 'string', description: 'Asset symbol (e.g. "BTC-USD", "NVDA", "ETH-USD", "SPY", "QQQ").' },
+        direction: { type: 'string', enum: ['LONG', 'SHORT'], description: 'Trade direction (LONG or SHORT).' },
+        strategy: { type: 'string', enum: ['STATISTICAL_MEAN_REVERSION', 'MOMENTUM_BREAKOUT', 'VOLATILITY_SQUEEZE', 'MANUAL'], description: 'Strategy underlying the trade thesis.' },
+        customStopLoss: { type: 'number', description: 'Optional explicit Stop-Loss price level (calculated mathematically if omitted).' },
+        customTakeProfit: { type: 'number', description: 'Optional explicit Take-Profit price level (calculated mathematically if omitted).' },
+      },
+      required: ['symbol', 'direction'],
+    },
+  },
+  {
+    name: 'manage_quant_trading_engine',
+    description: 'Manage the quant trading engine: close an open position, trip/clear the emergency circuit breaker (/halt or /resume), or reset the paper portfolio.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['close_position', 'halt_trading', 'resume_trading', 'evaluate_positions', 'reset_portfolio'], description: 'Management action to execute.' },
+        positionId: { type: 'string', description: 'ID of the position to close when action is close_position.' },
+        reason: { type: 'string', description: 'Reason for emergency halt when triggering halt_trading.' },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 /**
@@ -3977,6 +4023,83 @@ export async function executeJarvisTool(
           sendTelegramScreenshot: sendTelegramScreenshot !== false,
         });
         return { success: res.success, result: res, error: res.error };
+      }
+
+      case 'get_quant_portfolio_status': {
+        const { getPortfolioState, evaluateOpenPositions } = await import('./quant-engine');
+        const evalRes = await evaluateOpenPositions();
+        return {
+          success: true,
+          result: {
+            portfolio: evalRes.portfolio,
+            closedInThisEval: evalRes.closedPositions,
+            circuitBreakerTripped: evalRes.circuitBreakerTripped,
+          },
+        };
+      }
+
+      case 'run_quant_market_scan': {
+        const { generateAlphaSignalsForUniverse, getPortfolioState } = await import('./quant-engine');
+        const [signals, portfolio] = await Promise.all([
+          generateAlphaSignalsForUniverse(),
+          getPortfolioState(),
+        ]);
+        return {
+          success: true,
+          result: {
+            signalsCount: signals.length,
+            signals,
+            portfolioStatus: {
+              equity: portfolio.totalEquity,
+              cash: portfolio.cashBalance,
+              isHalted: portfolio.isHalted,
+              openPositionsCount: portfolio.openPositions.length,
+            },
+          },
+        };
+      }
+
+      case 'execute_paper_trade': {
+        const { symbol, direction, strategy, customStopLoss, customTakeProfit } = args;
+        if (!symbol || !direction) {
+          return { success: false, result: null, error: 'symbol and direction (LONG or SHORT) are required' };
+        }
+        const { executePaperOrder } = await import('./quant-engine');
+        const res = await executePaperOrder({
+          symbol: String(symbol).toUpperCase(),
+          direction: String(direction).toUpperCase() as any,
+          strategy: strategy || 'MANUAL',
+          customStopLoss: customStopLoss ? Number(customStopLoss) : undefined,
+          customTakeProfit: customTakeProfit ? Number(customTakeProfit) : undefined,
+        });
+        return { success: res.success, result: res.position, error: res.error };
+      }
+
+      case 'manage_quant_trading_engine': {
+        const { action, positionId, reason } = args;
+        const quant = await import('./quant-engine');
+        if (action === 'close_position') {
+          if (!positionId) return { success: false, result: null, error: 'positionId is required for close_position' };
+          const res = await quant.closePositionManually(positionId);
+          return { success: res.success, result: res.tradeLog, error: res.error };
+        }
+        if (action === 'halt_trading') {
+          const portfolio = await quant.toggleEmergencyHalt(true, reason || 'Emergency circuit breaker triggered by agent tool');
+          return { success: true, result: { message: 'Trading halted', isHalted: portfolio.isHalted, haltReason: portfolio.haltReason } };
+        }
+        if (action === 'resume_trading') {
+          const portfolio = await quant.toggleEmergencyHalt(false);
+          return { success: true, result: { message: 'Trading resumed', isHalted: portfolio.isHalted } };
+        }
+        if (action === 'evaluate_positions') {
+          const evalRes = await quant.evaluateOpenPositions();
+          return { success: true, result: evalRes };
+        }
+        if (action === 'reset_portfolio') {
+          const portfolio = await quant.resetPortfolio();
+          return { success: true, result: { message: 'Portfolio reset to $100k', portfolio } };
+        }
+        return { success: false, result: null, error: `Unsupported quant action: ${action}` };
       }
 
       default:

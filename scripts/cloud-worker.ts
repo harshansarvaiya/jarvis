@@ -881,6 +881,43 @@ async function checkFundedBountyOpportunities() {
   }
 }
 
+// 9.7 Autonomous Sovereign Quant & Paper Trading Risk Sentry
+async function checkQuantTradingSentry() {
+  try {
+    const { evaluateOpenPositions, getPortfolioState } = await import('../lib/jarvis/quant-engine');
+    const portfolio = await getPortfolioState();
+
+    if (portfolio.isHalted || portfolio.openPositions.length === 0) return;
+
+    const evalRes = await evaluateOpenPositions();
+
+    // 1. Alert on any closed positions (Stop Loss / Take Profit)
+    if (evalRes.closedPositions.length > 0) {
+      for (const closed of evalRes.closedPositions) {
+        const isWin = closed.realizedPnl >= 0;
+        const icon = isWin ? '🎯 TAKE-PROFIT HIT' : '🛡️ STOP-LOSS EXECUTED';
+        const sign = isWin ? '+' : '';
+        await dispatchPush(
+          `${icon}: ${closed.symbol} (${closed.direction})`,
+          `• Result: ${sign}$${closed.realizedPnl} (${sign}${closed.realizedPnlPct}%)\n• Fill: $${closed.entryPrice} ➔ Exit: $${closed.exitPrice}\n• Reason: ${closed.exitReason}\n• New Portfolio Equity: $${evalRes.portfolio.totalEquity.toLocaleString('en-US')}`,
+          '/api/jarvis/trading'
+        );
+      }
+    }
+
+    // 2. Alert if circuit breaker tripped
+    if (evalRes.circuitBreakerTripped) {
+      await dispatchPush(
+        '🛑 EMERGENCY CIRCUIT BREAKER TRIGGERED',
+        `Daily drawdown reached ${evalRes.portfolio.dailyDrawdownPct}% (Limit: 1.5%). All quant trading has been halted automatically to preserve capital. Current Equity: $${evalRes.portfolio.totalEquity.toLocaleString('en-US')}`,
+        '/api/jarvis/trading'
+      );
+    }
+  } catch (err: any) {
+    console.warn('[Cloud Worker:Quant Sentry] Check warning:', err.message);
+  }
+}
+
 // 10. Master Worker Loop & Lifecycle Controller
 async function startWorkerLoop(isTestMode: boolean = false) {
   console.log(`
@@ -899,6 +936,7 @@ async function startWorkerLoop(isTestMode: boolean = false) {
     await checkBuildIntegrityAndSelfHeal();
     await checkScheduledReminders();
     await checkScheduledBriefings();
+    await checkQuantTradingSentry();
     await checkGlobalThreatSentry();
     await checkGeopoliticalEscalationRadar();
     await checkDependencySecurityRadar();
@@ -913,6 +951,7 @@ async function startWorkerLoop(isTestMode: boolean = false) {
   await checkInfrastructureAndTokenHealth();
   await checkScheduledReminders();
   await checkScheduledBriefings();
+  await checkQuantTradingSentry();
   await checkGlobalThreatSentry();
   // High-Frequency Sub-Second VM Remote Execution RPC Listener (1.5s interval)
   setInterval(async () => {
@@ -928,6 +967,11 @@ async function startWorkerLoop(isTestMode: boolean = false) {
     try {
       // Every 30 seconds: Reminders & Autonomous Cron Tasks
       await checkScheduledReminders();
+
+      // Every 60 seconds (2 ticks): Sovereign Quant Trading Risk Sentry
+      if (tickCount % 2 === 0) {
+        await checkQuantTradingSentry();
+      }
 
       // Every 5 minutes (10 ticks): Scheduled morning/evening briefing check & Global Threat Sentry
       if (tickCount % 10 === 0) {

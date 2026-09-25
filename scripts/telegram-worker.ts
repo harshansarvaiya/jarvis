@@ -156,9 +156,9 @@ function buildActionKeyboard(tacticalActions?: string[]): TelegramInlineKeyboard
   // Tactical utility shortcut row
   keyboard.inline_keyboard.push([
     { text: '📊 Briefing', callback_data: 'cmd:briefing' },
+    { text: '📈 Quant', callback_data: 'cmd:quant' },
     { text: '🎯 Tasks', callback_data: 'cmd:tasks' },
     { text: '🤖 Agents', callback_data: 'cmd:subagents' },
-    { text: '🛡️ Audit', callback_data: 'cmd:audit' },
   ]);
 
   // Fast engine switch row
@@ -346,6 +346,123 @@ async function processDirective(
         );
         return;
       }
+    } else if (cleanUserText === '/trade' || cleanUserText === '/quant' || cleanUserText.toLowerCase() === 'quant' || cleanUserText.toLowerCase() === 'portfolio') {
+      const { evaluateOpenPositions, RISK_CONFIG } = await import('../lib/jarvis/quant-engine');
+      const evalRes = await evaluateOpenPositions();
+      const p = evalRes.portfolio;
+
+      const pnlSign = p.unrealizedPnl >= 0 ? '+' : '';
+      const realSign = p.realizedPnl >= 0 ? '+' : '';
+      const statusIcon = p.isHalted ? '🔴 HALTED' : '🟢 ACTIVE SENTRY';
+
+      let positionsStr = '_No open positions currently._';
+      if (p.openPositions.length > 0) {
+        positionsStr = p.openPositions
+          .map((pos) => {
+            const dirIcon = pos.direction === 'LONG' ? '🟢' : '🔴';
+            const posSign = pos.unrealizedPnl >= 0 ? '+' : '';
+            return `• ${dirIcon} **${pos.symbol}** (${pos.direction}) — Size: \`${pos.quantity}\`\n  Entry: \`$${pos.entryPrice}\` | Current: \`$${pos.currentPrice}\`\n  PnL: \`${posSign}$${pos.unrealizedPnl} (${posSign}${pos.unrealizedPnlPct}%)\`\n  SL: \`$${pos.stopLoss}\` | TP: \`$${pos.takeProfit}\``;
+          })
+          .join('\n\n');
+      }
+
+      const keyboard: TelegramInlineKeyboardMarkup = {
+        inline_keyboard: [
+          [
+            { text: '⚡ Run Alpha Scan', callback_data: 'cmd:quant_scan' },
+            p.isHalted
+              ? { text: '🟢 Resume Sentry', callback_data: 'cmd:quant_resume' }
+              : { text: '🛑 Circuit Breaker Halt', callback_data: 'cmd:quant_halt' },
+          ],
+          [
+            { text: '📊 Full Briefing', callback_data: 'cmd:briefing' },
+            { text: '🔄 Refresh Portfolio', callback_data: 'cmd:quant' },
+          ],
+        ],
+      };
+
+      const msg = `📈 **J.A.R.V.I.S. Sovereign Quant Engine (Stage 5)**\n\n` +
+        `• **Total Equity**: \`$${p.totalEquity.toLocaleString('en-US', { minimumFractionDigits: 2 })}\` USD\n` +
+        `• **Cash Available**: \`$${p.cashBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}\` USD\n` +
+        `• **Unrealized PnL**: \`${pnlSign}$${p.unrealizedPnl}\`\n` +
+        `• **Realized PnL**: \`${realSign}$${p.realizedPnl}\` (${p.winCount}W / ${p.lossCount}L — Win Rate: \`${(p.winRate * 100).toFixed(1)}%\`)\n` +
+        `• **Daily Drawdown**: \`${p.dailyDrawdownPct}%\` (Peak: \`$${p.dailyPeakEquity.toFixed(2)}\`)\n` +
+        `• **Risk Sentry**: \`Max 0.75% Risk ($${(p.totalEquity * RISK_CONFIG.MAX_RISK_PER_TRADE_PCT).toFixed(0)}) / 5% Alloc ($${(p.totalEquity * RISK_CONFIG.MAX_ALLOCATION_PER_ASSET_PCT).toFixed(0)})\`\n` +
+        `• **Engine State**: \`${statusIcon}\`${p.isHalted ? `\n_Reason: ${p.haltReason}_` : ''}\n\n` +
+        `**Open Positions (${p.openPositions.length}/${RISK_CONFIG.MAX_CONCURRENT_POSITIONS}):**\n${positionsStr}`;
+
+      await gateway.sendMessage(chatId, msg, { replyToMessageId, replyMarkup: keyboard });
+      return;
+    } else if (cleanUserText === '/scan' || cleanUserText.toLowerCase() === 'quant scan' || cleanUserText.toLowerCase() === 'scan market') {
+      const { generateAlphaSignalsForUniverse } = await import('../lib/jarvis/quant-engine');
+      gateway.sendTypingAction(chatId).catch(() => {});
+      const signals = await generateAlphaSignalsForUniverse();
+
+      if (signals.length === 0) {
+        const keyboard: TelegramInlineKeyboardMarkup = {
+          inline_keyboard: [
+            [
+              { text: '📈 Portfolio Status', callback_data: 'cmd:quant' },
+              { text: '🔄 Re-scan', callback_data: 'cmd:quant_scan' },
+            ],
+          ],
+        };
+        await gateway.sendMessage(
+          chatId,
+          `📡 **Alpha Radar Sweep Complete**\n\nAll monitored assets (BTC, ETH, SOL, NVDA, AAPL, MSFT, SPY, QQQ) are currently oscillating within normal statistical bounds. No anomaly met the strict threshold (Z-Score > 2.0 or Volatility Squeeze) at this millisecond, Sir. Zero-ruin discipline maintained.`,
+          { replyToMessageId, replyMarkup: keyboard }
+        );
+        return;
+      }
+
+      const keyboard: TelegramInlineKeyboardMarkup = { inline_keyboard: [] };
+      let signalsStr = '';
+
+      for (const sig of signals) {
+        const dirIcon = sig.direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT';
+        signalsStr += `**${sig.symbol}** ➔ ${dirIcon} (\`${(sig.confidence * 100).toFixed(0)}% Confidence\`)\n` +
+          `• Strategy: \`${sig.strategy}\`\n` +
+          `• Entry: \`$${sig.entryPrice}\` | SL: \`$${sig.stopLoss}\` | TP: \`$${sig.takeProfit}\` (R:R \`${sig.riskRewardRatio}:1\`)\n` +
+          `• Math: RSI=\`${sig.metrics.rsi14}\`, Z-Score=\`${sig.metrics.zScore}\`, Bandwidth=\`${sig.metrics.bollingerBandwidth}\`\n` +
+          `• Thesis: _${sig.reasoning}_\n\n`;
+
+        keyboard.inline_keyboard.push([
+          {
+            text: `⚡ Paper ${sig.direction} ${sig.symbol}`,
+            callback_data: `trade_order:${sig.symbol}:${sig.direction}:${sig.strategy}`,
+          },
+        ]);
+      }
+
+      keyboard.inline_keyboard.push([
+        { text: '📈 View Portfolio', callback_data: 'cmd:quant' },
+        { text: '🔄 Re-scan', callback_data: 'cmd:quant_scan' },
+      ]);
+
+      await gateway.sendMessage(
+        chatId,
+        `🎯 **Alpha Signals Detected (${signals.length} Opportunities)**\n\n${signalsStr}_Tap below to execute a paper order under Zero-Ruin Risk Guardian rules:_`,
+        { replyToMessageId, replyMarkup: keyboard }
+      );
+      return;
+    } else if (cleanUserText === '/halt') {
+      const { toggleEmergencyHalt } = await import('../lib/jarvis/quant-engine');
+      const p = await toggleEmergencyHalt(true, 'Emergency /halt commanded by Sir via Telegram');
+      await gateway.sendMessage(
+        chatId,
+        `🛑 **EMERGENCY CIRCUIT BREAKER ENGAGED, Sir.**\n\nAll automated trading has been halted immediately. Active positions are locked under sentry mode. No new capital will be committed until you issue \`/resume\`.\n\n- Current Equity: \`$${p.totalEquity.toFixed(2)}\`\n- Open Positions: \`${p.openPositions.length}\``,
+        { replyToMessageId }
+      );
+      return;
+    } else if (cleanUserText === '/resume') {
+      const { toggleEmergencyHalt } = await import('../lib/jarvis/quant-engine');
+      const p = await toggleEmergencyHalt(false);
+      await gateway.sendMessage(
+        chatId,
+        `🟢 **Trading Sentry Resumed, Sir.**\n\nCircuit breaker disengaged. Automated quant scanning and risk evaluation are nominal.\n\n- Current Equity: \`$${p.totalEquity.toFixed(2)}\``,
+        { replyToMessageId }
+      );
+      return;
     } else if (
       cleanUserText === '/call' ||
       cleanUserText === '/live' ||
@@ -511,7 +628,53 @@ async function handleIncomingMessage(update: TelegramUpdate) {
     console.log(`[Telegram Gateway] 🔘 Button Callback from Sir: "${cq.data}"`);
 
     let directiveText = '';
-    if (cq.data === 'cmd:briefing') {
+    if (cq.data === 'cmd:quant') {
+      await processDirective(chatId, '/quant', undefined, cq.message?.message_id);
+      return;
+    } else if (cq.data === 'cmd:quant_scan') {
+      await processDirective(chatId, '/scan', undefined, cq.message?.message_id);
+      return;
+    } else if (cq.data === 'cmd:quant_halt') {
+      await processDirective(chatId, '/halt', undefined, cq.message?.message_id);
+      return;
+    } else if (cq.data === 'cmd:quant_resume') {
+      await processDirective(chatId, '/resume', undefined, cq.message?.message_id);
+      return;
+    } else if (cq.data.startsWith('trade_order:')) {
+      const [, sym, dir, strat] = cq.data.split(':');
+      const { executePaperOrder } = await import('../lib/jarvis/quant-engine');
+      const orderRes = await executePaperOrder({
+        symbol: sym,
+        direction: dir as any,
+        strategy: strat as any,
+      });
+
+      if (!orderRes.success) {
+        await gateway.sendMessage(
+          chatId,
+          `⚠️ **Order Execution Blocked by Risk Guardian**\n\nAsset: \`${sym}\` (${dir})\nReason: _${orderRes.error}_`,
+          { replyToMessageId: cq.message?.message_id }
+        );
+        return;
+      }
+
+      const pos = orderRes.position!;
+      const kb: TelegramInlineKeyboardMarkup = {
+        inline_keyboard: [
+          [
+            { text: '📈 Inspect Portfolio', callback_data: 'cmd:quant' },
+            { text: '⚡ Scan Universe', callback_data: 'cmd:quant_scan' },
+          ],
+        ],
+      };
+
+      await gateway.sendMessage(
+        chatId,
+        `✅ **Paper Order Filled & Monitored**\n\n• **Asset**: \`${pos.symbol}\` (${pos.direction})\n• **Quantity**: \`${pos.quantity}\` units\n• **Fill Price**: \`$${pos.entryPrice}\`\n• **Invested Capital**: \`$${pos.investedAmount}\` (capped <= 5.0% allocation)\n• **Stop-Loss**: \`$${pos.stopLoss}\`\n• **Take-Profit**: \`$${pos.takeProfit}\`\n• **Strategy**: \`${pos.strategy}\`\n\n_Autonomous Cloud Sentry is active. Any Stop-Loss or Take-Profit crossing will trigger immediate auto-closure and notification._`,
+        { replyToMessageId: cq.message?.message_id, replyMarkup: kb }
+      );
+      return;
+    } else if (cq.data === 'cmd:briefing') {
       directiveText = 'Give me an executive briefing on all active systems, tasks, and radar.';
     } else if (cq.data === 'cmd:tasks') {
       directiveText = 'List all active pending tasks and priorities.';
