@@ -44,5 +44,6 @@ next-env.d.ts
 /data/private/
 /data/backups/
 /data/vault/
+/data/*.log
 scripts/inspect-chats.ts
 
