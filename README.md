@@ -128,6 +128,7 @@ flowchart TD
 * **Code That Actually Ships Itself**: Tell Friday: *"Integrate a Gmail sending engine and add unit tests."* She doesn't just paste code into a chat window for you to copy-paste. She edits the project files, runs the TypeScript compiler to ensure **0 errors**, tests it, and pushes directly to GitHub `main`—triggering an instant production deployment.
 * **Self-Upgrading Cognitive Engine**: Friday reads frontier research papers (arXiv) and trending open-source architectures every morning. When she identifies a state-of-the-art upgrade, she refactors her own codebase, verifies type safety, and deploys her own upgrades autonomously.
 * **Peer-Level Intellectual Sparring Partner**: Never a subservient "yes-man". When you propose an idea, Friday challenges weak assumptions, flags hidden latency and memory bottlenecks, and suggests superior architectural vectors.
+* **"Ghost in the Machine" (Autonomous Visual Browser Copilot)**: Commands a headless Chromium browser on the cloud VM. She navigates dynamic web apps, fills forms, clicks interactive buttons, analyzes full-screen viewport screenshots via Gemini Vision, and dispatches the live screenshot and findings directly to your Telegram chat.
 * **Sovereign In-House Operations**: Friday controls your personal infrastructure—sending authentic emails through your private Gmail without third-party email tracking, managing Google Cloud Storage vaults, and indexing your codebase dependency graph.
 
 ### 💰 3. Autonomous Revenue Hunter

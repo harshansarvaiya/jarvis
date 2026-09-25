@@ -350,6 +350,49 @@ export class TelegramGateway {
   }
 
   /**
+   * Sends a photo / screenshot image buffer directly to Telegram
+   */
+  public async sendPhoto(
+    chatId: number | string,
+    photoBuffer: Buffer,
+    options?: {
+      caption?: string;
+      parseMode?: 'Markdown' | 'HTML';
+      replyToMessageId?: number;
+    }
+  ): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    try {
+      const formData = new FormData();
+      formData.append('chat_id', String(chatId));
+      formData.append('photo', new Blob([new Uint8Array(photoBuffer)], { type: 'image/png' }), 'screenshot.png');
+      if (options?.caption) {
+        formData.append('caption', options.caption.slice(0, 1024));
+        if (options.parseMode) formData.append('parse_mode', options.parseMode);
+      }
+      if (options?.replyToMessageId) {
+        formData.append('reply_to_message_id', String(options.replyToMessageId));
+      }
+
+      const res = await fetch(`${this.baseUrl}/sendPhoto`, {
+        method: 'POST',
+        body: formData,
+        signal: AbortSignal.timeout(20000),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.warn(`[Telegram] sendPhoto returned HTTP ${res.status}:`, errText);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('[Telegram] Failed to send photo:', err);
+      return false;
+    }
+  }
+
+  /**
    * Responds to an inline callback query (e.g., button press acknowledgment)
    */
   public async answerCallbackQuery(
@@ -403,7 +446,7 @@ export class TelegramGateway {
    * Retrieves the authorized Telegram Chat ID from Upstash Redis or env
    */
   public async getAuthorizedChatId(): Promise<string | null> {
-    const envId = process.env.TELEGRAM_AUTHORIZED_CHAT_ID;
+    const envId = process.env.TELEGRAM_AUTHORIZED_CHAT_ID || process.env.TELEGRAM_ALLOWED_USER_ID;
     if (envId) return envId;
 
     try {

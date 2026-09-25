@@ -2514,6 +2514,20 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: 'visual_browser_copilot',
+    description: '"Ghost in the Machine" Autonomous Visual Browser Copilot — Launches headless Playwright Chromium on the GCP Runner VM, pilots dynamic websites, analyzes visual screenshots via Gemini Vision, clicks, fills forms, navigates multi-step workflows, and dispatches the live screenshot and findings directly to Sir\'s Telegram (Directives 01, 04, 06).',
+    parameters: {
+      type: 'object',
+      properties: {
+        initialUrl: { type: 'string', description: 'Starting web page URL (e.g. "https://news.ycombinator.com" or "https://www.google.com/travel/flights").' },
+        goal: { type: 'string', description: 'Specific operational objective to accomplish on the page.' },
+        maxSteps: { type: 'number', description: 'Maximum interactive micro-actions allowed (default: 5, max: 8).' },
+        sendTelegramScreenshot: { type: 'boolean', description: 'Whether to dispatch the final verified screenshot photo to Sir on Telegram (default: true).' },
+      },
+      required: ['initialUrl', 'goal'],
+    },
+  },
 ];
 
 /**
@@ -3950,6 +3964,19 @@ export async function executeJarvisTool(
           userContext: context,
         });
         return { success: true, result: res };
+      }
+
+      case 'visual_browser_copilot': {
+        const { initialUrl, goal, maxSteps, sendTelegramScreenshot } = args;
+        if (!initialUrl || !goal) return { success: false, result: null, error: 'initialUrl and goal are required' };
+        const { executeVisualBrowserMission } = await import('./visual-browser-copilot');
+        const res = await executeVisualBrowserMission({
+          initialUrl,
+          goal,
+          maxSteps: Number(maxSteps) || 5,
+          sendTelegramScreenshot: sendTelegramScreenshot !== false,
+        });
+        return { success: res.success, result: res, error: res.error };
       }
 
       default:
