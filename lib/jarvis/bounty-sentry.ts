@@ -121,8 +121,8 @@ export async function scanFundedBounties(): Promise<BountyScanResult> {
     console.warn('[Bounty Sentry] Polar live query warning:', err instanceof Error ? err.message : String(err));
   }
 
-  // Filter high ROI (>= $50 USD or high-velocity bounties) and sort by reward descending
-  const sorted = bounties.sort((a, b) => b.rewardUsd - a.rewardUsd);
+  // Filter bounties (>= $50 USD threshold) and sort by reward descending
+  const sorted = bounties.filter(b => b.rewardUsd >= 50).sort((a, b) => b.rewardUsd - a.rewardUsd);
   const totalPool = sorted.reduce((sum, b) => sum + b.rewardUsd, 0);
   const maxReward = sorted.length > 0 ? sorted[0].rewardUsd : 0;
 
