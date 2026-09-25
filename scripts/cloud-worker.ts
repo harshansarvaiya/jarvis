@@ -287,6 +287,25 @@ Format a razor-sharp, executive Tri-Vector Revenue Briefing for Sir (Harshan Sar
               } catch (scanErr: any) {
                 console.warn('[Cloud Worker] Tri-vector scan injection warning:', scanErr.message);
               }
+            } else if (task.title.toLowerCase().includes('indian market') || task.title.toLowerCase().includes('nse') || task.title.toLowerCase().includes('stock market')) {
+              try {
+                const { scanIndianMarketCatalysts, dispatchIndianMarketAlertToTelegram } = await import('../lib/jarvis/nse-macro-radar');
+                const nseCard = await scanIndianMarketCatalysts();
+                await dispatchIndianMarketAlertToTelegram(nseCard);
+                console.log(`[Cloud Worker] 🇮🇳 Indian Market Macro Catalyst Card dispatched to Telegram.`);
+                synthPrompt = `[INDIAN STOCK MARKET (NSE/BSE) PRE-MARKET MACRO DIRECTIVE]:
+Task: "${task.title}"
+Catalyst Headline: ${nseCard.headline}
+Primary Transmission: ${nseCard.transmissionMechanism}
+Favored Sectors: ${nseCard.favoredSectors.join(', ')}
+Pressured Sectors: ${nseCard.pressuredSectors.join(', ')}
+Nifty 50 Outlook: ${nseCard.niftyOutlook.bias} (${nseCard.niftyOutlook.supportZone} to ${nseCard.niftyOutlook.resistanceZone})
+Top Actionable Setups: ${nseCard.actionablePicks.map(p => `${p.companyName} (${p.symbol}) -> ${p.tacticalSetup?.action} [Entry: ${p.tacticalSetup?.entryRange}, Target: ₹${p.tacticalSetup?.targetPrice}, SL: ₹${p.tacticalSetup?.stopLossPrice}, R:R 1:${p.tacticalSetup?.riskRewardRatio}]`).join(' | ')}
+
+Synthesize a high-impact, professional pre-market trading executive summary for Sir (Harshan Sarvaiya) suitable for morning review before market open. Emphasize that these setups are structured for manual execution on Zerodha/Groww.`;
+              } catch (nseErr: any) {
+                console.warn('[Cloud Worker] Indian market scan injection warning:', nseErr.message);
+              }
             }
 
             try {

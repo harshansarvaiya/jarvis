@@ -724,6 +724,25 @@
           "notes": "Triggered autonomously by Cloud Cron Worker."
         }
       ]
+    },
+    {
+      "id": "task-nse-macro-radar-cron",
+      "title": "Daily 08:30 AM IST Indian Stock Market (NSE/BSE) Macro Catalyst Briefing",
+      "description": "Autonomous pre-market macro synthesis evaluating overnight global catalysts, Brent crude, DXY, and geopolitical moves mapped to actionable NSE swing and positional trade setups for manual execution on Zerodha/Groww.",
+      "status": "PENDING",
+      "priority": "HIGH",
+      "dueDate": "2026-09-26T03:00:00.000Z",
+      "isRecurring": true,
+      "recurrenceInterval": "DAILY",
+      "tags": [
+        "cron",
+        "market",
+        "nse",
+        "briefing",
+        "trading"
+      ],
+      "createdAt": "2026-09-25T21:46:41.395Z",
+      "updatedAt": "2026-09-25T21:46:41.395Z"
     }
   ],
   "memories": [
