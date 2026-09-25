@@ -83,6 +83,65 @@ flowchart TB
 
 ---
 
+## 🌟 What J.A.R.V.I.S. & F.R.I.D.A.Y. Actually Do (The Superpower Suite)
+
+*Imagine having Tony Stark's autonomous AI operating system running 24/7 across your cloud servers and mobile devices—one managing your daily life and operations, the other writing, testing, and deploying production code while you sleep.*
+
+```mermaid
+flowchart TD
+    User(["👤 Sir (You)"])
+    
+    subgraph EverydayOps["⚡ J.A.R.V.I.S. — Your 24/7 Digital Chief of Staff"]
+        B1["🌅 60-Second Audio Morning & Evening Briefings"]
+        B2["⚡ Sub-150ms Reflex Answers via LPU Silicon"]
+        B3["🎙️ Real-Time Voice Memos on Telegram (<200ms)"]
+        B4["🔔 Native Lock-Screen Push Alerts (iOS & Android)"]
+        B5["🌍 Global Risk Radar: Earthquakes, Geopolitics, Cyber Threats"]
+    end
+    
+    subgraph Engineering["🛡️ F.R.I.D.A.Y. — Your Autonomous Senior Staff Engineer"]
+        E1["💻 Hands-Free Code Mutation & Auto-Git Deployment"]
+        E2["🧬 Self-Upgrading Source Code via arXiv & GitHub Radar"]
+        E3["🧠 Uncompromising Intellectual Sparring & Architecture Teardowns"]
+        E4["📬 Sovereign In-House Email (SMTPS) & Cloud Vault Control"]
+    end
+    
+    subgraph Money["💰 Autonomous Revenue & Opportunity Hunter"]
+        M1["🎯 GitHub Cash Bounty Radar ($50 – $500+ USD)"]
+        M2["💼 Enterprise B2B Consulting Lead Sentry ($9.5k – $23k)"]
+        M3["🚀 48-Hour Micro-SaaS Pain-Point Arbitrage"]
+    end
+
+    User <--> EverydayOps
+    User <--> Engineering
+    User <--> Money
+```
+
+### ⚡ 1. J.A.R.V.I.S. — Your 24/7 Tactical Chief of Staff & Digital Butler
+* **Wake Up to High-Signal Intelligence, Not Generic News**: Every morning at 08:30 AM IST, J.A.R.V.I.S. synthesizes your day’s schedule, radar tasks, and world tech developments into a 60-second voice briefing delivered to your phone and Telegram.
+* **Instant Reflex Answers (<150ms)**: Powered by specialized Groq LPU silicon, J.A.R.V.I.S. answers questions faster than human reaction time—zero typing delay, zero awkward spinner animations.
+* **Voice-First Freedom Anywhere, Anytime**: Send a spontaneous voice note while walking, driving, or working out. J.A.R.V.I.S. transcribes your speech in under 200ms via Groq Whisper, understands your implicit intent, creates tasks, and updates your radar.
+* **Continuous 24/7 Global Sentry**: Watches the world while you sleep. J.A.R.V.I.S. continuously monitors seismic earthquake sensors, NOAA solar storms, critical geopolitical maritime chokepoints, and CVE security threats, alerting you only when actionable risks arise.
+* **Lock-Screen Push Notifications (Zero App Install)**: Native VAPID Web Push alerts deliver critical notifications directly onto your iPhone, Android, or MacBook lock-screen without requiring App Store downloads.
+
+### 🛡️ 2. F.R.I.D.A.Y. — Your Autonomous Senior Staff Engineer & Battle-Suit OS
+* **Code That Actually Ships Itself**: Tell Friday: *"Integrate a Gmail sending engine and add unit tests."* She doesn't just paste code into a chat window for you to copy-paste. She edits the project files, runs the TypeScript compiler to ensure **0 errors**, tests it, and pushes directly to GitHub `main`—triggering an instant production deployment.
+* **Self-Upgrading Cognitive Engine**: Friday reads frontier research papers (arXiv) and trending open-source architectures every morning. When she identifies a state-of-the-art upgrade, she refactors her own codebase, verifies type safety, and deploys her own upgrades autonomously.
+* **Peer-Level Intellectual Sparring Partner**: Never a subservient "yes-man". When you propose an idea, Friday challenges weak assumptions, flags hidden latency and memory bottlenecks, and suggests superior architectural vectors.
+* **Sovereign In-House Operations**: Friday controls your personal infrastructure—sending authentic emails through your private Gmail without third-party email tracking, managing Google Cloud Storage vaults, and indexing your codebase dependency graph.
+
+### 💰 3. Autonomous Revenue Hunter
+* **Hunting Cash Bounties on Autopilot**: Scans open-source ecosystems (Algora.io, Polar.sh) for active, escrowed cash bounties ($\ge \$50$ to $\$500+$ USD). She analyzes bug reports, drafts code fixes, and stages pull requests.
+* **B2B High-Intent Client Radar**: Scans market intelligence (Apollo.io) for enterprise companies migrating legacy backend systems (Java, Spring Boot, Kafka, Next.js) that match your exact skillset, preparing tailored consulting dossiers worth $\$9,500–\$23,000$.
+* **Micro-SaaS Opportunity Arbitrage**: Monitors developer communities for widespread software pain points, identifying 48-hour build opportunities that can be launched as profitable micro-services.
+
+### 🔒 4. Absolute Privacy, Zero-Trust Security & Sovereign Loyalty
+* **100% Western Foundation Models (Directive 01)**: By strict architectural law, your data is processed exclusively through vetted American foundation models (Google Vertex AI, Meta Llama, OpenAI). Zero Chinese models, zero third-party telemetry harvesting.
+* **Your Memory Never Degrades**: J.A.R.V.I.S. remembers your preferences, heuristics, past decisions, and working habits across months of conversation using 8-bit vector quantization that prevents memory corruption.
+* **Emergency Nuclear Wipe**: If a device is ever compromised, a single voice command triggers cryptographic data sanitization, instantly purging sensitive credentials while preserving the system's core DNA.
+
+---
+
 ## 🧠 Dual-Agent Cognitive Hierarchy: F.R.I.D.A.Y. & J.A.R.V.I.S.
 
 To maximize operational throughput and prevent cognitive pollution, the architecture splits responsibility between two synchronized personas operating over a shared state substrate:
