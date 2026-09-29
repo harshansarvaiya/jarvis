@@ -992,10 +992,16 @@ async function startWorkerLoop(isTestMode: boolean = false) {
         await checkQuantTradingSentry();
       }
 
-      // Every 5 minutes (10 ticks): Scheduled morning/evening briefing check & Global Threat Sentry
+      // Every 5 minutes (10 ticks): Scheduled morning/evening briefing check, Global Threat Sentry & Hardware Price Sentry
       if (tickCount % 10 === 0) {
         await checkScheduledBriefings();
         await checkGlobalThreatSentry();
+        try {
+          const { runMonitorPriceSentrySweep } = await import('../lib/jarvis/monitor-price-sentry');
+          await runMonitorPriceSentrySweep(dispatchPush);
+        } catch (sentryErr: any) {
+          console.warn('[Cloud Worker:Price Sentry] Check warning:', sentryErr.message);
+        }
       }
 
       // Every 10 minutes (20 ticks): Infrastructure, token health, and VM cgroup memory sentry
