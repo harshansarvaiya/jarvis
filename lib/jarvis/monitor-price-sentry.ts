@@ -5,8 +5,8 @@
  * 1. Acer Nitro XV272U V3 (27" 2K 180Hz Ergonomic Fast IPS) [Target: <= ₹15,000 / restock alert]
  * 2. Acer PM161QT (15.6" Full HD 10-Point Touch) [Target: <= ₹10,000 / drop from ₹10,699]
  * 
- * Synchronizes with Upstash Redis ('jarvis:monitor-price-sentry') and dispatches
- * dual-channel proactive alerts to Telegram (@harshan_jarvis_bot) and VAPID Web Push.
+ * Uses structured Schema.org JSON-LD extraction and sanity bounds to guarantee ZERO false positives
+ * from promotional banners, exchange values, EMI amounts, or related carousel accessories.
  */
 
 import { Redis } from '@upstash/redis';
@@ -17,6 +17,7 @@ export interface MonitorTarget {
   url: string;
   platform: 'amazon' | 'flipkart';
   targetPriceThreshold: number; // Trigger alert if price <= threshold
+  minValidPrice: number;        // Sanity floor: reject any price below this as EMI or accessory
   lastObservedPrice?: number;
   lastNotifiedPrice?: number;
   lastCheckedAt?: string;
@@ -35,6 +36,7 @@ const DEFAULT_TARGETS: Record<string, MonitorTarget> = {
     url: 'https://www.amazon.in/Acer-Backlight-Monitor-Refresh-Certified/dp/B0CCSL95T1',
     platform: 'amazon',
     targetPriceThreshold: 15000,
+    minValidPrice: 12000,
   },
   'acer-xv272u-v3-flipkart': {
     id: 'acer-xv272u-v3-flipkart',
@@ -42,6 +44,7 @@ const DEFAULT_TARGETS: Record<string, MonitorTarget> = {
     url: 'https://www.flipkart.com/acer-nitro-68-58-cm-27-inch-wqhd-led-backlit-ips-panel-gaming-monitor-xv272u-v3/p/itm9425aca7daee4',
     platform: 'flipkart',
     targetPriceThreshold: 15000,
+    minValidPrice: 12000,
   },
   'acer-pm161qt-amazon': {
     id: 'acer-pm161qt-amazon',
@@ -49,6 +52,7 @@ const DEFAULT_TARGETS: Record<string, MonitorTarget> = {
     url: 'https://www.amazon.in/Acer-Multi-Touch-Anti-Fingerprint-VisionCare-Adjustable/dp/B0HCX4F8WG',
     platform: 'amazon',
     targetPriceThreshold: 10000,
+    minValidPrice: 7000,
   },
 };
 
@@ -60,7 +64,37 @@ function getRedisClient(): Redis | null {
 }
 
 /**
- * Lightweight price extraction via HTTP request
+ * Extracts exact offer price from Schema.org JSON-LD scripts in the HTML
+ */
+function extractPriceFromJsonLd(html: string, minValid: number): number | null {
+  const jsonLdMatches = html.match(/<script[^>]*type=[\"\x27]application\/ld\+json[\"\x27][^>]*>([\s\S]*?)<\/script>/gi);
+  if (!jsonLdMatches) return null;
+
+  for (const tag of jsonLdMatches) {
+    const content = tag.replace(/<\/?script[^>]*>/gi, '').trim();
+    try {
+      const parsed = JSON.parse(content);
+      const items = Array.isArray(parsed) ? parsed : [parsed];
+      for (const item of items) {
+        if (!item) continue;
+        const offers = item.offers;
+        if (offers) {
+          const rawPrice = offers.price ?? (Array.isArray(offers) ? offers[0]?.price : null);
+          if (rawPrice !== null && rawPrice !== undefined) {
+            const price = typeof rawPrice === 'number' ? rawPrice : parseFloat(String(rawPrice).replace(/[^0-9.]/g, ''));
+            if (!isNaN(price) && price >= minValid && price <= 50000) {
+              return Math.round(price);
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+  return null;
+}
+
+/**
+ * Robust price extraction via HTTP with strict structured parsing
  */
 async function fetchPriceForTarget(target: MonitorTarget): Promise<{ price: number | null; inStock: boolean }> {
   try {
@@ -77,41 +111,53 @@ async function fetchPriceForTarget(target: MonitorTarget): Promise<{ price: numb
 
     const html = await res.text();
 
-    if (target.platform === 'amazon') {
-      // Check stock status
-      const isUnavailable = html.includes('Currently unavailable') || html.includes('we don\'t know when or if this item will be back in stock');
-      if (isUnavailable) {
-        return { price: null, inStock: false };
-      }
-
-      // Check for whole price
-      const priceWholeMatch = html.match(/class=["\x27]a-price-whole["\x27][^>]*>([0-9,]+)/);
-      if (priceWholeMatch) {
-        const cleanPrice = parseInt(priceWholeMatch[1].replace(/,/g, ''), 10);
-        if (!isNaN(cleanPrice) && cleanPrice > 1000) {
-          return { price: cleanPrice, inStock: true };
-        }
-      }
-
-      // Fallback: price span
-      const offscreenMatch = html.match(/class=["\x27]a-offscreen["\x27][^>]*>₹([0-9,.]+)/);
-      if (offscreenMatch) {
-        const cleanPrice = parseFloat(offscreenMatch[1].replace(/,/g, ''));
-        if (!isNaN(cleanPrice) && cleanPrice > 1000) {
-          return { price: Math.round(cleanPrice), inStock: true };
-        }
-      }
-    } else if (target.platform === 'flipkart') {
+    if (target.platform === 'flipkart') {
       const isOutOfStock = html.includes('This item is currently out of stock') || html.includes('Sold Out');
       if (isOutOfStock) {
         return { price: null, inStock: false };
       }
 
-      // Flipkart price div usually has class _30jeq3 or similar currency format
-      const priceMatch = html.match(/₹([0-9,]+)/);
-      if (priceMatch) {
-        const cleanPrice = parseInt(priceMatch[1].replace(/,/g, ''), 10);
-        if (!isNaN(cleanPrice) && cleanPrice > 1000 && cleanPrice < 50000) {
+      // Method 1: Schema.org JSON-LD (Authoritative)
+      const jsonLdPrice = extractPriceFromJsonLd(html, target.minValidPrice);
+      if (jsonLdPrice !== null) {
+        return { price: jsonLdPrice, inStock: true };
+      }
+
+      // Method 2: Flipkart Primary Price Container
+      const primaryPriceMatch = html.match(/class=["\x27][^"\x27]*Nx9bqj[^"\x27]*["\x27][^>]*>₹([0-9,]+)/) ||
+                                html.match(/class=["\x27][^"\x27]*_30jeq3[^"\x27]*["\x27][^>]*>₹([0-9,]+)/);
+      if (primaryPriceMatch) {
+        const cleanPrice = parseInt(primaryPriceMatch[1].replace(/,/g, ''), 10);
+        if (!isNaN(cleanPrice) && cleanPrice >= target.minValidPrice && cleanPrice <= 50000) {
+          return { price: cleanPrice, inStock: true };
+        }
+      }
+    } else if (target.platform === 'amazon') {
+      const isUnavailable = html.includes('Currently unavailable') || html.includes('we don\'t know when or if this item will be back in stock');
+      if (isUnavailable) {
+        return { price: null, inStock: false };
+      }
+
+      // Method 1: Schema.org JSON-LD
+      const jsonLdPrice = extractPriceFromJsonLd(html, target.minValidPrice);
+      if (jsonLdPrice !== null) {
+        return { price: jsonLdPrice, inStock: true };
+      }
+
+      // Method 2: Amazon priceToPay / apex container
+      const apexMatch = html.match(/class=["\x27][^"\x27]*priceToPay[^"\x27]*["\x27][^>]*>[\s\S]*?class=["\x27]a-price-whole["\x27]>([0-9,]+)/);
+      if (apexMatch) {
+        const cleanPrice = parseInt(apexMatch[1].replace(/,/g, ''), 10);
+        if (!isNaN(cleanPrice) && cleanPrice >= target.minValidPrice && cleanPrice <= 50000) {
+          return { price: cleanPrice, inStock: true };
+        }
+      }
+
+      // Method 3: Standard whole price element
+      const wholeMatch = html.match(/class=["\x27]a-price-whole["\x27]>([0-9,]+)/);
+      if (wholeMatch) {
+        const cleanPrice = parseInt(wholeMatch[1].replace(/,/g, ''), 10);
+        if (!isNaN(cleanPrice) && cleanPrice >= target.minValidPrice && cleanPrice <= 50000) {
           return { price: cleanPrice, inStock: true };
         }
       }
@@ -154,6 +200,10 @@ export async function runMonitorPriceSentrySweep(
   const triggeredAlerts: string[] = [];
 
   for (const [key, target] of Object.entries(state.monitors)) {
+    // Ensure sanity floor is always enforced from default config
+    target.minValidPrice = DEFAULT_TARGETS[key]?.minValidPrice || 10000;
+    target.targetPriceThreshold = DEFAULT_TARGETS[key]?.targetPriceThreshold || 15000;
+
     const { price, inStock } = await fetchPriceForTarget(target);
     target.lastCheckedAt = new Date().toISOString();
     target.inStock = inStock;
@@ -162,9 +212,9 @@ export async function runMonitorPriceSentrySweep(
       target.lastObservedPrice = price;
       console.log(`[Price Sentry] 📊 ${target.name}: ₹${price.toLocaleString('en-IN')} (Target: <= ₹${target.targetPriceThreshold.toLocaleString('en-IN')})`);
 
-      // Check if price meets or falls below the alert threshold
-      if (price <= target.targetPriceThreshold) {
-        // Prevent duplicate spam if we already notified at this exact or higher price recently
+      // Strict validation: must be below target threshold AND above the sanity floor
+      if (price <= target.targetPriceThreshold && price >= target.minValidPrice) {
+        // Prevent duplicate spam if we already notified at this exact or lower price
         const shouldNotify = !target.lastNotifiedPrice || price < target.lastNotifiedPrice;
 
         if (shouldNotify) {
