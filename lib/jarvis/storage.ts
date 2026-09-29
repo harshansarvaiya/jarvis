@@ -117,108 +117,7 @@ export function deduplicateChatHistory(messages: ChatMessageRecord[]): ChatMessa
 }
 
 // ==========================================
-// 1. Upstash Redis REST Provider (Cloud 24/7)
-// ==========================================
-class UpstashRedisProvider implements StorageProvider {
-  name = 'upstash-redis' as const;
-  isCloud = true;
-  private url: string;
-  private token: string;
-
-  constructor(url: string, token: string) {
-    this.url = url.replace(/\/$/, '');
-    this.token = token;
-  }
-
-  async execute(command: string, ...args: any[]): Promise<any> {
-    const formattedArgs = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a)));
-    const res = await fetch(this.url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify([command, ...formattedArgs]),
-      cache: 'no-store',
-    });
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      throw new Error(`Upstash Redis error (${res.status}): ${errText}`);
-    }
-
-    const data = await res.json();
-    return data.result;
-  }
-
-  async getState(): Promise<JarvisState | null> {
-    try {
-      const raw = await this.execute('get', 'jarvis:state');
-      if (!raw) return null;
-      return typeof raw === 'string' ? JSON.parse(raw) : raw;
-    } catch (err) {
-      console.error('[Storage:Upstash] Failed to get state:', err);
-      return null;
-    }
-  }
-
-  async saveState(state: JarvisState): Promise<void> {
-    try {
-      await this.execute('set', 'jarvis:state', JSON.stringify(state));
-    } catch (err) {
-      console.error('[Storage:Upstash] Failed to save state:', err);
-    }
-  }
-
-  async getChatHistory(limit = 100): Promise<ChatMessageRecord[]> {
-    try {
-      const raw = await this.execute('get', 'jarvis:chat_history');
-      if (!raw) return [];
-      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      if (!Array.isArray(parsed)) return [];
-      return parsed.slice(-limit);
-    } catch (err) {
-      console.error('[Storage:Upstash] Failed to get chat history:', err);
-      return [];
-    }
-  }
-
-
-
-  async saveChatHistory(messages: ChatMessageRecord[]): Promise<void> {
-    try {
-      const sanitized = deduplicateChatHistory(messages);
-      await this.execute('set', 'jarvis:chat_history', JSON.stringify(sanitized));
-    } catch (err) {
-      console.error('[Storage:Upstash] Failed to save chat history:', err);
-    }
-  }
-
-  async appendChatMessage(message: ChatMessageRecord): Promise<void> {
-    await this.appendChatMessages([message]);
-  }
-
-  async appendChatMessages(newMessages: ChatMessageRecord[]): Promise<void> {
-    try {
-      const current = await this.getChatHistory(50);
-      const merged = deduplicateChatHistory([...current, ...newMessages]);
-      await this.saveChatHistory(merged);
-    } catch (err) {
-      console.error('[Storage:Upstash] Failed to append chat messages:', err);
-    }
-  }
-
-  async clearChatHistory(): Promise<void> {
-    try {
-      await this.execute('del', 'jarvis:chat_history');
-    } catch (err) {
-      console.error('[Storage:Upstash] Failed to clear chat history:', err);
-    }
-  }
-}
-
-// ==========================================
-// 2. Local Disk Provider (Offline Fallback)
+// 1. Local Disk Provider (Offline & Atomic Backup)
 // ==========================================
 class LocalDiskProvider implements StorageProvider {
   name = 'local-disk' as const;
@@ -336,8 +235,8 @@ class LocalDiskProvider implements StorageProvider {
         } catch {
           return raw;
         }
-      } else if (cmd === 'set') {
-        const val = args[1];
+      } else if (cmd === 'set' || cmd === 'setex') {
+        const val = cmd === 'setex' ? (args[2] !== undefined ? args[2] : args[1]) : args[1];
         const content = typeof val === 'string' ? val : JSON.stringify(val, null, 2);
         fs.writeFileSync(customFile, content, 'utf-8');
         return 'OK';
@@ -346,11 +245,195 @@ class LocalDiskProvider implements StorageProvider {
           fs.unlinkSync(customFile);
         }
         return 1;
+      } else if (cmd === 'lpop') {
+        if (!fs.existsSync(customFile)) return null;
+        try {
+          const list = JSON.parse(fs.readFileSync(customFile, 'utf-8'));
+          if (Array.isArray(list) && list.length > 0) {
+            const item = list.shift();
+            fs.writeFileSync(customFile, JSON.stringify(list, null, 2), 'utf-8');
+            return item;
+          }
+        } catch {}
+        return null;
+      } else if (cmd === 'rpush') {
+        let list: any[] = [];
+        if (fs.existsSync(customFile)) {
+          try {
+            const parsed = JSON.parse(fs.readFileSync(customFile, 'utf-8'));
+            if (Array.isArray(parsed)) list = parsed;
+          } catch {}
+        }
+        for (let i = 1; i < args.length; i++) {
+          list.push(args[i]);
+        }
+        fs.writeFileSync(customFile, JSON.stringify(list, null, 2), 'utf-8');
+        return list.length;
+      } else if (cmd === 'keys') {
+        if (!fs.existsSync(this.dataDir)) return [];
+        const pattern = String(args[0] || '*').replace(/[^a-zA-Z0-9_*?-]/g, '');
+        const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+        const files = fs.readdirSync(this.dataDir);
+        return files
+          .filter((f) => f.endsWith('.json'))
+          .map((f) => f.slice(0, -5))
+          .filter((k) => regex.test(k));
       }
     } catch (err) {
       console.error(`[Storage:Local] execute(${command}) failed:`, err);
     }
     return null;
+  }
+}
+
+// ==========================================
+// 2. Upstash Redis REST Provider (Cloud 24/7 with Autonomous Fallback)
+// ==========================================
+class UpstashRedisProvider implements StorageProvider {
+  name = 'upstash-redis' as const;
+  isCloud = true;
+  private url: string;
+  private token: string;
+  private fallback: LocalDiskProvider;
+  private quotaExhaustedUntil: number = 0;
+  private lastQuotaWarning: number = 0;
+
+  constructor(url: string, token: string) {
+    this.url = url.replace(/\/$/, '');
+    this.token = token;
+    this.fallback = new LocalDiskProvider();
+  }
+
+  private isQuotaExhausted(): boolean {
+    return Date.now() < this.quotaExhaustedUntil;
+  }
+
+  private tripQuotaBreaker(reason: string) {
+    this.quotaExhaustedUntil = Date.now() + 30 * 60 * 1000; // 30-minute cooldown
+    if (Date.now() - this.lastQuotaWarning > 5 * 60 * 1000) {
+      this.lastQuotaWarning = Date.now();
+      console.warn(`[Storage:Upstash] ⚠️ Upstash Redis monthly quota exhausted (${reason}). Seamlessly operating via LocalDiskProvider backup.`);
+    }
+  }
+
+  async execute(command: string, ...args: any[]): Promise<any> {
+    if (this.isQuotaExhausted()) {
+      return await this.fallback.execute(command, ...args);
+    }
+
+    try {
+      const formattedArgs = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a)));
+      const res = await fetch(this.url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify([command, ...formattedArgs]),
+        cache: 'no-store',
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        if (res.status === 400 && (errText.includes('max requests limit exceeded') || errText.includes('ERR max requests'))) {
+          this.tripQuotaBreaker('Limit 500,000 reached');
+          return await this.fallback.execute(command, ...args);
+        }
+        throw new Error(`Upstash Redis error (${res.status}): ${errText}`);
+      }
+
+      const data = await res.json();
+      return data.result;
+    } catch (err: any) {
+      if (err.message && (err.message.includes('max requests limit exceeded') || err.message.includes('ERR max requests'))) {
+        this.tripQuotaBreaker('Limit 500,000 reached');
+      }
+      return await this.fallback.execute(command, ...args);
+    }
+  }
+
+  async getState(): Promise<JarvisState | null> {
+    if (!this.isQuotaExhausted()) {
+      try {
+        const raw = await this.execute('get', 'jarvis:state');
+        if (raw) {
+          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          this.fallback.saveState(parsed).catch(() => {});
+          return parsed;
+        }
+      } catch (err) {
+        console.warn('[Storage:Upstash] Falling back to local state on read error');
+      }
+    }
+    return await this.fallback.getState();
+  }
+
+  async saveState(state: JarvisState): Promise<void> {
+    // Dual storage: always write to local atomic backup first
+    await this.fallback.saveState(state);
+    if (!this.isQuotaExhausted()) {
+      try {
+        await this.execute('set', 'jarvis:state', JSON.stringify(state));
+      } catch (err) {
+        console.warn('[Storage:Upstash] Failed to write cloud state; local backup secured.');
+      }
+    }
+  }
+
+  async getChatHistory(limit = 100): Promise<ChatMessageRecord[]> {
+    if (!this.isQuotaExhausted()) {
+      try {
+        const raw = await this.execute('get', 'jarvis:chat_history');
+        if (raw) {
+          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.fallback.saveChatHistory(parsed).catch(() => {});
+            return parsed.slice(-limit);
+          }
+        }
+      } catch (err) {
+        console.warn('[Storage:Upstash] Falling back to local chat history on read error');
+      }
+    }
+    return await this.fallback.getChatHistory(limit);
+  }
+
+  async saveChatHistory(messages: ChatMessageRecord[]): Promise<void> {
+    const sanitized = deduplicateChatHistory(messages);
+    await this.fallback.saveChatHistory(sanitized);
+    if (!this.isQuotaExhausted()) {
+      try {
+        await this.execute('set', 'jarvis:chat_history', JSON.stringify(sanitized));
+      } catch (err) {
+        console.warn('[Storage:Upstash] Failed to write cloud chat history; local backup secured.');
+      }
+    }
+  }
+
+  async appendChatMessage(message: ChatMessageRecord): Promise<void> {
+    await this.appendChatMessages([message]);
+  }
+
+  async appendChatMessages(newMessages: ChatMessageRecord[]): Promise<void> {
+    await this.fallback.appendChatMessages(newMessages);
+    if (!this.isQuotaExhausted()) {
+      try {
+        const current = await this.getChatHistory(50);
+        const merged = deduplicateChatHistory([...current, ...newMessages]);
+        await this.execute('set', 'jarvis:chat_history', JSON.stringify(merged));
+      } catch (err) {
+        console.warn('[Storage:Upstash] Cloud appendChatMessages fallback triggered.');
+      }
+    }
+  }
+
+  async clearChatHistory(): Promise<void> {
+    await this.fallback.clearChatHistory();
+    if (!this.isQuotaExhausted()) {
+      try {
+        await this.execute('del', 'jarvis:chat_history');
+      } catch {}
+    }
   }
 }
 

@@ -93,6 +93,51 @@ if (VAPID_PUB && VAPID_PRIV) {
   }
 }
 
+// 1.2 Persistent Alert Deduplication Engine (Dual Memory + Disk + Redis)
+const DISPATCHED_ALERTS_FILE = path.join(process.cwd(), 'data', 'dispatched-alerts.json');
+let dispatchedAlertsMemory = new Set<string>();
+
+try {
+  if (fs.existsSync(DISPATCHED_ALERTS_FILE)) {
+    const raw = fs.readFileSync(DISPATCHED_ALERTS_FILE, 'utf-8');
+    const list = JSON.parse(raw);
+    if (Array.isArray(list)) {
+      dispatchedAlertsMemory = new Set(list);
+    }
+  }
+} catch {}
+
+async function isAlertDispatched(key: string): Promise<boolean> {
+  if (dispatchedAlertsMemory.has(key)) return true;
+  if (!redis) return false;
+  try {
+    const val = await redis.get(key);
+    if (val) {
+      dispatchedAlertsMemory.add(key);
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+async function markAlertDispatched(key: string, ttlSeconds: number = 86400): Promise<void> {
+  dispatchedAlertsMemory.add(key);
+  try {
+    const dataDir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(
+      DISPATCHED_ALERTS_FILE,
+      JSON.stringify(Array.from(dispatchedAlertsMemory).slice(-1000), null, 2),
+      'utf-8'
+    );
+  } catch {}
+  if (redis) {
+    try {
+      await redis.set(key, 'SENT', { ex: ttlSeconds });
+    } catch {}
+  }
+}
+
 // 2. Push Notification Dispatcher Helper (Web Push + Telegram Sentry)
 async function dispatchPush(
   title: string,
@@ -203,20 +248,13 @@ async function reflectAndRefineSkill(task: any, error: any, originalPrompt: stri
 }
 
 // 3. Routine A: Autonomous Scheduled Task & Cron Execution Engine
+const executedTaskInstances = new Set<string>();
+
 async function checkScheduledReminders() {
-  if (!redis) return;
   try {
-    const stateStr = (await redis.get('jarvis:state')) as string | null;
-    if (!stateStr) return;
-
-    let state: any = null;
-    try {
-      state = typeof stateStr === 'string' ? JSON.parse(stateStr) : stateStr;
-    } catch {
-      return;
-    }
-
-    if (!Array.isArray(state?.tasks)) return;
+    const { getUniversalState, saveUniversalState } = await import('../lib/jarvis/storage');
+    const state = await getUniversalState();
+    if (!state || !Array.isArray(state.tasks)) return;
 
     const now = Date.now();
     let stateModified = false;
@@ -227,6 +265,9 @@ async function checkScheduledReminders() {
         const dueTime = new Date(task.dueDate).getTime();
         
         if (!isNaN(dueTime) && dueTime <= now) {
+          const taskInstanceKey = `${task.id}:${task.dueDate}`;
+          if (executedTaskInstances.has(taskInstanceKey)) continue;
+
           const ageMs = now - dueTime;
           const CRON_GRACE_WINDOW_MS = 15 * 60 * 1000; // 15 minutes strict execution tolerance
 
@@ -248,6 +289,7 @@ async function checkScheduledReminders() {
             task.dueDate = nextDueStr;
             task.status = 'PENDING';
             stateModified = true;
+            executedTaskInstances.add(taskInstanceKey);
             console.log(`[Cloud Worker] ⏩ Stale recurring cron "${task.title}" auto-advanced to: ${nextDueStr}`);
             continue;
           }
@@ -256,6 +298,7 @@ async function checkScheduledReminders() {
           const shouldTrigger = isDaily ? ageMs <= CRON_GRACE_WINDOW_MS : ageMs < 24 * 60 * 60 * 1000;
           if (!shouldTrigger) continue;
 
+          executedTaskInstances.add(taskInstanceKey);
           console.log(`[Cloud Worker] ⏰ Scheduled Task Triggered: "${task.title}" (isCron=${isCron}, isDaily=${isDaily})`);
 
           if (isCron) {
@@ -345,7 +388,6 @@ Synthesize a high-impact, professional pre-market trading executive summary for 
                 try {
                   const { globalSelfMutationEngine } = await import('../lib/jarvis/self-mutation');
                   console.log('[Cloud Worker] 🧬 Evolutionary Sentry Cron active: Evaluating autonomous code mutations...');
-                  // Records evolutionary stage and verifies system mutations
                 } catch (evoErr: any) {
                   console.warn('[Cloud Worker] Evolutionary self-mutation skipped:', evoErr.message);
                 }
@@ -353,9 +395,12 @@ Synthesize a high-impact, professional pre-market trading executive summary for 
 
               task.executionAudit = task.executionAudit || [];
               task.executionAudit.push({
+                id: `exec-${Date.now()}`,
                 timestamp: new Date().toISOString(),
-                status: 'COMPLETED',
-                notes: `Autonomous synthesis executed successfully via ${result.telemetry?.engineUsed || 'Gemini 3.7'}.`,
+                type: 'API_ORCHESTRATION',
+                name: 'cron_synthesis',
+                status: 'SUCCESS',
+                output: `Autonomous synthesis executed successfully via ${result.telemetry?.engineUsed || 'Gemini 3.7'}.`,
               });
 
               if (isDaily) {
@@ -387,9 +432,12 @@ Synthesize a high-impact, professional pre-market trading executive summary for 
             task.completedAt = new Date().toISOString();
             task.executionAudit = task.executionAudit || [];
             task.executionAudit.push({
+              id: `exec-${Date.now()}`,
               timestamp: new Date().toISOString(),
-              status: 'COMPLETED',
-              notes: 'Triggered autonomously by Cloud Cron Worker.',
+              type: 'API_ORCHESTRATION',
+              name: 'scheduled_reminder',
+              status: 'SUCCESS',
+              output: 'Triggered autonomously by Cloud Cron Worker.',
             });
             stateModified = true;
           }
@@ -398,7 +446,8 @@ Synthesize a high-impact, professional pre-market trading executive summary for 
     }
 
     if (stateModified) {
-      await redis.set('jarvis:state', JSON.stringify(state));
+      const { saveUniversalState } = await import('../lib/jarvis/storage');
+      await saveUniversalState(state);
     }
   } catch (err: any) {
     console.warn('[Cloud Worker] Reminder check warning:', err.message);
@@ -407,7 +456,6 @@ Synthesize a high-impact, professional pre-market trading executive summary for 
 
 // 4. Routine B: Proactive Tactical Briefings (08:30 AM - 09:15 AM IST Morning & 09:30 PM IST Evening)
 async function checkScheduledBriefings() {
-  if (!redis) return;
   try {
     const now = new Date();
     // Calculate current time in Sir's timezone (Asia/Kolkata, UTC+5:30)
@@ -417,13 +465,8 @@ async function checkScheduledBriefings() {
     const istMin = parseInt(mStr, 10);
     const todayDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
 
-    const stateStr = (await redis.get('jarvis:state')) as string | null;
-    let state: any = null;
-    if (stateStr) {
-      try {
-        state = typeof stateStr === 'string' ? JSON.parse(stateStr) : stateStr;
-      } catch {}
-    }
+    const { getUniversalState } = await import('../lib/jarvis/storage');
+    const state = await getUniversalState();
 
     const tasks: any[] = Array.isArray(state?.tasks) ? state.tasks : [];
     const pendingTasks = tasks.filter((t) => t.status !== 'COMPLETED');
@@ -435,8 +478,11 @@ async function checkScheduledBriefings() {
     const isMorningWindow = (istHour === 8 && istMin >= 30) || (istHour === 9 && istMin <= 30);
     if (isMorningWindow) {
       const morningKey = `jarvis:briefing:morning:${todayDateStr}`;
-      const alreadySent = await redis.get(morningKey);
+      const alreadySent = await isAlertDispatched(morningKey);
       if (!alreadySent) {
+        // Mark immediately before dispatch to guarantee zero duplicate sends
+        await markAlertDispatched(morningKey, 72000);
+
         const top3 = pendingTasks.slice(0, 3);
         const taskHighlights = top3.length > 0
           ? top3.map((t) => `• [${t.priority}] ${t.title}${t.dueDate ? ` (Due: ${t.dueDate})` : ''}`).join('\n')
@@ -451,7 +497,6 @@ async function checkScheduledBriefings() {
 
         console.log(`[Cloud Worker] 🌅 Dispatching Morning Briefing to Sir (IST ${istHour}:${istMin})...`);
         await dispatchPush('🌅 J.A.R.V.I.S. Morning Briefing', message, '/');
-        await redis.set(morningKey, 'SENT');
       }
     }
 
@@ -460,8 +505,11 @@ async function checkScheduledBriefings() {
     // -------------------------------------------------------------
     if (istHour === 21 && istMin >= 20) {
       const eveningKey = `jarvis:briefing:evening:${todayDateStr}`;
-      const alreadySent = await redis.get(eveningKey);
+      const alreadySent = await isAlertDispatched(eveningKey);
       if (!alreadySent) {
+        // Mark immediately before dispatch to guarantee zero duplicate sends
+        await markAlertDispatched(eveningKey, 72000);
+
         const completedToday = completedTasks.filter((t) => t.completedAt && t.completedAt.startsWith(todayDateStr));
 
         const message = `Good evening, Sir. Tactical de-brief for ${todayDateStr}:\n\n` +
@@ -474,7 +522,6 @@ async function checkScheduledBriefings() {
 
         console.log(`[Cloud Worker] 🌙 Dispatching Evening De-Brief to Sir (IST 21:30)...`);
         await dispatchPush('🌙 J.A.R.V.I.S. Evening De-Brief', message, '/');
-        await redis.set(eveningKey, 'SENT');
       }
     }
   } catch (err: any) {
@@ -758,10 +805,10 @@ async function checkBuildIntegrityAndSelfHeal() {
     console.error('[Cloud Worker] 🚨 Build Regression Detected by Sentry:\n', errOutput);
 
     const alertKey = `jarvis:threat_sentry:build_err:${errOutput.slice(0, 30)}`;
-    const alreadySeen = redis ? await redis.get(alertKey) : localSeenThreats.has(alertKey);
+    const alreadySeen = (await isAlertDispatched(alertKey)) || localSeenThreats.has(alertKey);
 
     if (!alreadySeen) {
-      if (redis) await redis.set(alertKey, 'NOTIFIED', { ex: 24 * 3600 });
+      await markAlertDispatched(alertKey, 24 * 3600);
       localSeenThreats.add(alertKey);
 
       await dispatchPush(
@@ -787,10 +834,10 @@ async function checkDependencySecurityRadar() {
         if (criticalThreats.length > 0) {
           const threat = criticalThreats[0];
           const alertKey = `jarvis:threat_sentry:cve:${threat.id}`;
-          const alreadySeen = redis ? await redis.get(alertKey) : localSeenThreats.has(alertKey);
+          const alreadySeen = (await isAlertDispatched(alertKey)) || localSeenThreats.has(alertKey);
 
           if (!alreadySeen) {
-            if (redis) await redis.set(alertKey, 'NOTIFIED', { ex: 7 * 24 * 3600 });
+            await markAlertDispatched(alertKey, 7 * 24 * 3600);
             localSeenThreats.add(alertKey);
 
             console.log(`[Cloud Worker] 🚨 CVE Sentry Alert: ${threat.id} on ${pkg}`);
@@ -972,13 +1019,29 @@ async function startWorkerLoop(isTestMode: boolean = false) {
   await checkScheduledBriefings();
   await checkQuantTradingSentry();
   await checkGlobalThreatSentry();
-  // High-Frequency Sub-Second VM Remote Execution RPC Listener (1.5s interval)
-  setInterval(async () => {
+  // Adaptive VM Remote Execution RPC Listener (Dynamic backoff from 500ms reflex to 15s idle)
+  let rpcBackoffMs = 5000;
+  let isRpcPolling = false;
+
+  async function scheduleNextRpcPoll() {
+    if (isRpcPolling) return;
+    isRpcPolling = true;
     try {
       const { processNextVmRpcRequest } = await import('../lib/jarvis/vm-rpc');
-      await processNextVmRpcRequest();
-    } catch {}
-  }, 1500);
+      const processed = await processNextVmRpcRequest();
+      if (processed) {
+        rpcBackoffMs = 500; // Reflex speed when commands are active
+      } else {
+        rpcBackoffMs = Math.min(rpcBackoffMs + 2000, 15000); // Gradual idle backoff
+      }
+    } catch {
+      rpcBackoffMs = 30000; // Quota exhaustion or network error backoff
+    } finally {
+      isRpcPolling = false;
+      setTimeout(scheduleNextRpcPoll, rpcBackoffMs);
+    }
+  }
+  setTimeout(scheduleNextRpcPoll, 2000);
 
   let tickCount = 0;
   setInterval(async () => {

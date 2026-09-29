@@ -189,7 +189,9 @@ export async function processNextVmRpcRequest(): Promise<boolean> {
     console.log(`[VM RPC Bridge] ✅ Completed request ${request.id} in ${result.durationMs}ms (exitCode: ${result.exitCode})`);
     return true;
   } catch (err: any) {
-    console.warn('[VM RPC Bridge] Queue processing warning:', err.message);
+    if (!err.message?.includes('max requests limit exceeded')) {
+      console.warn('[VM RPC Bridge] Queue processing warning:', err.message);
+    }
     return false;
   }
 }
