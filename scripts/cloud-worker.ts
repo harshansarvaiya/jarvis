@@ -1019,29 +1019,13 @@ async function startWorkerLoop(isTestMode: boolean = false) {
   await checkScheduledBriefings();
   await checkQuantTradingSentry();
   await checkGlobalThreatSentry();
-  // Adaptive VM Remote Execution RPC Listener (Dynamic backoff from 500ms reflex to 15s idle)
-  let rpcBackoffMs = 5000;
-  let isRpcPolling = false;
-
-  async function scheduleNextRpcPoll() {
-    if (isRpcPolling) return;
-    isRpcPolling = true;
-    try {
-      const { processNextVmRpcRequest } = await import('../lib/jarvis/vm-rpc');
-      const processed = await processNextVmRpcRequest();
-      if (processed) {
-        rpcBackoffMs = 500; // Reflex speed when commands are active
-      } else {
-        rpcBackoffMs = Math.min(rpcBackoffMs + 2000, 15000); // Gradual idle backoff
-      }
-    } catch {
-      rpcBackoffMs = 30000; // Quota exhaustion or network error backoff
-    } finally {
-      isRpcPolling = false;
-      setTimeout(scheduleNextRpcPoll, rpcBackoffMs);
-    }
+  // Sovereign Direct VM RPC Listener (0 Upstash Redis calls, direct <100ms reflex)
+  try {
+    const { startSovereignRpcServer } = await import('../lib/jarvis/rpc-server');
+    startSovereignRpcServer();
+  } catch (rpcErr: any) {
+    console.warn('[Cloud Worker] Sovereign RPC server initialization warning:', rpcErr.message);
   }
-  setTimeout(scheduleNextRpcPoll, 2000);
 
   let tickCount = 0;
   setInterval(async () => {

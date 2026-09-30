@@ -95,10 +95,43 @@ export async function dispatchVmRpcCommand(
     }
   }
 
-  // Remote Execution Gateway (Vercel Serverless -> Upstash -> GCP VM Daemon)
+  // 2. Direct Sovereign HTTP RPC Gateway (Vercel Serverless -> GCP VM Port 4004 in <100ms)
+  const rpcHost = process.env.VM_RPC_HOST || '34.58.239.181';
+  const rpcPort = process.env.VM_RPC_PORT || '4004';
+  const rpcSecret = process.env.VM_RPC_SECRET || 'jarvis-sovereign-rpc-652a16c035ab8640b52f724d3302790c31ec7497c3a71ae7db119f76d70f50d8';
+
+  try {
+    const directUrl = `http://${rpcHost}:${rpcPort}/api/vm-rpc`;
+    const res = await fetch(directUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-jarvis-rpc-token': rpcSecret,
+      },
+      body: JSON.stringify({
+        requestId,
+        command,
+        cwd,
+        timeoutMs,
+        requestedBy: options.requestedBy || 'Vercel Edge PWA',
+      }),
+      signal: AbortSignal.timeout(timeoutMs + 4000),
+    });
+
+    if (res.ok) {
+      const parsed: VmRpcExecutionResult = await res.json();
+      return parsed;
+    }
+    const errText = await res.text().catch(() => '');
+    console.warn(`[VM RPC Bridge] Direct HTTP RPC returned HTTP ${res.status}: ${errText}`);
+  } catch (directErr: any) {
+    console.warn(`[VM RPC Bridge] Direct HTTP RPC unreachable (${directErr.message}). Engaging secondary fallback...`);
+  }
+
+  // 3. Secondary Fallback: Upstash Redis Queue (Only if cloud storage available and not quota-exhausted)
   const storage = getStorage();
   if (!storage.isCloud) {
-    throw new Error('Cloud storage (Upstash Redis) is required to bridge Vercel to the GCP VM.');
+    throw new Error('Cloud storage (Upstash Redis) or Direct Sovereign RPC is required to bridge Vercel to the GCP VM.');
   }
 
   const payload: VmRpcRequest = {
@@ -110,29 +143,33 @@ export async function dispatchVmRpcCommand(
     requestedBy: options.requestedBy || 'Friday/PWA',
   };
 
-  // Push task to queue
-  await storage.execute('rpush', RPC_QUEUE_KEY, JSON.stringify(payload));
+  try {
+    // Push task to queue
+    await storage.execute('rpush', RPC_QUEUE_KEY, JSON.stringify(payload));
 
-  // Poll for result
-  const pollIntervalMs = 300;
-  const maxPolls = Math.ceil(timeoutMs / pollIntervalMs);
+    // Poll for result
+    const pollIntervalMs = 300;
+    const maxPolls = Math.ceil(timeoutMs / pollIntervalMs);
 
-  for (let i = 0; i < maxPolls; i++) {
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-    const rawResult = await storage.execute('get', `${RPC_RESULT_PREFIX}${requestId}`);
-    if (rawResult) {
-      const parsed: VmRpcExecutionResult =
-        typeof rawResult === 'string' ? JSON.parse(rawResult) : rawResult;
-      // Cleanup result key
-      storage.execute('del', `${RPC_RESULT_PREFIX}${requestId}`).catch(() => {});
-      return parsed;
+    for (let i = 0; i < maxPolls; i++) {
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      const rawResult = await storage.execute('get', `${RPC_RESULT_PREFIX}${requestId}`);
+      if (rawResult) {
+        const parsed: VmRpcExecutionResult =
+          typeof rawResult === 'string' ? JSON.parse(rawResult) : rawResult;
+        // Cleanup result key
+        storage.execute('del', `${RPC_RESULT_PREFIX}${requestId}`).catch(() => {});
+        return parsed;
+      }
     }
+  } catch (queueErr: any) {
+    console.error('[VM RPC Bridge] Queue fallback also failed:', queueErr.message);
   }
 
   return {
     requestId,
     stdout: '',
-    stderr: `Timed out waiting for GCP Cloud Runner VM response (${timeoutMs}ms). Ensure scripts/cloud-worker.ts is active.`,
+    stderr: `Timed out waiting for GCP Cloud Runner VM response (${timeoutMs}ms). Ensure scripts/cloud-worker.ts is active on GCP VM.`,
     exitCode: 124,
     durationMs: Date.now() - start,
     executedOn: 'GCP Runner (RPC Timeout)',
