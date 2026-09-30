@@ -75,6 +75,45 @@ export function startSovereignRpcServer(port: number = Number(process.env.VM_RPC
       return;
     }
 
+    // Direct Sovereign Satellite Mesh Relay
+    if (parsedUrl.pathname === '/api/satellite/poll' && req.method === 'POST') {
+      let bodyRaw = '';
+      req.on('data', (chunk) => { bodyRaw += chunk; });
+      req.on('end', async () => {
+        try {
+          const body = JSON.parse(bodyRaw);
+          const { registerOrHeartbeatSatellite, pollSatelliteInbox, reportSatelliteResult } = await import('./satellite');
+          if (body.result) {
+            await reportSatelliteResult(body.result);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, recorded: true }));
+            return;
+          }
+          if (body.device && body.device.id) {
+            const registered = await registerOrHeartbeatSatellite(body.device);
+            const cmd = await pollSatelliteInbox(body.device.id);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, device: registered, command: cmd || null }));
+            return;
+          }
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid payload' }));
+        } catch (err: any) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+      return;
+    }
+
+    if (parsedUrl.pathname === '/api/satellite/list' && req.method === 'GET') {
+      const { listRegisteredSatellites } = await import('./satellite');
+      const devices = await listRegisteredSatellites();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, count: devices.length, devices }));
+      return;
+    }
+
     if (req.method !== 'POST' || (parsedUrl.pathname !== '/api/vm-rpc' && parsedUrl.pathname !== '/')) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Endpoint not found' }));
