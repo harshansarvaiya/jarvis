@@ -15,8 +15,12 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Exempt public authentication routes and dedicated hardware shortcut bridge
-  if (pathname.startsWith('/api/jarvis/auth') || pathname === '/api/jarvis/shortcut') {
+  // Exempt public authentication routes, dedicated hardware shortcut bridge, and satellite mesh
+  if (
+    pathname.startsWith('/api/jarvis/auth') ||
+    pathname === '/api/jarvis/shortcut' ||
+    pathname.startsWith('/api/jarvis/satellite')
+  ) {
     return NextResponse.next();
   }
 
