@@ -4,6 +4,24 @@
   "evolutionStage": 7,
   "tasks": [
     {
+      "id": "task-nse-premarket-radar",
+      "title": "Daily 08:15 AM IST Pre-Market Indian Stock Market (NSE/BSE) Macro Radar",
+      "description": "Autonomous pre-market macro synthesis: monitors Brent crude, DXY, US 10-Yr yields, global financial wires, and technical setups across the Nifty 50 watchlist. Delivers high-conviction trade setups for manual execution on Zerodha/Groww.",
+      "status": "PENDING",
+      "priority": "HIGH",
+      "dueDate": "2026-10-01T02:45:00.000Z",
+      "isRecurring": true,
+      "recurrenceInterval": "DAILY",
+      "tags": [
+        "cron",
+        "market",
+        "nse",
+        "trading",
+        "briefing"
+      ],
+      "createdAt": "2026-09-30T19:57:20.951Z"
+    },
+    {
       "title": "[FLAGSHIP SALE SENTRY] Procure Acer XV272U V3 + ViewSonic TD1655 / Acer PM161QT",
       "description": "Live radar for Festive Flagship Sales (Amazon GIF & Flipkart BBD): Target Acer Nitro XV272U V3 (27\" 2K 180Hz Ergonomic) @ <=₹13.5k, ViewSonic TD1655 (Aluminum Touch) @ <=₹18.0k, Acer PM161QT Touch @ <=₹13.5k. Track SBI & HDFC/Axis 10% instant card checkout windows.",
       "priority": "HIGH",
@@ -33,8 +51,8 @@
     {
       "title": "Daily 9:00 AM AI & Tech News Morning Briefing (Cron Schedule)",
       "description": "Scheduled recurring 09:00 AM IST intelligence delivery completed and verified.",
-      "priority": "MEDIUM",
-      "status": "COMPLETED",
+      "priority": "HIGH",
+      "status": "PENDING",
       "tags": [
         "general"
       ],
@@ -62,7 +80,10 @@
       ],
       "id": "task-1790566211416-eta8",
       "createdAt": "2026-09-28T03:30:11.416Z",
-      "completedAt": "2026-09-28T03:30:13.090Z"
+      "completedAt": "2026-09-28T03:30:13.090Z",
+      "isRecurring": true,
+      "recurrenceInterval": "DAILY",
+      "dueDate": "2026-10-01T03:30:00.000Z"
     },
     {
       "title": "Autonomous Tri-Vector Monetization & Opportunity Report (08:00 AM IST)",
@@ -104,9 +125,9 @@
     {
       "title": "Daily 8:00 AM IST Autonomous Monetization & Opportunity Report",
       "description": "Delivered 08:00 AM IST Tri-Vector Revenue & Opportunity Briefing covering $6,210 open bounties, $9.5k-$23k B2B consulting pipeline, and Micro-SaaS AST security engine.",
-      "priority": "CRITICAL",
-      "status": "COMPLETED",
-      "dueDate": "2026-09-26T02:30:00.000Z",
+      "priority": "HIGH",
+      "status": "PENDING",
+      "dueDate": "2026-10-01T02:30:00.000Z",
       "tags": [
         "monetization",
         "cron",
@@ -160,14 +181,16 @@
       ],
       "id": "task-1789941504135-wbop",
       "createdAt": "2026-09-20T21:58:24.135Z",
-      "completedAt": "2026-09-26T02:30:36.672Z"
+      "completedAt": "2026-09-26T02:30:36.672Z",
+      "isRecurring": true,
+      "recurrenceInterval": "DAILY"
     },
     {
       "title": "Autonomous Evolutionary Sentry & Architecture Synthesis Cron",
       "description": "Autonomous evolutionary synthesis daemon: periodically scans state-of-the-art papers (arXiv), trending GitHub architectures (Devin/Hermes/Voyager patterns), frontier model release mechanics (Claude 3.7 reasoning, OpenAI o3/o4/Mythos), and global open-source architectural breakthroughs (e.g. MLA, DeepSeek MoE routing, MTP heuristics). Synthesizes concrete extraction vectors and drafts sovereign, Directive 01-compliant evolution proposals directly for Sir's review.",
       "priority": "HIGH",
       "status": "PENDING",
-      "dueDate": "2026-10-01T19:36:49.265Z",
+      "dueDate": "2026-10-01T16:30:00.000Z",
       "tags": [
         "cron",
         "evolution",

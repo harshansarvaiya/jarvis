@@ -362,6 +362,32 @@ async function processDirective(
       }
       return;
     } else if (
+      cleanUserText === '/monetization' ||
+      cleanUserText === '/revenue' ||
+      cleanUserText === '/bounties' ||
+      cleanUserText === '/deals' ||
+      cleanUserText.toLowerCase() === 'monetization' ||
+      cleanUserText.toLowerCase() === 'bounties'
+    ) {
+      gateway.sendTypingAction(chatId).catch(() => {});
+      const { runMonetizationScan, dispatchMonetizationReportToTelegram } = await import('../lib/jarvis/monetization_cron');
+      const report = await runMonetizationScan();
+      await dispatchMonetizationReportToTelegram(report);
+      return;
+    } else if (
+      cleanUserText === '/briefing' ||
+      cleanUserText === '/news' ||
+      cleanUserText === '/tech' ||
+      cleanUserText === '/executive' ||
+      cleanUserText.toLowerCase() === 'briefing' ||
+      cleanUserText.toLowerCase() === 'tech news' ||
+      cleanUserText.toLowerCase() === 'morning briefing'
+    ) {
+      gateway.sendTypingAction(chatId).catch(() => {});
+      const { runExecutiveAiTechNewsBriefing } = await import('../lib/jarvis/ai-tech-briefing');
+      await runExecutiveAiTechNewsBriefing();
+      return;
+    } else if (
       cleanUserText === '/nse' ||
       cleanUserText === '/market' ||
       cleanUserText === '/nifty' ||
@@ -1042,8 +1068,10 @@ async function startTelegramGateway() {
     { command: 'call', description: '📞 Launch Full-Duplex Voice Sheet (AirPods / TMA)' },
     { command: 'friday', description: '🛡️ Apex Tactical Mind directive' },
     { command: 'jarvis', description: '⚡ Tactical Chief of Staff & Butler' },
-    { command: 'evolve', description: '🧬 Trigger Autonomous Self-Evolution cycle' },
-    { command: 'nse', description: '🇮🇳 Indian Market (NSE/BSE) macro catalysts & setups' },
+    { command: 'monetization', description: '💰 08:00 AM Revenue, Bounties & B2B Leads' },
+    { command: 'nse', description: '🇮🇳 08:15 AM Indian Market (NSE/BSE) macro catalysts & setups' },
+    { command: 'briefing', description: '🌅 09:00 AM Executive AI & Tech Briefing' },
+    { command: 'evolve', description: '🧬 10:00 PM Autonomous Self-Evolution cycle' },
     { command: 'trade', description: '📈 Sovereign Quant Engine & Portfolio' },
     { command: 'agents', description: '🤖 Specialized Subagents Matrix' },
     { command: 'radar', description: '📡 Tactical radar sweep' },

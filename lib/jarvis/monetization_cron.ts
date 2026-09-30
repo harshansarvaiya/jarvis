@@ -11,6 +11,7 @@
 
 import { scanFundedBounties, BountyScanResult } from './bounty-sentry';
 import { globalComposioGateway } from './composio';
+import { telegramGateway, TelegramInlineKeyboardMarkup } from './telegram';
 
 export interface B2BLeadOpportunity {
   targetCompany: string;
@@ -157,3 +158,73 @@ export async function runMonetizationScan(): Promise<TriVectorRevenueReport> {
     ],
   };
 }
+
+/**
+ * Dispatches the Tri-Vector Monetization & Opportunity Report directly to Telegram
+ */
+export async function dispatchMonetizationReportToTelegram(report: TriVectorRevenueReport): Promise<boolean> {
+  try {
+    const authChatId = process.env.TELEGRAM_AUTHORIZED_CHAT_ID || '864360540';
+
+    let msg = `💰 **[F.R.I.D.A.Y. — AUTONOMOUS 08:00 AM IST REVENUE & OPPORTUNITY RADAR]**\n\n`;
+
+    // Vector 1
+    msg += `🎯 **VECTOR 1: FUNDED OPEN-SOURCE BOUNTIES (>= $50)**\n`;
+    msg += `• **Pool**: \`$${report.vector1_bounties.totalPoolValueUsd} USD\` across Algora & Polar\n`;
+    msg += `• **Status**: ${report.vector1_bounties.summary}\n`;
+    if (report.vector1_bounties.bounties.length > 0) {
+      for (const b of report.vector1_bounties.bounties.slice(0, 3)) {
+        msg += `  - \`$${b.rewardUsd || b.amount}\`: ${b.title?.slice(0, 50)} (\`${b.repo || b.platform}\`)\n`;
+      }
+    }
+    msg += `\n`;
+
+    // Vector 2
+    msg += `🏢 **VECTOR 2: APOLLO B2B CONSULTING PIPELINE**\n`;
+    msg += `• **Pipeline Value**: \`${report.vector2_b2b_leads.pipelineValueUsd}\`\n`;
+    msg += `• **Target Stack**: \`${report.vector2_b2b_leads.targetVertical}\`\n`;
+    const topLead = report.vector2_b2b_leads.leads[0];
+    if (topLead) {
+      msg += `• **Top Wedge**: ${topLead.targetCompany} (${topLead.estimatedContractValue})\n`;
+      msg += `• **Pitch Hook**: _${topLead.pitchHook}_\n`;
+    }
+    msg += `\n`;
+
+    // Vector 3
+    msg += `🚀 **VECTOR 3: MICRO-SAAS ARBITRAGE**\n`;
+    msg += `• **Top Pick**: \`${report.vector3_micro_saas.topPick}\`\n`;
+    const topSaas = report.vector3_micro_saas.opportunities[0];
+    if (topSaas) {
+      msg += `• **Est. MRR**: \`${topSaas.estimatedMrr}\` | MVP Runway: \`${topSaas.timeToMvpDays} days\`\n`;
+      msg += `• **Distribution**: ${topSaas.distributionChannel}\n`;
+    }
+    msg += `\n`;
+
+    // Action plan
+    msg += `⚡ **EXECUTIVE ACTION STEPS**:\n`;
+    for (const step of report.executiveActionPlan) {
+      msg += `• ${step}\n`;
+    }
+
+    const kb: TelegramInlineKeyboardMarkup = {
+      inline_keyboard: [
+        [
+          { text: '💰 Inspect Bounties', callback_data: 'cmd:bounties' },
+          { text: '🏢 B2B Leads', callback_data: 'cmd:b2b' },
+        ],
+        [
+          { text: '📊 Main Briefing', callback_data: 'cmd:briefing' },
+          { text: '📈 Quant Radar', callback_data: 'cmd:quant' },
+        ],
+      ],
+    };
+
+    await telegramGateway.sendMessage(authChatId, msg, { parseMode: 'Markdown', replyMarkup: kb });
+    console.log(`[Revenue Engine] 📱 Tri-Vector Monetization report dispatched to Telegram.`);
+    return true;
+  } catch (err: any) {
+    console.warn(`[Revenue Engine] Telegram dispatch error:`, err.message);
+    return false;
+  }
+}
+

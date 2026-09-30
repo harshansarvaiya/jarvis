@@ -474,7 +474,33 @@ async function checkScheduledBriefings() {
     const completedTasks = tasks.filter((t) => t.status === 'COMPLETED');
 
     // -------------------------------------------------------------
-    // PRE-MARKET INDIAN STOCK MARKET RADAR (08:15 AM - 08:50 AM IST, Mon-Fri)
+    // 1. DAILY 08:00 AM IST AUTONOMOUS MONETIZATION & OPPORTUNITY REPORT
+    // -------------------------------------------------------------
+    const isMonetizationWindow = istHour === 8 && istMin >= 0 && istMin < 30;
+    if (isMonetizationWindow) {
+      const monKey = `jarvis:briefing:monetization:${todayDateStr}`;
+      const alreadySent = await isAlertDispatched(monKey);
+      if (!alreadySent) {
+        await markAlertDispatched(monKey, 72000);
+        console.log(`[Cloud Worker] 💰 Dispatching 08:00 AM IST Tri-Vector Monetization Report...`);
+        try {
+          const { runMonetizationScan, dispatchMonetizationReportToTelegram } = await import('../lib/jarvis/monetization_cron');
+          const report = await runMonetizationScan();
+          await dispatchMonetizationReportToTelegram(report);
+          await dispatchPush(
+            '💰 Autonomous Monetization Report',
+            `Tri-Vector Revenue: Bounties ($${report.vector1_bounties.totalPoolValueUsd}), B2B Pipeline (${report.vector2_b2b_leads.pipelineValueUsd}), Micro-SaaS (${report.vector3_micro_saas.topPick}).`,
+            '/',
+            { skipTelegram: true }
+          );
+        } catch (monErr: any) {
+          console.error('[Cloud Worker] Monetization report failed:', monErr.message);
+        }
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 2. PRE-MARKET INDIAN STOCK MARKET RADAR (08:15 AM - 08:50 AM IST, Mon-Fri)
     // -------------------------------------------------------------
     const istDayOfWeek = now.toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short' });
     const isTradingDay = !['Sat', 'Sun'].includes(istDayOfWeek);
@@ -498,30 +524,27 @@ async function checkScheduledBriefings() {
     }
 
     // -------------------------------------------------------------
-    // MORNING TACTICAL BRIEFING (Window: 08:30 AM - 09:30 AM IST)
+    // 3. DAILY 09:00 AM IST EXECUTIVE INTELLIGENCE & AI TECH NEWS BRIEFING
     // -------------------------------------------------------------
-    const isMorningWindow = (istHour === 8 && istMin >= 30) || (istHour === 9 && istMin <= 30);
-    if (isMorningWindow) {
-      const morningKey = `jarvis:briefing:morning:${todayDateStr}`;
-      const alreadySent = await isAlertDispatched(morningKey);
+    const isAiNewsWindow = (istHour === 9 && istMin >= 0 && istMin <= 45);
+    if (isAiNewsWindow) {
+      const aiNewsKey = `jarvis:briefing:executive_ai_news:${todayDateStr}`;
+      const alreadySent = await isAlertDispatched(aiNewsKey);
       if (!alreadySent) {
-        // Mark immediately before dispatch to guarantee zero duplicate sends
-        await markAlertDispatched(morningKey, 72000);
-
-        const top3 = pendingTasks.slice(0, 3);
-        const taskHighlights = top3.length > 0
-          ? top3.map((t) => `• [${t.priority}] ${t.title}${t.dueDate ? ` (Due: ${t.dueDate})` : ''}`).join('\n')
-          : '• All radar objectives currently clear.';
-
-        const message = `Good morning, Sir. Tactical radar initialized.\n\n` +
-          `📋 *Active Objectives (${pendingTasks.length} pending):*\n${taskHighlights}\n\n` +
-          `🧠 *Substrate Health:*\n` +
-          `• Engine: Vertex AI Gemini 3.7 & Groq LPU (Sub-150ms)\n` +
-          `• Host VM: GCP e2-standard-2 (8GB RAM, 2 vCPUs) Online\n\n` +
-          `Standing by for directives.`;
-
-        console.log(`[Cloud Worker] 🌅 Dispatching Morning Briefing to Sir (IST ${istHour}:${istMin})...`);
-        await dispatchPush('🌅 J.A.R.V.I.S. Morning Briefing', message, '/');
+        await markAlertDispatched(aiNewsKey, 72000);
+        console.log(`[Cloud Worker] 🧠 Dispatching 09:00 AM IST Executive AI & Tech Briefing...`);
+        try {
+          const { runExecutiveAiTechNewsBriefing } = await import('../lib/jarvis/ai-tech-briefing');
+          await runExecutiveAiTechNewsBriefing();
+          await dispatchPush(
+            '🌅 09:00 AM Executive AI & Tech Briefing',
+            'Strategic intelligence, frontier models, and distributed systems architecture briefing delivered.',
+            '/',
+            { skipTelegram: true }
+          );
+        } catch (aiNewsErr: any) {
+          console.error('[Cloud Worker] Executive AI news briefing failed:', aiNewsErr.message);
+        }
       }
     }
 
