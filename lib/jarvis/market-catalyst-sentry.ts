@@ -38,6 +38,7 @@ export interface BreakingCatalyst {
   id: string;
   type: CatalystType;
   headline: string;
+  normalizedHeadline?: string;
   summary: string;
   sourceUrl?: string;
   sourceName: string;
@@ -53,50 +54,165 @@ export interface BreakingCatalyst {
 }
 
 // -------------------------------------------------------------
-// Deduplication Utilities
+// Deduplication & Semantic Filtering Utilities
 // -------------------------------------------------------------
 const DISPATCHED_ALERTS_FILE = path.join(process.cwd(), 'data', 'dispatched-alerts.json');
+const DISPATCHED_CATALYSTS_FILE = path.join(process.cwd(), 'data', 'dispatched-catalysts.json');
 
-async function isCatalystAlreadyDispatched(key: string): Promise<boolean> {
+export interface DispatchedCatalystRecord {
+  id: string;
+  normalizedHeadline: string;
+  keywords: string[];
+  headline: string;
+  dispatchedAt: number;
+}
+
+let dispatchedCatalystsCache: DispatchedCatalystRecord[] | null = null;
+
+export function normalizeHeadline(headline: string): string {
+  if (!headline) return '';
+  return headline
+    .toLowerCase()
+    .replace(/\s*-\s*[a-z0-9\s&.]+(?:times|today|standard|control|livemint|mint|express|reuters|bloomberg|cnbc|ndtv|hindu|news|post|wire)?$/i, '')
+    .replace(/^(?:live|breaking|alert|update|watch|explained|just in|exclusive):\s*/i, '')
+    .replace(/[’'`]s\b/gi, '')
+    .replace(/[’'`]/g, '')
+    .replace(/[—–-]/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const STOP_WORDS = new Set([
+  'and', 'the', 'for', 'with', 'over', 'from', 'into', 'that', 'this', 'after',
+  'will', 'have', 'been', 'says', 'about', 'more', 'what', 'when', 'where', 'which',
+  'who', 'why', 'are', 'was', 'were', 'their', 'some', 'than', 'them', 'these', 'its'
+]);
+
+export function getHeadlineKeywords(headline: string): string[] {
+  const normalized = normalizeHeadline(headline);
+  const words = normalized.split(/\s+/).filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+  return Array.from(new Set(words));
+}
+
+export function calculateKeywordOverlap(wordsA: string[], wordsB: string[]): number {
+  if (wordsA.length === 0 || wordsB.length === 0) return 0;
+  const setB = new Set(wordsB);
+  let intersection = 0;
+  for (const w of wordsA) {
+    if (setB.has(w)) intersection++;
+  }
+  const minLen = Math.min(wordsA.length, wordsB.length);
+  return intersection / minLen;
+}
+
+function loadDispatchedCatalysts(): DispatchedCatalystRecord[] {
+  if (dispatchedCatalystsCache) return dispatchedCatalystsCache;
+  try {
+    if (fs.existsSync(DISPATCHED_CATALYSTS_FILE)) {
+      const content = fs.readFileSync(DISPATCHED_CATALYSTS_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) {
+        const cutoff = Date.now() - 86400 * 1000;
+        dispatchedCatalystsCache = parsed.filter((r) => r.dispatchedAt > cutoff);
+        return dispatchedCatalystsCache;
+      }
+    }
+  } catch {}
+  dispatchedCatalystsCache = [];
+  return dispatchedCatalystsCache;
+}
+
+function saveDispatchedCatalysts(records: DispatchedCatalystRecord[]) {
+  try {
+    dispatchedCatalystsCache = records;
+    const dir = path.dirname(DISPATCHED_CATALYSTS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(DISPATCHED_CATALYSTS_FILE, JSON.stringify(records.slice(-200), null, 2), 'utf-8');
+  } catch (err: any) {
+    console.warn('[Market Sentry] Failed to save dispatched-catalysts.json:', err.message);
+  }
+}
+
+async function isCatalystAlreadyDispatched(catalyst: BreakingCatalyst): Promise<boolean> {
+  const dedupKey = `jarvis:breaking_market_catalyst:${catalyst.id}`;
+
+  // 1. Direct Redis check (if available)
   if (redis) {
     try {
-      const exists = await redis.get(key);
+      const exists = await redis.get(dedupKey);
       if (exists) return true;
-    } catch (err: any) {
-      console.warn('[Market Sentry] Redis dedup read failed, falling back to local file:', err.message);
-    }
+    } catch {}
   }
 
+  // 2. Local dispatched-alerts list check
   try {
     if (fs.existsSync(DISPATCHED_ALERTS_FILE)) {
       const content = fs.readFileSync(DISPATCHED_ALERTS_FILE, 'utf-8');
       const list: string[] = JSON.parse(content);
-      return list.includes(key);
+      if (list.includes(dedupKey)) return true;
     }
   } catch {}
-  return false;
-}
 
-async function markCatalystDispatched(key: string, ttlSeconds: number = 86400): Promise<void> {
-  if (redis) {
-    try {
-      await redis.set(key, 'DISPATCHED', { ex: ttlSeconds });
-    } catch (err: any) {
-      console.warn('[Market Sentry] Redis dedup write failed:', err.message);
+  // 3. Multi-outlet Fuzzy Semantic Duplicate Radar (e.g. ET vs Google News vs Moneycontrol)
+  const records = loadDispatchedCatalysts();
+  const normalized = catalyst.normalizedHeadline || normalizeHeadline(catalyst.headline);
+  const keywords = getHeadlineKeywords(catalyst.headline);
+
+  for (const record of records) {
+    // Exact ID or normalized string match
+    if (record.id === catalyst.id || record.normalizedHeadline === normalized) {
+      return true;
+    }
+    // High keyword overlap check across outlets
+    const overlap = calculateKeywordOverlap(keywords, record.keywords);
+    if (overlap >= 0.65) {
+      console.log(
+        `[Market Sentry] 🛡️ Semantic duplicate suppressed (${(overlap * 100).toFixed(0)}% match with "${record.headline.slice(0, 45)}...")`
+      );
+      return true;
     }
   }
 
+  return false;
+}
+
+async function markCatalystDispatched(catalyst: BreakingCatalyst, ttlSeconds: number = 86400): Promise<void> {
+  const dedupKey = `jarvis:breaking_market_catalyst:${catalyst.id}`;
+
+  // 1. Redis set
+  if (redis) {
+    try {
+      await redis.set(dedupKey, 'DISPATCHED', { ex: ttlSeconds });
+    } catch {}
+  }
+
+  // 2. Update dispatched-alerts.json
   try {
     let list: string[] = [];
     if (fs.existsSync(DISPATCHED_ALERTS_FILE)) {
       list = JSON.parse(fs.readFileSync(DISPATCHED_ALERTS_FILE, 'utf-8'));
     }
-    if (!list.includes(key)) {
-      list.push(key);
+    if (!list.includes(dedupKey)) {
+      list.push(dedupKey);
       if (list.length > 300) list = list.slice(-250);
       fs.writeFileSync(DISPATCHED_ALERTS_FILE, JSON.stringify(list, null, 2));
     }
   } catch {}
+
+  // 3. Update dispatched-catalysts.json with semantic record
+  const records = loadDispatchedCatalysts();
+  const normalized = catalyst.normalizedHeadline || normalizeHeadline(catalyst.headline);
+  const keywords = getHeadlineKeywords(catalyst.headline);
+
+  records.push({
+    id: catalyst.id,
+    normalizedHeadline: normalized,
+    keywords,
+    headline: catalyst.headline,
+    dispatchedAt: Date.now(),
+  });
+  saveDispatchedCatalysts(records);
 }
 
 // -------------------------------------------------------------
@@ -171,19 +287,23 @@ export function classifyNewsItem(item: RawRssItem): BreakingCatalyst | null {
 
   // Strict Exclusion: Filter out opinion pieces, editorial columns, speculative advice, and op-eds
   const isOpinionOrCommentary =
-    /\b(opinion|editorial|column|views|viewpoint|blog|says analyst|brokerage view|expert view|argues|demands a rate|could see|may see|what if)\b/i.test(
+    /\b(opinion|editorial|column|views?|viewpoint|blog|says? analyst|brokerage view|expert view|argues?|demands? a rate|could see|may see|what if|bets? on|analysts? (?:see|expect|warn|predict)|experts? (?:say|see|warn)|poll|survey|speculat(?:ion|ive)|should (?:hike|cut)|plea|urge|likely to|poised to)\b/i.test(
       fullText
     );
   if (isOpinionOrCommentary) {
     return null;
   }
 
+  const normalizedSlug = normalizeHeadline(item.title);
+  const catalystId = crypto.createHash('sha256').update(normalizedSlug).digest('hex').slice(0, 16);
+
   // Filter 1: Regulatory & Central Bank (SEBI / RBI)
   if (/\b(sebi|derivatives curbs|f&o curbs|margin rule|circular|penalties|investigation)\b/i.test(fullText)) {
     return {
-      id: crypto.createHash('sha256').update(item.title).digest('hex').slice(0, 16),
+      id: catalystId,
       type: 'REGULATORY_SEBI',
       headline: item.title,
+      normalizedHeadline: normalizedSlug,
       summary: item.description.slice(0, 300),
       sourceUrl: item.link,
       sourceName: 'SEBI / Regulatory Wire',
@@ -200,14 +320,15 @@ export function classifyNewsItem(item: RawRssItem): BreakingCatalyst | null {
   }
 
   if (
-    /\b(rbi|repo rate|monetary policy|mpc|crr)\b/i.test(fullText) &&
-    /\b(cuts?|hiked?|hikes?|reduces?|raises?|holds?|held|decision|announces?|unveils?|inflation rate|status quo)\b/i.test(fullText)
+    /\b(rbi|repo rate|monetary policy committee|mpc)\b/i.test(fullText) &&
+    /\b(cuts? repo rate|hikes? repo rate|rate cut|rate hike|keeps? repo rate|holds? rate|leaves? repo rate unchanged|mpc outcome|mpc decision|announces? (?:crr|repo|liquidity)|slashes? rate)\b/i.test(fullText)
   ) {
-    const isRateCut = /\b(cuts?|easing|lower|reduction|reduces?)\b/i.test(fullText);
+    const isRateCut = /\b(cuts?|easing|lower|reduction|reduces?|slashes?)\b/i.test(fullText);
     return {
-      id: crypto.createHash('sha256').update(item.title).digest('hex').slice(0, 16),
+      id: catalystId,
       type: 'MONETARY_RBI',
       headline: item.title,
+      normalizedHeadline: normalizedSlug,
       summary: item.description.slice(0, 300),
       sourceUrl: item.link,
       sourceName: 'RBI / Macro Financial Wire',
@@ -233,9 +354,10 @@ export function classifyNewsItem(item: RawRssItem): BreakingCatalyst | null {
     /\b(order|contract|delivery|re-rating|target|clearance|clears|approves|billion|crore)\b/i.test(fullText)
   ) {
     return {
-      id: crypto.createHash('sha256').update(item.title).digest('hex').slice(0, 16),
+      id: catalystId,
       type: 'POLICY_CAPEX',
       headline: item.title,
+      normalizedHeadline: normalizedSlug,
       summary: item.description.slice(0, 300),
       sourceUrl: item.link,
       sourceName: 'Defence & Industrial Capex Wire',
@@ -259,9 +381,10 @@ export function classifyNewsItem(item: RawRssItem): BreakingCatalyst | null {
   ) {
     const isSpike = /\b(surge|spike|soars|jump|climb|high|war|crisis)\b/i.test(fullText);
     return {
-      id: crypto.createHash('sha256').update(item.title).digest('hex').slice(0, 16),
+      id: catalystId,
       type: 'COMMODITY_CRUDE',
       headline: item.title,
+      normalizedHeadline: normalizedSlug,
       summary: item.description.slice(0, 300),
       sourceUrl: item.link,
       sourceName: 'Global Commodity & Energy Wire',
@@ -282,9 +405,10 @@ export function classifyNewsItem(item: RawRssItem): BreakingCatalyst | null {
   // Filter 4: Electronics & Semiconductor PLI / Make in India
   if (/\b(dixon|semiconductor|pli scheme|electronics export|iphone assembly|foxconn india)\b/i.test(fullText)) {
     return {
-      id: crypto.createHash('sha256').update(item.title).digest('hex').slice(0, 16),
+      id: catalystId,
       type: 'POLICY_CAPEX',
       headline: item.title,
+      normalizedHeadline: normalizedSlug,
       summary: item.description.slice(0, 300),
       sourceUrl: item.link,
       sourceName: 'PLI & Industrial Tech Wire',
@@ -303,9 +427,10 @@ export function classifyNewsItem(item: RawRssItem): BreakingCatalyst | null {
   // Filter 5: Corporate Black Swan / Major Regulatory Enforcement
   if (/\b(usfda|import alert|form 483|warning letter|hindenburg|fraud|cbi|ed raid|promoter pledged|default)\b/i.test(fullText)) {
     return {
-      id: crypto.createHash('sha256').update(item.title).digest('hex').slice(0, 16),
+      id: catalystId,
       type: 'CORPORATE_EARNINGS',
       headline: item.title,
+      normalizedHeadline: normalizedSlug,
       summary: item.description.slice(0, 300),
       sourceUrl: item.link,
       sourceName: 'Corporate Forensic & FDA Wire',
@@ -413,14 +538,13 @@ export async function dispatchBreakingCatalystAlert(
   catalyst: BreakingCatalyst,
   dispatchPushFn?: (title: string, body: string, url?: string, options?: any) => Promise<any>
 ): Promise<boolean> {
-  const dedupKey = `jarvis:breaking_market_catalyst:${catalyst.id}`;
-  const alreadyNotified = await isCatalystAlreadyDispatched(dedupKey);
+  const alreadyNotified = await isCatalystAlreadyDispatched(catalyst);
 
   if (alreadyNotified) {
     return false;
   }
 
-  await markCatalystDispatched(dedupKey, 86400); // 24-hour deduplication window
+  await markCatalystDispatched(catalyst, 86400); // 24-hour deduplication window
 
   // 1. Fetch live actionable setups for key tickers (filter out invalid/dead quotes)
   const actionableAnalyses: any[] = [];
