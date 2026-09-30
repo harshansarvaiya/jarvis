@@ -20,6 +20,7 @@
     "input": "^1.0.1",
     "lucide-react": "^0.453.0",
     "next": "^14.2.15",
+    "node-edge-tts": "^1.2.10",
     "playwright-chromium": "^1.63.0",
     "qrcode-terminal": "^0.12.0",
     "react": "^18.3.1",

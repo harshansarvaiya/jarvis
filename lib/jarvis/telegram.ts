@@ -375,7 +375,7 @@ export class TelegramGateway {
     try {
       const formData = new FormData();
       formData.append('chat_id', String(chatId));
-      formData.append('voice', new Blob([new Uint8Array(voiceBuffer)], { type: 'audio/wav' }), 'voice.wav');
+      formData.append('voice', new Blob([new Uint8Array(voiceBuffer)], { type: 'audio/mpeg' }), 'voice.mp3');
       if (options?.caption) {
         formData.append('caption', options.caption.slice(0, 1024));
       }

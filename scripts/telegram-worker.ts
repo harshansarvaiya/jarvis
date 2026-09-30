@@ -346,6 +346,71 @@ async function processDirective(
         );
         return;
       }
+    } else if (cleanUserText.startsWith('/voice')) {
+      const voiceArgs = cleanUserText.replace(/^\/voice\s*/i, '').trim();
+      const { synthesizeMovieVoice } = await import('../lib/jarvis/tts');
+
+      if (voiceArgs.toLowerCase().startsWith('friday')) {
+        const textToSpeak = voiceArgs.replace(/^friday\s*/i, '').trim() ||
+          'Boss, Mark 85 armor systems are fully armed and operational. Tactical radar scanning.';
+        gateway.sendTypingAction(chatId).catch(() => {});
+        const buf = await synthesizeMovieVoice(textToSpeak, 'FRIDAY');
+        if (buf) {
+          await gateway.sendVoice(chatId, buf, {
+            replyToMessageId,
+            caption: '🛡️ F.R.I.D.A.Y. (Kerry Condon — Irish AI)',
+          });
+        }
+        return;
+      } else if (voiceArgs.toLowerCase().startsWith('jarvis')) {
+        const textToSpeak = voiceArgs.replace(/^jarvis\s*/i, '').trim() ||
+          'Always at your service, Sir. All cloud runner systems are nominal.';
+        gateway.sendTypingAction(chatId).catch(() => {});
+        const buf = await synthesizeMovieVoice(textToSpeak, 'JARVIS');
+        if (buf) {
+          await gateway.sendVoice(chatId, buf, {
+            replyToMessageId,
+            caption: '⚡ J.A.R.V.I.S. (Paul Bettany — British Butler)',
+          });
+        }
+        return;
+      } else if (voiceArgs.toLowerCase().startsWith('khushi')) {
+        const textToSpeak = voiceArgs.replace(/^khushi\s*/i, '').trim() ||
+          'Namaste Sir, I am Khushi. I can help track your daily meals, habits, and expenses naturally.';
+        gateway.sendTypingAction(chatId).catch(() => {});
+        const buf = await synthesizeMovieVoice(textToSpeak, 'KHUSHI');
+        if (buf) {
+          await gateway.sendVoice(chatId, buf, {
+            replyToMessageId,
+            caption: '🌸 Khushi (Indic Conversational AI)',
+          });
+        }
+        return;
+      } else {
+        const keyboard: TelegramInlineKeyboardMarkup = {
+          inline_keyboard: [
+            [
+              { text: '🛡️ Friday (Kerry Condon - Irish)', callback_data: 'voice_demo:friday' },
+              { text: '⚡ Jarvis (Paul Bettany - British)', callback_data: 'voice_demo:jarvis' },
+            ],
+            [
+              { text: '🌸 Khushi (Indic Conversational)', callback_data: 'voice_demo:khushi' },
+            ],
+          ],
+        };
+        await gateway.sendMessage(
+          chatId,
+          `🎙️ **Movie-Fidelity Neural Speech Matrix (100% Free)**\n\n` +
+          `Zero-cost cloud neural speech calibrated to match authentic movie personas:\n\n` +
+          `• 🛡️ **F.R.I.D.A.Y.**: Kerry Condon's Irish AI cadence from Avengers & MCU.\n` +
+          `• ⚡ **J.A.R.V.I.S.**: Paul Bettany's refined British baritone from Iron Man.\n` +
+          `• 🌸 **Khushi**: Indic conversational voice for daily lifestyle & habits.\n\n` +
+          `_Tap below to hear sample dispatches, or send any voice note on Telegram to converse hands-free!_\n` +
+          `_Syntax:_ \`/voice friday [text]\` or \`/voice jarvis [text]\``,
+          { replyToMessageId, replyMarkup: keyboard }
+        );
+        return;
+      }
     } else if (
       cleanUserText === '/evolve' ||
       cleanUserText === '/upgrade' ||
@@ -730,6 +795,29 @@ async function processDirective(
       replyToMessageId,
       replyMarkup: actionMarkup,
     });
+
+    // 5. Send Movie-Fidelity Neural Voice Note if triggered via Voice Input or explicit request
+    const wantsVoiceResponse =
+      isVoiceInput ||
+      /\b(voice note|send audio|speak to me|say it in voice|read it aloud)\b/i.test(cleanUserText);
+
+    if (wantsVoiceResponse) {
+      try {
+        const { synthesizeMovieVoice } = await import('../lib/jarvis/tts');
+        const vocalContent = result.vocalSummary || result.reply.slice(0, 400);
+        const voicePersona = result.telemetry?.persona === 'FRIDAY' ? 'FRIDAY' : 'JARVIS';
+        const voiceBuffer = await synthesizeMovieVoice(vocalContent, voicePersona);
+        if (voiceBuffer) {
+          const personaLabel = voicePersona === 'FRIDAY' ? '🛡️ F.R.I.D.A.Y.' : '⚡ J.A.R.V.I.S.';
+          await gateway.sendVoice(chatId, voiceBuffer, {
+            replyToMessageId,
+            caption: `${personaLabel} Vocal Dispatch`,
+          });
+        }
+      } catch (voiceErr: any) {
+        console.warn('[Telegram Gateway] Voice synthesis error:', voiceErr?.message);
+      }
+    }
   } catch (err: any) {
     console.error('[Telegram Gateway] Processing error:', err);
     await gateway.sendMessage(
@@ -892,6 +980,26 @@ async function handleIncomingMessage(update: TelegramUpdate) {
       } else if (parts[1] === 'tone' && parts[2]) {
         const config = await updatePersonaConfig({ tone: parts[2] as PersonaTone });
         await gateway.sendMessage(chatId, `🎭 Persona tone updated to: \`${config.tone}\``);
+      }
+      return;
+    } else if (cq.data.startsWith('voice_demo:')) {
+      const personaKey = cq.data.split(':')[1]?.toUpperCase() as any;
+      const { synthesizeMovieVoice } = await import('../lib/jarvis/tts');
+      let sampleText = '';
+      let caption = '';
+      if (personaKey === 'FRIDAY') {
+        sampleText = 'Boss, Mark 85 armor systems are fully armed and online. Tactical radar scanning.';
+        caption = '🛡️ F.R.I.D.A.Y. (Kerry Condon — Irish AI)';
+      } else if (personaKey === 'KHUSHI') {
+        sampleText = 'Namaste Sir! I am Khushi. I can help track your daily meals, habits, and expenses naturally.';
+        caption = '🌸 Khushi (Indic Conversational AI)';
+      } else {
+        sampleText = 'Always at your service, Sir. Cloud telemetry nominal, awaiting your command.';
+        caption = '⚡ J.A.R.V.I.S. (Paul Bettany — British Butler)';
+      }
+      const buf = await synthesizeMovieVoice(sampleText, personaKey);
+      if (buf) {
+        await gateway.sendVoice(chatId, buf, { caption });
       }
       return;
     } else if (cq.data.startsWith('act:')) {
@@ -1075,6 +1183,7 @@ async function startTelegramGateway() {
     { command: 'trade', description: '📈 Sovereign Quant Engine & Portfolio' },
     { command: 'agents', description: '🤖 Specialized Subagents Matrix' },
     { command: 'radar', description: '📡 Tactical radar sweep' },
+    { command: 'voice', description: '🎙️ Movie Neural Speech (Kerry Condon & Paul Bettany)' },
     { command: 'persona', description: '🎭 Tune tone and sparring intensity' },
     { command: 'status', description: '🩺 Cloud runner VM & infrastructure health' },
   ]).catch(() => {});
