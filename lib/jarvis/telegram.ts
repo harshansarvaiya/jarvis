@@ -96,6 +96,58 @@ export interface TelegramUpdate {
   };
 }
 
+/**
+ * Safely transforms standard Markdown formatting into Telegram-compliant HTML entities.
+ * Eliminates unescaped entity parse crashes and raw asterisks.
+ */
+export function formatMarkdownForTelegramHtml(text: string): string {
+  if (!text) return '';
+
+  // 1. Preserve code blocks and inline code by replacing with unique non-character tokens
+  const codeBlocks: string[] = [];
+  let processed = text.replace(/```(?:[a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g, (_, code) => {
+    const placeholder = `\u0000CB${codeBlocks.length}\u0000`;
+    codeBlocks.push(`<pre><code>${escapeHtml(code.trim())}</code></pre>`);
+    return placeholder;
+  });
+
+  const inlineCodes: string[] = [];
+  processed = processed.replace(/`([^`]+)`/g, (_, code) => {
+    const placeholder = `\u0000IC${inlineCodes.length}\u0000`;
+    inlineCodes.push(`<code>${escapeHtml(code)}</code>`);
+    return placeholder;
+  });
+
+  // 2. Escape HTML special characters in the rest of the text
+  processed = escapeHtml(processed);
+
+  // 3. Convert Markdown syntax
+  // Bold: **text**
+  processed = processed.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+
+  // Single asterisk bold: *text* (when bounded)
+  processed = processed.replace(/(^|[\s(])\*([^*]+)\*(?=[)\s.,;!?]|$)/g, '$1<b>$2</b>');
+
+  // Italic: _text_ (when bounded by whitespace/punctuation to preserve SNAKE_CASE variables)
+  processed = processed.replace(/(^|[\s(])_([^_]+)_(?=[)\s.,;!?]|$)/g, '$1<i>$2</i>');
+
+  // Markdown links: [label](url)
+  processed = processed.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>');
+
+  // 4. Restore code blocks & inline code
+  processed = processed.replace(/\u0000CB(\d+)\u0000/g, (_, idx) => codeBlocks[Number(idx)] || '');
+  processed = processed.replace(/\u0000IC(\d+)\u0000/g, (_, idx) => inlineCodes[Number(idx)] || '');
+
+  return processed;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 export class TelegramGateway {
   private token: string;
   private baseUrl: string;
@@ -221,7 +273,7 @@ export class TelegramGateway {
 
   /**
    * Sends a message to a Telegram chat with automatic chunking (>4096 chars),
-   * optional inline action keyboards, and fallback to plain text if Markdown parsing fails.
+   * optional inline action keyboards, and seamless conversion of Markdown to Telegram HTML.
    */
   public async sendMessage(
     chatId: number | string,
@@ -260,14 +312,18 @@ export class TelegramGateway {
     let success = true;
     for (let i = 0; i < chunks.length; i++) {
       const isLastChunk = i === chunks.length - 1;
+      const rawChunk = chunks[i];
+
+      // Convert Markdown to clean Telegram HTML to eliminate raw asterisks and parsing crashes
+      const shouldConvertToHtml = options?.parseMode === 'Markdown' || !options?.parseMode;
+      const formattedText = shouldConvertToHtml ? formatMarkdownForTelegramHtml(rawChunk) : rawChunk;
+
       const payload: any = {
         chat_id: chatId,
-        text: chunks[i],
+        text: formattedText,
+        parse_mode: 'HTML',
       };
 
-      if (options?.parseMode) {
-        payload.parse_mode = options.parseMode;
-      }
       if (options?.replyToMessageId && i === 0) {
         payload.reply_to_message_id = options.replyToMessageId;
       }
@@ -284,18 +340,15 @@ export class TelegramGateway {
         });
 
         if (!res.ok) {
-          // If markdown syntax failed, fallback to raw plain text
-          if (options?.parseMode) {
-            delete payload.parse_mode;
-            const retryRes = await fetch(`${this.baseUrl}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-            });
-            if (!retryRes.ok) success = false;
-          } else {
-            success = false;
-          }
+          // If HTML syntax fails, strip tags and fallback to clean plain text
+          payload.text = rawChunk.replace(/<[^>]+>/g, '').replace(/[*_`]/g, '');
+          delete payload.parse_mode;
+          const retryRes = await fetch(`${this.baseUrl}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (!retryRes.ok) success = false;
         }
       } catch (err) {
         console.error('[Telegram] Failed to send message:', err);
