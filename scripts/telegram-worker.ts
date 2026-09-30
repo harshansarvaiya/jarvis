@@ -155,9 +155,9 @@ function buildActionKeyboard(tacticalActions?: string[]): TelegramInlineKeyboard
 
   // Tactical utility shortcut row
   keyboard.inline_keyboard.push([
-    { text: '📊 Briefing', callback_data: 'cmd:briefing' },
+    { text: '🇮🇳 NSE Radar', callback_data: 'cmd:nse' },
     { text: '📈 Quant', callback_data: 'cmd:quant' },
-    { text: '🎯 Tasks', callback_data: 'cmd:tasks' },
+    { text: '📊 Briefing', callback_data: 'cmd:briefing' },
     { text: '🤖 Agents', callback_data: 'cmd:subagents' },
   ]);
 
@@ -346,6 +346,100 @@ async function processDirective(
         );
         return;
       }
+    } else if (
+      cleanUserText === '/nse' ||
+      cleanUserText === '/market' ||
+      cleanUserText === '/nifty' ||
+      cleanUserText.startsWith('/nse ') ||
+      cleanUserText.startsWith('/stock ') ||
+      cleanUserText.toLowerCase() === 'nse' ||
+      cleanUserText.toLowerCase() === 'nifty' ||
+      cleanUserText.toLowerCase() === 'indian market'
+    ) {
+      gateway.sendTypingAction(chatId).catch(() => {});
+      const arg = cleanUserText.replace(/^\/(nse|market|nifty|stock)\s*/i, '').trim();
+
+      if (arg && !['scan', 'all', 'radar'].includes(arg.toLowerCase())) {
+        // Individual Stock Inspection
+        const { analyzeNseStock } = await import('../lib/jarvis/nse-macro-radar');
+        const analysis = await analyzeNseStock(arg);
+
+        const changeSign = analysis.change24hPct >= 0 ? '+' : '';
+        const trendIcon = analysis.trend === 'UPTREND' ? '🟢' : analysis.trend === 'DOWNTREND' ? '🔴' : '🟡';
+        const setup = analysis.tacticalSetup;
+
+        let msg = `🇮🇳 **[NSE EQUITY RADAR: ${analysis.companyName}]**\n\n` +
+          `• **Symbol**: \`${analysis.symbol}\` | Sector: \`${analysis.sector}\`\n` +
+          `• **Current Price**: \`₹${analysis.currentPrice.toLocaleString('en-IN')}\` (\`${changeSign}${analysis.change24hPct.toFixed(2)}%\`)\n` +
+          `• **Trend**: ${trendIcon} \`${analysis.trend}\` | Macro Bias: \`${analysis.macroBias}\`\n` +
+          `• **Technicals**: RSI(14)=\`${analysis.rsi14.toFixed(1)}\` | EMA20=\`₹${analysis.ema20.toFixed(1)}\` | EMA50=\`₹${analysis.ema50.toFixed(1)}\`\n\n`;
+
+        if (setup) {
+          msg += `🎯 **Tactical Setup**: *${setup.action}* (\`${setup.conviction} Conviction\`)\n` +
+            `• **Entry Zone**: \`${setup.entryRange}\`\n` +
+            `• **Target**: \`₹${setup.targetPrice}\` | **Stop-Loss**: \`₹${setup.stopLossPrice}\` (R:R \`1:${setup.riskRewardRatio}\`)\n` +
+            `• **Horizon**: \`${setup.timeHorizon}\`\n` +
+            `• **Thesis**: _${setup.thesis}_\n\n`;
+        } else {
+          msg += `_No high-conviction breakout or mean-reversion setup detected at this level._\n\n`;
+        }
+
+        msg += `_Execute manually on Zerodha Kite / Groww / AngelOne._`;
+
+        const kb: TelegramInlineKeyboardMarkup = {
+          inline_keyboard: [
+            [
+              { text: '🇮🇳 Full NSE Radar', callback_data: 'cmd:nse' },
+              { text: '📈 Quant Sentry', callback_data: 'cmd:quant' },
+            ],
+          ],
+        };
+
+        await gateway.sendMessage(chatId, msg, { replyToMessageId, replyMarkup: kb });
+        return;
+      }
+
+      // Full Market Scan
+      const { scanIndianMarketCatalysts } = await import('../lib/jarvis/nse-macro-radar');
+      const card = await scanIndianMarketCatalysts();
+
+      let msg = `🇮🇳 **[F.R.I.D.A.Y. — INDIAN MARKET MACRO RADAR]**\n\n`;
+      msg += `🌐 **Catalyst**: ${card.headline}\n\n`;
+      msg += `🧠 **Transmission**: ${card.transmissionMechanism}\n\n`;
+      msg += `📈 **Favored**: ${card.favoredSectors.join(', ')}\n`;
+      msg += `📉 **Pressured**: ${card.pressuredSectors.join(', ')}\n\n`;
+      msg += `📊 **Nifty 50 Outlook**: **${card.niftyOutlook.bias}**\n`;
+      msg += `• Support: \`${card.niftyOutlook.supportZone}\` | Resistance: \`${card.niftyOutlook.resistanceZone}\`\n`;
+      msg += `• _${card.niftyOutlook.rationale}_\n\n`;
+      msg += `🎯 **TOP TACTICAL SETUPS (MANUAL EXECUTION)**:\n\n`;
+
+      const kb: TelegramInlineKeyboardMarkup = { inline_keyboard: [] };
+
+      for (let idx = 0; idx < card.actionablePicks.length; idx++) {
+        const pick = card.actionablePicks[idx];
+        const s = pick.tacticalSetup;
+        if (!s) continue;
+        msg += `*${idx + 1}. ${pick.companyName} (\`${pick.symbol}\`)*\n`;
+        msg += `• Action: *${s.action}* | Current: *₹${pick.currentPrice}*\n`;
+        msg += `• Entry Zone: \`${s.entryRange}\`\n`;
+        msg += `• Target: *₹${s.targetPrice}* | Stop-Loss: \`₹${s.stopLossPrice}\` (R:R 1:${s.riskRewardRatio})\n`;
+        msg += `• Horizon: _${s.timeHorizon}_ | Conviction: *${s.conviction}*\n`;
+        msg += `• _${s.thesis}_\n\n`;
+
+        kb.inline_keyboard.push([
+          { text: `🔍 Inspect ${pick.symbol}`, callback_data: `nse_inspect:${pick.symbol}` },
+        ]);
+      }
+
+      msg += `_Execute orders manually on Zerodha Kite / Groww / AngelOne._`;
+
+      kb.inline_keyboard.push([
+        { text: '🔄 Refresh NSE Radar', callback_data: 'cmd:nse' },
+        { text: '📈 Global Quant', callback_data: 'cmd:quant' },
+      ]);
+
+      await gateway.sendMessage(chatId, msg, { replyToMessageId, replyMarkup: kb });
+      return;
     } else if (cleanUserText === '/trade' || cleanUserText === '/quant' || cleanUserText.toLowerCase() === 'quant' || cleanUserText.toLowerCase() === 'portfolio') {
       const { evaluateOpenPositions, RISK_CONFIG } = await import('../lib/jarvis/quant-engine');
       const evalRes = await evaluateOpenPositions();
@@ -628,7 +722,14 @@ async function handleIncomingMessage(update: TelegramUpdate) {
     console.log(`[Telegram Gateway] 🔘 Button Callback from Sir: "${cq.data}"`);
 
     let directiveText = '';
-    if (cq.data === 'cmd:quant') {
+    if (cq.data === 'cmd:nse' || cq.data === 'cmd:nse_scan') {
+      await processDirective(chatId, '/nse', undefined, cq.message?.message_id);
+      return;
+    } else if (cq.data.startsWith('nse_inspect:')) {
+      const sym = cq.data.replace(/^nse_inspect:/, '');
+      await processDirective(chatId, `/nse ${sym}`, undefined, cq.message?.message_id);
+      return;
+    } else if (cq.data === 'cmd:quant') {
       await processDirective(chatId, '/quant', undefined, cq.message?.message_id);
       return;
     } else if (cq.data === 'cmd:quant_scan') {
@@ -923,6 +1024,8 @@ async function startTelegramGateway() {
     { command: 'call', description: '📞 Launch Full-Duplex Voice Sheet (AirPods / TMA)' },
     { command: 'friday', description: '🛡️ Apex Tactical Mind directive' },
     { command: 'jarvis', description: '⚡ Tactical Chief of Staff & Butler' },
+    { command: 'nse', description: '🇮🇳 Indian Market (NSE/BSE) macro catalysts & setups' },
+    { command: 'trade', description: '📈 Sovereign Quant Engine & Portfolio' },
     { command: 'agents', description: '🤖 Specialized Subagents Matrix' },
     { command: 'radar', description: '📡 Tactical radar sweep' },
     { command: 'persona', description: '🎭 Tune tone and sparring intensity' },

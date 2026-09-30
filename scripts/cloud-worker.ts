@@ -473,6 +473,30 @@ async function checkScheduledBriefings() {
     const completedTasks = tasks.filter((t) => t.status === 'COMPLETED');
 
     // -------------------------------------------------------------
+    // PRE-MARKET INDIAN STOCK MARKET RADAR (08:15 AM - 08:50 AM IST, Mon-Fri)
+    // -------------------------------------------------------------
+    const istDayOfWeek = now.toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short' });
+    const isTradingDay = !['Sat', 'Sun'].includes(istDayOfWeek);
+    const isNsePreMarketWindow = isTradingDay && istHour === 8 && istMin >= 15 && istMin <= 50;
+
+    if (isNsePreMarketWindow) {
+      const nseAlertKey = `jarvis:nse_premarket_radar:${todayDateStr}`;
+      const alreadySent = await isAlertDispatched(nseAlertKey);
+      if (!alreadySent) {
+        await markAlertDispatched(nseAlertKey, 72000);
+        console.log(`[Cloud Worker] 🇮🇳 Triggering Autonomous Pre-Market Indian Macro Scan (IST ${istHour}:${istMin})...`);
+        try {
+          const { scanIndianMarketCatalysts, dispatchIndianMarketAlertToTelegram } = await import('../lib/jarvis/nse-macro-radar');
+          const card = await scanIndianMarketCatalysts();
+          await dispatchIndianMarketAlertToTelegram(card);
+          console.log('[Cloud Worker] 📱 Indian Market Macro Radar delivered to Telegram.');
+        } catch (nseErr: any) {
+          console.error('[Cloud Worker] Indian Market Macro Radar failed:', nseErr.message);
+        }
+      }
+    }
+
+    // -------------------------------------------------------------
     // MORNING TACTICAL BRIEFING (Window: 08:30 AM - 09:30 AM IST)
     // -------------------------------------------------------------
     const isMorningWindow = (istHour === 8 && istMin >= 30) || (istHour === 9 && istMin <= 30);

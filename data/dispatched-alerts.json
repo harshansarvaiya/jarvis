@@ -1,3 +1,9 @@
 [
-  "jarvis:briefing:morning:2026-09-29"
+  "jarvis:briefing:morning:2026-09-29",
+  "jarvis:briefing:evening:2026-09-29",
+  "jarvis:threat_sentry:cve:CVE-1999-1198",
+  "jarvis:threat_sentry:cve:CVE-2021-21414",
+  "jarvis:threat_sentry:cve:CVE-2005-4500",
+  "jarvis:briefing:morning:2026-09-30",
+  "jarvis:briefing:evening:2026-09-30"
 ]
