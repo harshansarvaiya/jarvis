@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-const SATELLITE_VERSION = '2.1.0';
+const SATELLITE_VERSION = '2.2.0';
 
 const STANDALONE_SATELLITE_SCRIPT = `#!/usr/bin/env node
 /**
@@ -194,7 +194,8 @@ async function heartbeatAndPoll() {
   };
 
   try {
-    const res = await fetch(serverUrl + '/api/jarvis/satellite/poll', {
+    const pollEndpoint = serverUrl + '/api/satellite/poll';
+    const res = await fetch(pollEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -204,7 +205,13 @@ async function heartbeatAndPoll() {
       signal: AbortSignal.timeout(8000),
     });
 
-    if (!res.ok) return;
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      if (res.status === 401 || res.status === 403) {
+        console.warn('[Satellite Node] Auth rejected (' + res.status + '): ' + errText.slice(0, 100));
+      }
+      return;
+    }
 
     const data = await res.json();
     const command = data.command;
@@ -237,7 +244,7 @@ async function heartbeatAndPoll() {
       const durationMs = Date.now() - start;
 
       // Post execution result back
-      await fetch(serverUrl + '/api/jarvis/satellite/poll', {
+      await fetch(serverUrl + '/api/satellite/poll', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
