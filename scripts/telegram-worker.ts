@@ -156,9 +156,9 @@ function buildActionKeyboard(tacticalActions?: string[]): TelegramInlineKeyboard
   // Tactical utility shortcut row
   keyboard.inline_keyboard.push([
     { text: '🇮🇳 NSE Radar', callback_data: 'cmd:nse' },
+    { text: '🧬 Evolve', callback_data: 'cmd:evolve' },
     { text: '📈 Quant', callback_data: 'cmd:quant' },
     { text: '📊 Briefing', callback_data: 'cmd:briefing' },
-    { text: '🤖 Agents', callback_data: 'cmd:subagents' },
   ]);
 
   // Fast engine switch row
@@ -346,6 +346,21 @@ async function processDirective(
         );
         return;
       }
+    } else if (
+      cleanUserText === '/evolve' ||
+      cleanUserText === '/upgrade' ||
+      cleanUserText.toLowerCase() === 'evolve' ||
+      cleanUserText.toLowerCase() === 'upgrade friday' ||
+      cleanUserText.toLowerCase() === 'evolve friday' ||
+      cleanUserText.toLowerCase() === 'self evolve'
+    ) {
+      gateway.sendTypingAction(chatId).catch(() => {});
+      const { runAutonomousEvolutionCycle } = await import('../lib/jarvis/evolution-sentry');
+      const res = await runAutonomousEvolutionCycle({ force: true });
+      if (!res.success) {
+        await gateway.sendMessage(chatId, `Sir, autonomous evolution cycle encountered an error: ${res.error}`, { replyToMessageId });
+      }
+      return;
     } else if (
       cleanUserText === '/nse' ||
       cleanUserText === '/market' ||
@@ -722,7 +737,10 @@ async function handleIncomingMessage(update: TelegramUpdate) {
     console.log(`[Telegram Gateway] 🔘 Button Callback from Sir: "${cq.data}"`);
 
     let directiveText = '';
-    if (cq.data === 'cmd:nse' || cq.data === 'cmd:nse_scan') {
+    if (cq.data === 'cmd:evolve') {
+      await processDirective(chatId, '/evolve', undefined, cq.message?.message_id);
+      return;
+    } else if (cq.data === 'cmd:nse' || cq.data === 'cmd:nse_scan') {
       await processDirective(chatId, '/nse', undefined, cq.message?.message_id);
       return;
     } else if (cq.data.startsWith('nse_inspect:')) {
@@ -1024,6 +1042,7 @@ async function startTelegramGateway() {
     { command: 'call', description: '📞 Launch Full-Duplex Voice Sheet (AirPods / TMA)' },
     { command: 'friday', description: '🛡️ Apex Tactical Mind directive' },
     { command: 'jarvis', description: '⚡ Tactical Chief of Staff & Butler' },
+    { command: 'evolve', description: '🧬 Trigger Autonomous Self-Evolution cycle' },
     { command: 'nse', description: '🇮🇳 Indian Market (NSE/BSE) macro catalysts & setups' },
     { command: 'trade', description: '📈 Sovereign Quant Engine & Portfolio' },
     { command: 'agents', description: '🤖 Specialized Subagents Matrix' },

@@ -382,12 +382,13 @@ Synthesize a high-impact, professional pre-market trading executive summary for 
                 { skipTelegram: true }
               );
 
-              // If this is the Autonomous Evolutionary Sentry, trigger autonomous self-mutation verification
+              // If this is the Autonomous Evolutionary Sentry, trigger autonomous self-mutation & evolution verification
               const isEvolutionaryCron = task.title.toLowerCase().includes('evolutionary') || task.title.toLowerCase().includes('sentry') || task.title.toLowerCase().includes('synthesis');
               if (isEvolutionaryCron) {
                 try {
-                  const { globalSelfMutationEngine } = await import('../lib/jarvis/self-mutation');
-                  console.log('[Cloud Worker] 🧬 Evolutionary Sentry Cron active: Evaluating autonomous code mutations...');
+                  const { runAutonomousEvolutionCycle } = await import('../lib/jarvis/evolution-sentry');
+                  console.log('[Cloud Worker] 🧬 Evolutionary Sentry Cron active: Executing autonomous evolution cycle...');
+                  await runAutonomousEvolutionCycle({ force: true, dispatchPushFn: dispatchPush });
                 } catch (evoErr: any) {
                   console.warn('[Cloud Worker] Evolutionary self-mutation skipped:', evoErr.message);
                 }
@@ -546,6 +547,25 @@ async function checkScheduledBriefings() {
 
         console.log(`[Cloud Worker] 🌙 Dispatching Evening De-Brief to Sir (IST 21:30)...`);
         await dispatchPush('🌙 J.A.R.V.I.S. Evening De-Brief', message, '/');
+      }
+    }
+
+    // -------------------------------------------------------------
+    // AUTONOMOUS SELF-EVOLUTION & ARCHITECTURAL SENTRY (Window: 10:00 PM - 11:30 PM IST)
+    // -------------------------------------------------------------
+    const isEvolutionWindow = istHour === 22 || (istHour === 23 && istMin <= 30);
+    if (isEvolutionWindow) {
+      const evoKey = `jarvis:evolution_run:${todayDateStr}`;
+      const alreadyRun = await isAlertDispatched(evoKey);
+      if (!alreadyRun) {
+        await markAlertDispatched(evoKey, 72000);
+        console.log(`[Cloud Worker] 🧬 Triggering Autonomous Nightly Evolution Cycle (IST ${istHour}:${istMin})...`);
+        try {
+          const { runAutonomousEvolutionCycle } = await import('../lib/jarvis/evolution-sentry');
+          await runAutonomousEvolutionCycle({ dispatchPushFn: dispatchPush });
+        } catch (evoErr: any) {
+          console.error('[Cloud Worker] Autonomous evolution cycle failed:', evoErr.message);
+        }
       }
     }
   } catch (err: any) {
