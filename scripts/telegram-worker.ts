@@ -713,9 +713,10 @@ async function processDirective(
         await gateway.sendMessage(
           chatId,
           `🛰️ **J.A.R.V.I.S. & F.R.I.D.A.Y. Sovereign Satellite Mesh**\n\n` +
-          `No active satellite devices currently paired. You can connect any device by running:\n\n` +
-          `\`npx tsx scripts/satellite-node.ts --name "My MacBook"\`\n\n` +
-          `_Once connected, Friday gains live actuators to control hardware, run local terminal commands, launch apps, and trigger desktop notifications._`,
+          `No active satellite devices paired. Zero cloning or git pulling required!\n\n` +
+          `**Connect any Mac, Linux, or PC in 1 line:**\n` +
+          `\`curl -fsSL https://jarvis-iota-beige.vercel.app/satellite | bash\`\n\n` +
+          `_Runs a self-updating 15KB background node that hot-reloads automatically whenever Friday evolves. Once connected, Friday gains live actuators to control hardware, run local terminal commands, launch apps, and trigger desktop notifications._`,
           { replyToMessageId, replyMarkup: kb }
         );
         return;
