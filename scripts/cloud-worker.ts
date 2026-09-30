@@ -1028,6 +1028,10 @@ async function startWorkerLoop(isTestMode: boolean = false) {
     await checkScheduledBriefings();
     await checkQuantTradingSentry();
     await checkGlobalThreatSentry();
+    try {
+      const { runMarketCatalystSentrySweep } = await import('../lib/jarvis/market-catalyst-sentry');
+      await runMarketCatalystSentrySweep(dispatchPush);
+    } catch {}
     await checkGeopoliticalEscalationRadar();
     await checkDependencySecurityRadar();
     console.log('[Cloud Worker] Diagnostic sweep complete. Exiting cleanly.');
@@ -1043,6 +1047,10 @@ async function startWorkerLoop(isTestMode: boolean = false) {
   await checkScheduledBriefings();
   await checkQuantTradingSentry();
   await checkGlobalThreatSentry();
+  try {
+    const { runMarketCatalystSentrySweep } = await import('../lib/jarvis/market-catalyst-sentry');
+    await runMarketCatalystSentrySweep(dispatchPush);
+  } catch {}
   // Sovereign Direct VM RPC Listener (0 Upstash Redis calls, direct <100ms reflex)
   try {
     const { startSovereignRpcServer } = await import('../lib/jarvis/rpc-server');
@@ -1063,10 +1071,16 @@ async function startWorkerLoop(isTestMode: boolean = false) {
         await checkQuantTradingSentry();
       }
 
-      // Every 5 minutes (10 ticks): Scheduled morning/evening briefing check, Global Threat Sentry & Hardware Price Sentry
+      // Every 5 minutes (10 ticks): Scheduled morning/evening briefing check, Global Threat Sentry, 24/7 Market Catalyst Sentry & Hardware Price Sentry
       if (tickCount % 10 === 0) {
         await checkScheduledBriefings();
         await checkGlobalThreatSentry();
+        try {
+          const { runMarketCatalystSentrySweep } = await import('../lib/jarvis/market-catalyst-sentry');
+          await runMarketCatalystSentrySweep(dispatchPush);
+        } catch (catErr: any) {
+          console.warn('[Cloud Worker:Market Sentry] Check warning:', catErr.message);
+        }
         try {
           const { runMonitorPriceSentrySweep } = await import('../lib/jarvis/monitor-price-sentry');
           await runMonitorPriceSentrySweep(dispatchPush);

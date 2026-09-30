@@ -2540,6 +2540,17 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'scan_breaking_market_catalysts',
+    description: '24/7 Real-Time Breaking Market Catalyst Sentry — Sweeps live financial wires (ET Markets, Google News Finance, SEBI/RBI circulars) and macro price shocks (Brent Crude >2%, DXY, US 10-Yr Yields) to detect high-impact market-moving events around the clock (Directives 01, 04, 06).',
+    parameters: {
+      type: 'object',
+      properties: {
+        dispatchAlerts: { type: 'boolean', description: 'Whether to dispatch high-impact breaking alerts to Sir on Telegram and Web Push (default: false when manually queried by agent).' },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'analyze_nse_stock',
     description: 'Tactical NSE/BSE Equity Technical & Macro Analyzer — Conducts deep-dive quantitative technical analysis (RSI, 20/50 EMA, Bollinger Bands, ATR) and global macro sector alignment on any specific Indian stock (e.g. "HAL.NS", "RELIANCE.NS", "TCS.NS", "DIXON.NS", "ONGC.NS"), returning an actionable trade setup with entry zones, target prices, and risk-reward ratios for manual execution.',
     parameters: {
@@ -4061,6 +4072,20 @@ export async function executeJarvisTool(
           result: {
             catalystCard: card,
             telegramSent,
+          },
+        };
+      }
+
+      case 'scan_breaking_market_catalysts': {
+        const { dispatchAlerts } = args;
+        const { runMarketCatalystSentrySweep, checkMacroPriceShocks } = await import('./market-catalyst-sentry');
+        const macroShock = await checkMacroPriceShocks();
+        const sweepRes = await runMarketCatalystSentrySweep(dispatchAlerts ? async () => true : undefined);
+        return {
+          success: true,
+          result: {
+            macroShock,
+            sweep: sweepRes,
           },
         };
       }
