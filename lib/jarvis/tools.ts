@@ -2608,6 +2608,48 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['action'],
     },
   },
+  {
+    name: 'list_satellites',
+    description: 'List all registered sovereign edge satellite devices (MacBook, Linux desktop, Android/Termux, Raspberry Pi, Windows PC), including their online/offline state, battery %, OS, CPU/RAM telemetry, and capabilities.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'execute_satellite_command',
+    description: 'Execute a remote shell command on a specific connected satellite device (e.g. Sir\'s MacBook, home server, phone) with /CAREFUL Guardian protection.',
+    parameters: {
+      type: 'object',
+      properties: {
+        deviceId: { type: 'string', description: 'The ID of the target satellite device (e.g. "sat-macbook-pro").' },
+        command: { type: 'string', description: 'The shell command to execute on the remote device.' },
+        timeoutMs: { type: 'number', description: 'Execution timeout in milliseconds (default 25000).' },
+      },
+      required: ['deviceId', 'command'],
+    },
+  },
+  {
+    name: 'satellite_action',
+    description: 'Trigger native operating system actuators on a satellite device: open URL, display desktop notification, launch app, sync clipboard (get/set), or lock screen.',
+    parameters: {
+      type: 'object',
+      properties: {
+        deviceId: { type: 'string', description: 'The ID of the target satellite device.' },
+        action: {
+          type: 'string',
+          enum: ['NOTIFY', 'OPEN_URL', 'APP_LAUNCH', 'CLIPBOARD_SET', 'CLIPBOARD_GET', 'LOCK_SCREEN'],
+          description: 'The native OS action to trigger.',
+        },
+        params: {
+          type: 'object',
+          description: 'Action parameters: e.g. { url: "https://..." } for OPEN_URL, { title: "...", message: "..." } for NOTIFY, { appName: "Xcode" } for APP_LAUNCH, { text: "..." } for CLIPBOARD_SET.',
+        },
+      },
+      required: ['deviceId', 'action'],
+    },
+  },
 ];
 
 /**
@@ -4176,6 +4218,57 @@ export async function executeJarvisTool(
           return { success: true, result: { message: 'Portfolio reset to $100k', portfolio } };
         }
         return { success: false, result: null, error: `Unsupported quant action: ${action}` };
+      }
+
+      case 'list_satellites': {
+        const { listRegisteredSatellites } = await import('./satellite');
+        const satellites = await listRegisteredSatellites();
+        return {
+          success: true,
+          result: {
+            count: satellites.length,
+            onlineCount: satellites.filter((s) => s.status === 'ONLINE').length,
+            satellites,
+          },
+        };
+      }
+
+      case 'execute_satellite_command': {
+        const { deviceId, command, timeoutMs } = args;
+        if (!deviceId || !command) {
+          return { success: false, result: null, error: 'deviceId and command are required' };
+        }
+        const { dispatchSatelliteCommand } = await import('./satellite');
+        const res = await dispatchSatelliteCommand(
+          String(deviceId),
+          'SHELL',
+          { command: String(command) },
+          timeoutMs ? Number(timeoutMs) : 25000
+        );
+        return {
+          success: res.success,
+          result: res,
+          error: res.error,
+        };
+      }
+
+      case 'satellite_action': {
+        const { deviceId, action, params } = args;
+        if (!deviceId || !action) {
+          return { success: false, result: null, error: 'deviceId and action are required' };
+        }
+        const { dispatchSatelliteCommand } = await import('./satellite');
+        const res = await dispatchSatelliteCommand(
+          String(deviceId),
+          'ACTION',
+          { action: action as any, params: params || {} },
+          25000
+        );
+        return {
+          success: res.success,
+          result: res,
+          error: res.error,
+        };
       }
 
       default:

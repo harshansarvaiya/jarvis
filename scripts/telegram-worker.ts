@@ -664,6 +664,93 @@ async function processDirective(
       );
       return;
     } else if (
+      cleanUserText === '/satellites' ||
+      cleanUserText === '/devices' ||
+      cleanUserText === '/mesh' ||
+      cleanUserText.toLowerCase() === 'satellites' ||
+      cleanUserText.toLowerCase() === 'devices' ||
+      cleanUserText.toLowerCase() === 'satellite mesh' ||
+      cleanUserText.startsWith('/satellite ') ||
+      cleanUserText.startsWith('/sat ')
+    ) {
+      gateway.sendTypingAction(chatId).catch(() => {});
+      const { listRegisteredSatellites, dispatchSatelliteCommand } = await import('../lib/jarvis/satellite');
+
+      // Direct device execution: /satellite <deviceId> <command>
+      const directMatch = cleanUserText.match(/^\/(?:satellite|sat)\s+([^\s]+)\s+(.*)$/i);
+      if (directMatch) {
+        const targetId = directMatch[1].trim();
+        const cmdToRun = directMatch[2].trim();
+
+        const execRes = await dispatchSatelliteCommand(targetId, 'SHELL', { command: cmdToRun }, 25000, 'Sir/Telegram');
+        if (!execRes.success) {
+          await gateway.sendMessage(
+            chatId,
+            `⚠️ **Satellite Execution Failed / Timed Out**\n\n• **Target**: \`${targetId}\`\n• **Error**: _${execRes.error || 'Unknown error'}_\n• **Duration**: \`${execRes.durationMs}ms\``,
+            { replyToMessageId }
+          );
+          return;
+        }
+
+        await gateway.sendMessage(
+          chatId,
+          `✅ **Satellite Directive Executed**\n\n• **Target**: \`${targetId}\`\n• **Exit Code**: \`${execRes.exitCode}\` (Duration: \`${execRes.durationMs}ms\`)\n\n\`\`\`\n${execRes.output || '(No stdout)'}\n\`\`\``,
+          { replyToMessageId, parseMode: 'Markdown' }
+        );
+        return;
+      }
+
+      // Device list display
+      const satellites = await listRegisteredSatellites();
+      if (satellites.length === 0) {
+        const kb: TelegramInlineKeyboardMarkup = {
+          inline_keyboard: [
+            [
+              { text: '🔄 Refresh Mesh', callback_data: 'cmd:satellites' },
+            ],
+          ],
+        };
+        await gateway.sendMessage(
+          chatId,
+          `🛰️ **J.A.R.V.I.S. & F.R.I.D.A.Y. Sovereign Satellite Mesh**\n\n` +
+          `No active satellite devices currently paired. You can connect any device by running:\n\n` +
+          `\`npx tsx scripts/satellite-node.ts --name "My MacBook"\`\n\n` +
+          `_Once connected, Friday gains live actuators to control hardware, run local terminal commands, launch apps, and trigger desktop notifications._`,
+          { replyToMessageId, replyMarkup: kb }
+        );
+        return;
+      }
+
+      const kb: TelegramInlineKeyboardMarkup = { inline_keyboard: [] };
+      let msg = `🛰️ **Sovereign Satellite Mesh (${satellites.length} Registered Devices)**\n\n`;
+
+      for (const dev of satellites) {
+        const statusIcon = dev.status === 'ONLINE' ? '🟢 ONLINE' : '🔴 OFFLINE';
+        const battStr = dev.telemetry?.batteryPercent !== undefined ? ` | Battery: \`${dev.telemetry.batteryPercent}%\`` : '';
+        const memStr = dev.telemetry?.freeMemMb !== undefined ? ` | Free RAM: \`${dev.telemetry.freeMemMb}MB\`` : '';
+
+        msg += `**${dev.name}** (\`${dev.id}\`)\n` +
+          `• Status: ${statusIcon}${battStr}\n` +
+          `• Host: \`${dev.hostname}\` (${dev.platform}-${dev.arch})${memStr}\n` +
+          `• Capabilities: _${dev.capabilities.join(', ')}_\n` +
+          `• Last Seen: _${new Date(dev.lastSeen).toLocaleTimeString('en-GB')}_\n\n`;
+
+        if (dev.status === 'ONLINE') {
+          kb.inline_keyboard.push([
+            { text: `⚡ Ping ${dev.name.slice(0, 18)}`, callback_data: `sat_ping:${dev.id}` },
+            { text: `🔔 Notify ${dev.name.slice(0, 18)}`, callback_data: `sat_notify:${dev.id}` },
+          ]);
+        }
+      }
+
+      kb.inline_keyboard.push([
+        { text: '🔄 Refresh Satellites', callback_data: 'cmd:satellites' },
+      ]);
+
+      msg += `_Execute remotely via:_ \`/satellite <deviceId> <command>\``;
+      await gateway.sendMessage(chatId, msg, { replyToMessageId, replyMarkup: kb });
+      return;
+    } else if (
       cleanUserText === '/call' ||
       cleanUserText === '/live' ||
       cleanUserText === '/voice' ||
@@ -872,6 +959,29 @@ async function handleIncomingMessage(update: TelegramUpdate) {
       return;
     } else if (cq.data === 'cmd:quant_resume') {
       await processDirective(chatId, '/resume', undefined, cq.message?.message_id);
+      return;
+    } else if (cq.data === 'cmd:satellites') {
+      await processDirective(chatId, '/satellites', undefined, cq.message?.message_id);
+      return;
+    } else if (cq.data.startsWith('sat_ping:')) {
+      const targetId = cq.data.replace(/^sat_ping:/, '');
+      const { dispatchSatelliteCommand } = await import('../lib/jarvis/satellite');
+      const res = await dispatchSatelliteCommand(targetId, 'SHELL', { command: 'echo "Ping latency test from Telegram: $(date)"' }, 15000);
+      if (res.success) {
+        await gateway.sendMessage(chatId, `📶 **Satellite Ping Return (${targetId})**:\n\`\`\`\n${res.output}\n\`\`\`\n_Round-trip: ${res.durationMs}ms_`, { replyToMessageId: cq.message?.message_id });
+      } else {
+        await gateway.sendMessage(chatId, `⚠️ **Satellite Ping Failed (${targetId})**: ${res.error}`, { replyToMessageId: cq.message?.message_id });
+      }
+      return;
+    } else if (cq.data.startsWith('sat_notify:')) {
+      const targetId = cq.data.replace(/^sat_notify:/, '');
+      const { dispatchSatelliteCommand } = await import('../lib/jarvis/satellite');
+      const res = await dispatchSatelliteCommand(targetId, 'ACTION', { action: 'NOTIFY', params: { title: 'J.A.R.V.I.S. Command', message: 'Sir dispatched a remote alert from Telegram.' } }, 15000);
+      if (res.success) {
+        await gateway.sendMessage(chatId, `🔔 **Desktop Alert Triggered on ${targetId}**\n\n_${res.output}_`, { replyToMessageId: cq.message?.message_id });
+      } else {
+        await gateway.sendMessage(chatId, `⚠️ **Failed to trigger alert on ${targetId}**: ${res.error}`, { replyToMessageId: cq.message?.message_id });
+      }
       return;
     } else if (cq.data.startsWith('trade_order:')) {
       const [, sym, dir, strat] = cq.data.split(':');

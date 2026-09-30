@@ -47,5 +47,6 @@ next-env.d.ts
 /data/sandboxes/
 /data/*.log
 /data/jarvis_trading*.json
+/data/jarvis_satellites*.json
 scripts/inspect-chats.ts
 
