@@ -169,6 +169,15 @@ async function fetchRssFeed(url: string, timeoutMs = 5000): Promise<RawRssItem[]
 export function classifyNewsItem(item: RawRssItem): BreakingCatalyst | null {
   const fullText = `${item.title} ${item.description}`.toLowerCase();
 
+  // Strict Exclusion: Filter out opinion pieces, editorial columns, speculative advice, and op-eds
+  const isOpinionOrCommentary =
+    /\b(opinion|editorial|column|views|viewpoint|blog|says analyst|brokerage view|expert view|argues|demands a rate|could see|may see|what if)\b/i.test(
+      fullText
+    );
+  if (isOpinionOrCommentary) {
+    return null;
+  }
+
   // Filter 1: Regulatory & Central Bank (SEBI / RBI)
   if (/\b(sebi|derivatives curbs|f&o curbs|margin rule|circular|penalties|investigation)\b/i.test(fullText)) {
     return {
@@ -190,8 +199,11 @@ export function classifyNewsItem(item: RawRssItem): BreakingCatalyst | null {
     };
   }
 
-  if (/\b(rbi|repo rate|monetary policy|mpc|crr|interest rate cut|rate hike|inflation print)\b/i.test(fullText)) {
-    const isRateCut = /\b(cut|easing|lower|reduction)\b/i.test(fullText);
+  if (
+    /\b(rbi|repo rate|monetary policy|mpc|crr)\b/i.test(fullText) &&
+    /\b(cuts?|hiked?|hikes?|reduces?|raises?|holds?|held|decision|announces?|unveils?|inflation rate|status quo)\b/i.test(fullText)
+  ) {
+    const isRateCut = /\b(cuts?|easing|lower|reduction|reduces?)\b/i.test(fullText);
     return {
       id: crypto.createHash('sha256').update(item.title).digest('hex').slice(0, 16),
       type: 'MONETARY_RBI',
@@ -207,7 +219,7 @@ export function classifyNewsItem(item: RawRssItem): BreakingCatalyst | null {
           : 'Elevated policy stance dampens high-multiple growth equities and pressures rate-sensitive sectors.',
         favoredSectors: isRateCut ? ['Banking & NBFCs', 'Auto', 'Real Estate'] : ['Export IT', 'Pharma'],
         pressuredSectors: isRateCut ? ['Export IT'] : ['Real Estate', 'High-Beta NBFCs'],
-        keyTickers: ['HDFCBANK.NS', 'TATAMOTORS.NS', 'DLF.NS'],
+        keyTickers: ['HDFCBANK.NS', 'MARUTI.NS', 'DLF.NS'],
         tacticalAction: isRateCut ? 'ACCUMULATE' : 'DEFENSIVE_HEDGE',
       },
     };
@@ -410,12 +422,12 @@ export async function dispatchBreakingCatalystAlert(
 
   await markCatalystDispatched(dedupKey, 86400); // 24-hour deduplication window
 
-  // 1. Fetch live actionable setups for key tickers
+  // 1. Fetch live actionable setups for key tickers (filter out invalid/dead quotes)
   const actionableAnalyses: any[] = [];
   for (const ticker of catalyst.transmission.keyTickers.slice(0, 2)) {
     try {
       const a = await analyzeNseStock(ticker);
-      if (a) actionableAnalyses.push(a);
+      if (a && a.currentPrice > 0) actionableAnalyses.push(a);
     } catch {}
   }
 
@@ -480,7 +492,8 @@ export async function dispatchBreakingCatalystAlert(
       await dispatchPushFn(
         `⚡ [MARKET ALERT] ${catalyst.headline.slice(0, 50)}`,
         `${catalyst.transmission.summary.slice(0, 160)}... Stance: ${catalyst.transmission.tacticalAction}`,
-        '/api/jarvis/trading'
+        '/api/jarvis/trading',
+        { skipTelegram: true }
       );
     } catch (pushErr: any) {
       console.warn('[Market Sentry] Web Push dispatch failed:', pushErr.message);

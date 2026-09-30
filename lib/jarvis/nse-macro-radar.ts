@@ -192,9 +192,14 @@ export async function analyzeNseStock(
   symbol: string,
   macroContext?: string
 ): Promise<NseStockAnalysis> {
-  const normSymbol = symbol.endsWith('.NS') || symbol.endsWith('.BO') || symbol.startsWith('^')
+  let normSymbol = symbol.endsWith('.NS') || symbol.endsWith('.BO') || symbol.startsWith('^')
     ? symbol
     : `${symbol}.NS`;
+
+  // Auto-resolve known demergers & delistings
+  if (normSymbol.toUpperCase() === 'TATAMOTORS.NS') {
+    normSymbol = 'TMPV.NS';
+  }
 
   const quote = await fetchLiveQuote(normSymbol);
   const candles = await fetchHistoricalCandles(normSymbol, '1mo', '1d');
@@ -203,7 +208,7 @@ export async function analyzeNseStock(
   const companyName = quote?.name || normSymbol;
   const change24hPct = quote?.change24hPct || 0;
 
-  if (candles.length < 14) {
+  if (candles.length < 14 || currentPrice <= 0) {
     return {
       symbol: normSymbol,
       companyName,
