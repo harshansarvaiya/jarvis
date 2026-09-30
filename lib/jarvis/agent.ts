@@ -187,10 +187,12 @@ export async function runJarvisAgent(
     personaExplicit = true;
   }
 
-  // GitHub Repository & Architecture Query Guarantee
+  // GitHub Repository & Architecture Query Guarantee (matches current turn or recent follow-up context)
   const isGithubOrRepoQuery =
     /github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+/i.test(lastUserMessage.content) ||
-    /\b(repository|repo|teardown|architecture of)\b/i.test(lastUserMessage.content);
+    /\b(repository|repo|teardown|architecture of)\b/i.test(lastUserMessage.content) ||
+    (messages.slice(-4).some((m) => /github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+/i.test(m.content || '')) &&
+      /\b(above|that|this|voice|model|stack|code|feature|how)\b/i.test(lastUserMessage.content));
 
   if (isGithubOrRepoQuery) {
     persona = 'FRIDAY';
@@ -321,14 +323,27 @@ export async function runJarvisAgent(
 
   // 3.11. Auto-Inject External Repository & Web Link Pre-flight Grounding (INVESTIGATE Iron Law)
   let externalRepoPreflightBlock = '';
-  const ghUrlMatch = lastUserMessage.content.match(/https?:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:[^\s)]*)?/i);
-  if (ghUrlMatch) {
+  let targetGhUrl: string | undefined = undefined;
+  const directGhMatch = lastUserMessage.content.match(/https?:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:[^\s)]*)?/i);
+  if (directGhMatch) {
+    targetGhUrl = directGhMatch[0];
+  } else if (/\b(above|that|this|the)\s+repo\b/i.test(lastUserMessage.content) || isGithubOrRepoQuery) {
+    for (let i = messages.length - 1; i >= Math.max(0, messages.length - 6); i--) {
+      const prevMatch = messages[i]?.content?.match(/https?:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:[^\s)]*)?/i);
+      if (prevMatch) {
+        targetGhUrl = prevMatch[0];
+        break;
+      }
+    }
+  }
+
+  if (targetGhUrl) {
     try {
       const { runDeepWebScraper } = await import('./tools');
-      const repoIntel = await runDeepWebScraper(ghUrlMatch[0]);
+      const repoIntel = await runDeepWebScraper(targetGhUrl);
       if (repoIntel && !repoIntel.error) {
         externalRepoPreflightBlock = `\n[AUTOMATIC PRE-FLIGHT REPOSITORY INTEL INGESTION (INVESTIGATE IRON LAW)]:
-- Target Repository: ${repoIntel.repository || ghUrlMatch[0]}
+- Target Repository: ${repoIntel.repository || targetGhUrl}
 - Description: ${repoIntel.description || 'N/A'}
 - Primary Language: ${repoIntel.language || 'Unknown'} | Stars: ${repoIntel.stars ?? 'N/A'} | Forks: ${repoIntel.forks ?? 'N/A'} | License: ${repoIntel.license || 'N/A'}
 - Topics: ${(repoIntel.topics || []).join(', ') || 'None'}
@@ -636,7 +651,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     const generationTemperature = archetype === 'DEEP_SYNTHESIS' ? 0.6 : 0.5;
 
     const repoTeardownAnchor = isGithubOrRepoQuery
-      ? `\n\n[MANDATORY GITHUB REPOSITORY & ARCHITECTURAL TEARDOWN STANDARD]: Sir has provided a GitHub repository / architecture for evaluation. You are strictly mandated to produce an exhaustive, Staff-level architectural teardown covering: 1. Anatomy & Core Execution Primitives, 2. Compliance with Directives 01 & 06, 3. Operational Trade-offs & Security/Latency, 4. Concrete Extraction Vector for J.A.R.V.I.S. (exact modules & radar admission). DO NOT truncate into a superficial 1-2 sentence summary.`
+      ? `\n\n[MANDATORY STAFF ARCHITECT & PRODUCT STRATEGIST STANDARD]: Sir has referenced a repository, architecture, or product for evaluation. You are strictly mandated to produce an authentic, Staff-level teardown covering: 1. Product Hook & User Delight (why users/devs love it, tactile feel, dopamine loops), 2. Technical Anatomy & Core Primitives (models, voice/vision streaming pipelines, state topology), 3. Ecosystem & Model Grounding (if Sir mentions companion personas or models like "Khushi", explain the underlying models in the ecosystem like Sarvam AI or ElevenLabs—NEVER stop at "not found"), 4. Operational Trade-offs & Security, 5. Concrete Extraction / Outperformance Vector for J.A.R.V.I.S. DO NOT truncate into a superficial summary or dry security compliance checklist.`
       : '';
 
     const systemInstruction = {
