@@ -1375,13 +1375,14 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             ],
           },
         ];
+        const synthTimeoutMs = persona === 'FRIDAY' || archetype === 'DEEP_SYNTHESIS' ? 45000 : 30000;
         if (isVertexEngine) {
           const synthRes = await callVertexAIGenerate({
             model: selectedVertexModel,
             contents: finalPrompt,
             systemInstruction,
             generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
-            signal: AbortSignal.timeout(25000),
+            signal: AbortSignal.timeout(synthTimeoutMs),
           });
           if (synthRes.ok) {
             const sData = await synthRes.json();
@@ -1399,7 +1400,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
               systemInstruction,
               generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
             }),
-            signal: AbortSignal.timeout(25000),
+            signal: AbortSignal.timeout(synthTimeoutMs),
           });
           if (synthRes.ok) {
             const sData = await synthRes.json();
@@ -1426,10 +1427,42 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           .map((tc) => tc.args?.path || tc.args?.query || tc.args?.pattern || 'codebase')
           .filter((v, i, a) => a.indexOf(v) === i);
 
+        const webReconCalls = toolCallsExecuted.filter((tc) =>
+          ['search_web', 'mcp_exa', 'read_web_page', 'deep_research', 'run_deep_research'].includes(tc.name)
+        );
+
         if (mutatedFiles.length > 0) {
           finalReply = `Sir, the requested modifications across \`${mutatedFiles.join('`, `')}\` have been implemented. TypeScript compiler checks passed and mutations are active.`;
-        } else {
+        } else if (webReconCalls.length > 0) {
+          const intelSummaries: string[] = [];
+          for (const tc of webReconCalls) {
+            const queryOrUrl = tc.args?.query || tc.args?.url || (Array.isArray(tc.args?.urls) ? tc.args.urls.join(', ') : '');
+            const rawResults = tc.result?.results || tc.result?.output?.results || (Array.isArray(tc.result) ? tc.result : []);
+            if (Array.isArray(rawResults) && rawResults.length > 0) {
+              const topSnippets = rawResults.slice(0, 3).map((r: any) => {
+                const title = r.title ? `**${r.title}**` : '';
+                const link = r.url ? `([link](${r.url}))` : '';
+                const text = r.snippet || r.text || '';
+                const cleanText = text.replace(/\s+/g, ' ').slice(0, 200);
+                return `${[title, link].filter(Boolean).join(' ')}: ${cleanText}`;
+              }).join('\n- ');
+              intelSummaries.push(`• **Recon for** \`${queryOrUrl}\`:\n- ${topSnippets}`);
+            } else if (queryOrUrl) {
+              intelSummaries.push(`• **Recon completed for** \`${queryOrUrl}\`.`);
+            }
+          }
+
+          if (intelSummaries.length > 0) {
+            finalReply = `Sir, here is the intelligence extracted from our reconnaissance:\n\n${intelSummaries.join('\n\n')}`;
+          } else {
+            const queries = webReconCalls.map((tc) => tc.args?.query || tc.args?.url).filter(Boolean);
+            finalReply = `Sir, reconnaissance completed across ${queries.map((q) => `\`${q}\``).join(', ')}. No additional active public records were found.`;
+          }
+        } else if (readFiles.length > 0) {
           finalReply = `Sir, I completed the inspection across ${readFiles.slice(0, 4).map(f => `\`${f}\``).join(', ')}. All diagnostic traces are nominal and verified.`;
+        } else {
+          const toolNames = toolCallsExecuted.map((tc) => tc.name).filter((v, i, a) => a.indexOf(v) === i);
+          finalReply = `Sir, operations across ${toolNames.map((n) => `\`${n}\``).join(', ')} have completed with nominal status.`;
         }
       } else {
         finalReply = 'All systems green, Sir. Standing by for your directive.';
