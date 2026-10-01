@@ -581,11 +581,13 @@ async function checkScheduledBriefings() {
       const evoKey = `jarvis:evolution_run:${todayDateStr}`;
       const alreadyRun = await isAlertDispatched(evoKey);
       if (!alreadyRun) {
-        await markAlertDispatched(evoKey, 72000);
         console.log(`[Cloud Worker] 🧬 Triggering Autonomous Nightly Evolution Cycle (IST ${istHour}:${istMin})...`);
         try {
           const { runAutonomousEvolutionCycle } = await import('../lib/jarvis/evolution-sentry');
-          await runAutonomousEvolutionCycle({ dispatchPushFn: dispatchPush });
+          const res = await runAutonomousEvolutionCycle({ force: true, dispatchPushFn: dispatchPush });
+          if (res.success) {
+            await markAlertDispatched(evoKey, 72000);
+          }
         } catch (evoErr: any) {
           console.error('[Cloud Worker] Autonomous evolution cycle failed:', evoErr.message);
         }
