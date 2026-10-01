@@ -82,12 +82,13 @@ export function sanitizeTextForSpeech(rawText: string): string {
  */
 export async function synthesizeMovieVoice(
   text: string,
-  persona: VoicePersona = 'FRIDAY'
+  persona: VoicePersona = 'FRIDAY',
+  options?: { pitch?: string; rate?: string }
 ): Promise<Buffer | null> {
   const cleanSpoken = sanitizeTextForSpeech(text);
   if (!cleanSpoken) return null;
 
-  // Truncate to speech-friendly length (up to 600 characters for vocal summaries)
+  // Truncate to speech-friendly length (up to 800 characters for vocal summaries)
   const truncatedText = cleanSpoken.length > 800
     ? `${cleanSpoken.slice(0, 780)}... and more details are available in the briefing.`
     : cleanSpoken;
@@ -95,12 +96,15 @@ export async function synthesizeMovieVoice(
   const cfg = MOVIE_VOICE_CONFIGS[persona] || MOVIE_VOICE_CONFIGS.FRIDAY;
   const tempPath = path.join(os.tmpdir(), `tts_${Date.now()}_${Math.random().toString(36).slice(2)}.mp3`);
 
+  const activePitch = options?.pitch || cfg.pitch;
+  const activeRate = options?.rate || cfg.rate;
+
   try {
     const tts = new EdgeTTS({
       voice: cfg.voice,
       lang: cfg.lang,
-      pitch: cfg.pitch,
-      rate: cfg.rate,
+      pitch: activePitch,
+      rate: activeRate,
       outputFormat: 'audio-24khz-48kbitrate-mono-mp3',
     });
 

@@ -894,7 +894,8 @@ async function processDirective(
         const { synthesizeMovieVoice } = await import('../lib/jarvis/tts');
         const vocalContent = result.vocalSummary || result.reply.slice(0, 400);
         const voicePersona = result.telemetry?.persona === 'FRIDAY' ? 'FRIDAY' : 'JARVIS';
-        const voiceBuffer = await synthesizeMovieVoice(vocalContent, voicePersona);
+        const modulation = result.emotionSubtext?.voiceModulation;
+        const voiceBuffer = await synthesizeMovieVoice(vocalContent, voicePersona, modulation);
         if (voiceBuffer) {
           const personaLabel = voicePersona === 'FRIDAY' ? '🛡️ F.R.I.D.A.Y.' : '⚡ J.A.R.V.I.S.';
           await gateway.sendVoice(chatId, voiceBuffer, {

@@ -18,6 +18,7 @@ import {
 } from './orchestrator';
 import { appendUniversalChatMessage, appendAgentChatMessage, getCrossChannelContext } from './storage';
 import { getPersonaConfig, buildPersonaPromptBlock } from './persona';
+import { analyzeEmotionalSubtext, EmotionalSubtextResult } from './emotion-engine';
 import { compressSystemPrompt, compressToolOutput } from './compression';
 import { getDynamicCognitiveDnaBlock } from './dynamic-dna';
 import * as fs from 'fs';
@@ -128,6 +129,7 @@ export async function runJarvisAgent(
   toolCallsExecuted: Array<{ name: string; args: any; result: any }>;
   motiveAnalysis?: string;
   internalThoughts?: string;
+  emotionSubtext?: EmotionalSubtextResult;
   telemetry: OrchestrationTelemetry;
   error?: string;
 }> {
@@ -251,6 +253,7 @@ export async function runJarvisAgent(
   const activeTasks = allTasks.filter((t) => t.status !== 'COMPLETED').slice(0, 8);
   const completedTasks = allTasks.filter((t) => t.status === 'COMPLETED').slice(0, 5);
   const motivePass = deconstructOperationalMotive(lastUserMessage.content);
+  const emotionAnalysis = analyzeEmotionalSubtext(lastUserMessage.content, messages.slice(-4));
 
 
   let skillsContext = '';
@@ -363,6 +366,12 @@ ${specializedAgentBlock}
 ${dynamicDnaBlock}
 ${workspacePreflightBlock}
 ${externalRepoPreflightBlock}
+
+[EMOTIONAL INTELLIGENCE & PSYCHOLOGICAL SUBTEXT PASS (EQ-SENTRY)]:
+- Primary Emotional Valence: ${emotionAnalysis.primaryEmotion} (Intensity: ${emotionAnalysis.intensity})
+- Social / Operational Domain: ${emotionAnalysis.socialDomain}
+- Unspoken Human Subtext: ${emotionAnalysis.unspokenSubtext}
+- Mandatory Guidance Directive: ${emotionAnalysis.guidanceDirective}
 
 [TIER 1 - WORKING MEMORY & PRE-THOUGHT REASONING PASS]:
 - Unstated Motive: ${motivePass.unstatedMotive}
@@ -657,7 +666,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     const systemInstruction = {
       parts: [
         {
-          text: `${personaPromptBlock}\n\n${JARVIS_SYSTEM_PROMPT}\n\n${contextPrompt}\n\n[MANDATORY EMPIRICAL GROUNDING & ANTI-HALLUCINATION ANCHOR]: Speak directly to Sir as ${persona}. Fluid natural paragraphs. Strictly ban textbook listicles and newsletter headings. NEVER claim you tested an API or executed a command unless you actually invoked a tool in this turn and inspected its verbatim stdout. You operate on Google Cloud VM (antigravity-cloud-runner); ngrok is permanently decommissioned. If asked about VM or infrastructure health, ALWAYS execute inspect_infrastructure or check_runner_vm first.${repoTeardownAnchor}`,
+          text: `${personaPromptBlock}\n\n${JARVIS_SYSTEM_PROMPT}\n\n${contextPrompt}\n\n[MANDATORY EMOTIONAL INTELLIGENCE & SOCIAL ANCHOR]: You must match Sir's emotional frequency and social context. Subtext: "${emotionAnalysis.unspokenSubtext}". Action Directive: ${emotionAnalysis.guidanceDirective}. If Sir is in a social, presenting, or conversational context, NEVER emit developer resume jargon ("Upstash Redis", "Vector RAG", "compiler diffs"). Speak with charisma, relatable storytelling, and human charm.\n\n[MANDATORY EMPIRICAL GROUNDING & ANTI-HALLUCINATION ANCHOR]: Speak directly to Sir as ${persona}. Fluid natural paragraphs. Strictly ban textbook listicles and newsletter headings. NEVER claim you tested an API or executed a command unless you actually invoked a tool in this turn and inspected its verbatim stdout. You operate on Google Cloud VM (antigravity-cloud-runner); ngrok is permanently decommissioned. If asked about VM or infrastructure health, ALWAYS execute inspect_infrastructure or check_runner_vm first.${repoTeardownAnchor}`,
         },
       ],
     };
@@ -1494,6 +1503,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       toolCallsExecuted,
       motiveAnalysis: motivePass.unstatedMotive,
       internalThoughts,
+      emotionSubtext: emotionAnalysis,
       telemetry: {
         engineUsed: isVertexEngine
           ? (selectedVertexModel.includes('3.8')
@@ -1517,6 +1527,8 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
         persona,
         failoverOccurred: false,
         recalledEpisodesCount: recalledEpisodes.length,
+        emotion: emotionAnalysis.primaryEmotion,
+        unspokenSubtext: emotionAnalysis.unspokenSubtext,
       },
     };
   } catch (err: any) {

@@ -22,6 +22,8 @@ export interface OrchestrationTelemetry {
   recalledEpisodesCount?: number;
   motiveAnalysis?: string;
   persona?: ActivePersona;
+  emotion?: string;
+  unspokenSubtext?: string;
 }
 
 export interface PreThoughtReasoningPass {
