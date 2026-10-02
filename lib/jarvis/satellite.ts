@@ -25,7 +25,10 @@ export type SatelliteCapability =
   | 'screen-lock'
   | 'media-control'
   | 'camera'
-  | 'audio';
+  | 'audio'
+  | 'screenshot'
+  | 'keystroke'
+  | 'speak';
 
 export interface SatelliteSystemTelemetry {
   cpuUsagePct?: number;
@@ -61,7 +64,11 @@ export type SatelliteActionType =
   | 'CLIPBOARD_SET'
   | 'CLIPBOARD_GET'
   | 'MEDIA_CONTROL'
-  | 'LOCK_SCREEN';
+  | 'LOCK_SCREEN'
+  | 'SCREENSHOT'
+  | 'TYPE_TEXT'
+  | 'KEYSTROKE'
+  | 'SPEAK';
 
 export interface SatelliteCommand {
   id: string;

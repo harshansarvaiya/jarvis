@@ -162,6 +162,112 @@ async function executeNativeAction(action: string, params: any = {}): Promise<{ 
       return { success: true, output: 'Host screen locked successfully.' };
     }
 
+    case 'SCREENSHOT': {
+      let b64 = '';
+      if (platform === 'win32') {
+        const psScript = `
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+$bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+$bmp = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+$graphics = [System.Drawing.Graphics]::FromImage($bmp)
+$graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+$ms = New-Object System.IO.MemoryStream
+$bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Jpeg)
+$bmp.Dispose()
+$graphics.Dispose()
+[Convert]::ToBase64String($ms.ToArray())
+`.trim();
+        const { stdout } = await execAsync(`powershell -NoProfile -Command "${psScript.replace(/\n/g, '; ')}"`, {
+          maxBuffer: 10 * 1024 * 1024,
+        });
+        b64 = stdout.trim();
+      } else if (platform === 'darwin') {
+        const tmpPath = path.join(os.tmpdir(), `sat-screen-${Date.now()}.jpg`);
+        await execAsync(`screencapture -x -t jpg "${tmpPath}"`);
+        if (fs.existsSync(tmpPath)) {
+          b64 = fs.readFileSync(tmpPath, { encoding: 'base64' });
+          fs.unlinkSync(tmpPath);
+        }
+      } else {
+        const tmpPath = path.join(os.tmpdir(), `sat-screen-${Date.now()}.jpg`);
+        await execAsync(`(scrot "${tmpPath}" 2>/dev/null || import -window root "${tmpPath}" 2>/dev/null || true)`);
+        if (fs.existsSync(tmpPath)) {
+          b64 = fs.readFileSync(tmpPath, { encoding: 'base64' });
+          fs.unlinkSync(tmpPath);
+        }
+      }
+      return {
+        success: Boolean(b64),
+        output: b64 ? `data:image/jpeg;base64,${b64}` : 'Failed to capture screenshot',
+      };
+    }
+
+    case 'TYPE_TEXT': {
+      const text = params.text || '';
+      if (!text) throw new Error('Missing text parameter');
+      // High-reliability simulated typing via clipboard paste
+      if (platform === 'win32') {
+        const escaped = text.replace(/"/g, '`"');
+        const psCmd = `powershell -NoProfile -Command "Set-Clipboard -Value \\"${escaped}\\"; Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')"`;
+        await execAsync(psCmd);
+      } else if (platform === 'darwin') {
+        const escaped = text.replace(/"/g, '\\"');
+        await execAsync(`echo -n "${escaped}" | pbcopy && osascript -e 'tell application "System Events" to keystroke "v" using command down'`);
+      } else {
+        const escaped = text.replace(/"/g, '\\"');
+        await execAsync(`echo -n "${escaped}" | (xclip -selection clipboard 2>/dev/null || wl-copy 2>/dev/null || true) && (xdotool key --clearmodifiers ctrl+v 2>/dev/null || true)`);
+      }
+      return { success: true, output: `Pasted text into active window (${text.length} chars).` };
+    }
+
+    case 'KEYSTROKE': {
+      const key = (params.key || '').trim().toUpperCase();
+      if (!key) throw new Error('Missing key parameter');
+      if (platform === 'win32') {
+        // Map common key combos to SendKeys format
+        let sendKey = key;
+        if (key === 'ENTER') sendKey = '{ENTER}';
+        else if (key === 'ESC' || key === 'ESCAPE') sendKey = '{ESC}';
+        else if (key === 'TAB') sendKey = '{TAB}';
+        else if (key === 'BACKSPACE') sendKey = '{BACKSPACE}';
+        else if (key.startsWith('CTRL+')) sendKey = `^${key.replace('CTRL+', '').toLowerCase()}`;
+        else if (key.startsWith('ALT+')) sendKey = `%{${key.replace('ALT+', '').toLowerCase()}}`;
+        else if (key.startsWith('SHIFT+')) sendKey = `+${key.replace('SHIFT+', '').toLowerCase()}`;
+        await execAsync(`powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${sendKey}')"`);
+      } else if (platform === 'darwin') {
+        if (key === 'ENTER') {
+          await execAsync(`osascript -e 'tell application "System Events" to key code 36'`);
+        } else if (key === 'ESC') {
+          await execAsync(`osascript -e 'tell application "System Events" to key code 53'`);
+        } else if (key.startsWith('CTRL+')) {
+          const k = key.replace('CTRL+', '').toLowerCase();
+          await execAsync(`osascript -e 'tell application "System Events" to keystroke "${k}" using control down'`);
+        } else if (key.startsWith('CMD+')) {
+          const k = key.replace('CMD+', '').toLowerCase();
+          await execAsync(`osascript -e 'tell application "System Events" to keystroke "${k}" using command down'`);
+        } else {
+          await execAsync(`osascript -e 'tell application "System Events" to keystroke "${key.toLowerCase()}"'`);
+        }
+      } else {
+        const xKey = key.toLowerCase();
+        await execAsync(`xdotool key "${xKey}" 2>/dev/null || true`);
+      }
+      return { success: true, output: `Dispatched keystroke: [${key}]` };
+    }
+
+    case 'SPEAK': {
+      const text = (params.text || params.message || 'Alert from Friday').replace(/"/g, '\\"');
+      if (platform === 'win32') {
+        await execAsync(`powershell -NoProfile -Command "Add-Type -AssemblyName System.Speech; $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; $synth.Speak('${text}')"`);
+      } else if (platform === 'darwin') {
+        await execAsync(`say "${text}"`);
+      } else {
+        await execAsync(`spd-say "${text}" 2>/dev/null || espeak "${text}" 2>/dev/null || true`);
+      }
+      return { success: true, output: `Spoke through host audio: "${text}"` };
+    }
+
     default:
       throw new Error(`Unsupported native action: ${action}`);
   }
@@ -178,7 +284,17 @@ async function heartbeatAndPoll() {
     hostname,
     platform,
     arch,
-    capabilities: ['shell', 'desktop-notify', 'open-url', 'clipboard', 'app-launch', 'screen-lock'],
+    capabilities: [
+      'shell',
+      'desktop-notify',
+      'open-url',
+      'clipboard',
+      'app-launch',
+      'screen-lock',
+      'screenshot',
+      'keystroke',
+      'speak',
+    ],
     telemetry: {
       ...sys,
       batteryPercent: battery.percent,
