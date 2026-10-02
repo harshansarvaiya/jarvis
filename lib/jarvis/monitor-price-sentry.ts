@@ -62,6 +62,46 @@ const DEFAULT_TARGETS: Record<string, MonitorTarget> = {
     targetPriceThreshold: 23000,
     minValidPrice: 18000,
   },
+  'amd-ryzen-5-7600-amazon': {
+    id: 'amd-ryzen-5-7600-amazon',
+    name: 'AMD Ryzen 5 7600 (AM5 6C/12T Boxed w/ Cooler) - Amazon',
+    url: 'https://www.amazon.in/dp/B0BMQJWBDM',
+    platform: 'amazon',
+    targetPriceThreshold: 16500,
+    minValidPrice: 13000,
+  },
+  'msi-b650m-gaming-wifi-amazon': {
+    id: 'msi-b650m-gaming-wifi-amazon',
+    name: 'MSI B650M Gaming WiFi Motherboard (AM5 DDR5) - Amazon',
+    url: 'https://www.amazon.in/dp/B0CRKR3HXN',
+    platform: 'amazon',
+    targetPriceThreshold: 9900,
+    minValidPrice: 7500,
+  },
+  'crucial-p3-plus-1tb-amazon': {
+    id: 'crucial-p3-plus-1tb-amazon',
+    name: 'Crucial P3 Plus 1TB PCIe 4.0 NVMe M.2 SSD - Amazon',
+    url: 'https://www.amazon.in/dp/B0B25NXWC7',
+    platform: 'amazon',
+    targetPriceThreshold: 5500,
+    minValidPrice: 4000,
+  },
+  'cooler-master-mwe-650-bronze-amazon': {
+    id: 'cooler-master-mwe-650-bronze-amazon',
+    name: 'Cooler Master MWE 650 V3 Bronze (650W ATX 3.1) - Amazon',
+    url: 'https://www.amazon.in/dp/B0DBV8WDFP',
+    platform: 'amazon',
+    targetPriceThreshold: 4500,
+    minValidPrice: 3500,
+  },
+  'corsair-vengeance-ddr5-32gb-amazon': {
+    id: 'corsair-vengeance-ddr5-32gb-amazon',
+    name: 'Corsair Vengeance 32GB (2x16GB) DDR5 6000MHz - Amazon',
+    url: 'https://www.amazon.in/dp/B0BZHW15KF',
+    platform: 'amazon',
+    targetPriceThreshold: 8500,
+    minValidPrice: 6500,
+  },
 };
 
 function getRedisClient(): Redis | null {
@@ -252,17 +292,17 @@ export async function runMonitorPriceSentrySweep(
 
         if (shouldNotify) {
           target.lastNotifiedPrice = price;
-          let discountDesc = '';
+          let discountDesc = `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Target: <= ₹${target.targetPriceThreshold.toLocaleString('en-IN')})\n• Card Checkout Net Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`;
           if (target.id.includes('ed340cur')) {
             discountDesc = `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Was ₹23,599!)\n• Card Checkout Net Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`;
           } else if (target.id.includes('xv272u')) {
             discountDesc = `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Was ₹19,000+!)\n• Card Checkout Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`;
-          } else {
-            discountDesc = `\n• Price Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Dropped from ₹10,699!)\n• Card Cashback Net: ~₹${Math.max(0, price - 500).toLocaleString('en-IN')}`;
           }
 
+          const isMonitor = target.id.includes('cur') || target.id.includes('xv272') || target.id.includes('pm161');
+          const itemType = isMonitor ? 'tracked display' : 'PC build component';
           const alertTitle = `🎯 TARGET HIT: ${target.name.split(' - ')[0]} @ ₹${price.toLocaleString('en-IN')}`;
-          const alertBody = `Sir, your tracked display has hit your purchase trigger threshold!${discountDesc}\n\n🔗 Direct Link: ${target.url}\n\n⚡ Recommendation: Strike immediately before flash allocations deplete.`;
+          const alertBody = `Sir, your ${itemType} has hit your sniper trigger threshold!${discountDesc}\n\n🔗 Direct Link: ${target.url}\n\n⚡ Recommendation: Strike immediately before flash allocations deplete.`;
 
           triggeredAlerts.push(`${target.name} @ ₹${price}`);
 

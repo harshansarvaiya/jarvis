@@ -4,17 +4,18 @@
   "evolutionStage": 7,
   "tasks": [
     {
-      "title": "[FLAGSHIP SALE SENTRY] Procure Acer ED340CUR X0 (34\" Ultrawide) / XV272U V3 / PM161QT",
-      "description": "Live radar for Festive Flagship Sales (Amazon GIF & Flipkart BBD): Target Acer Nitro ED340CUR X0 (34\" UWQHD 200Hz Curved) @ <=₹23.0k (Current: ₹23,599), Acer Nitro XV272U V3 (27\" 2K 180Hz) @ <=₹15.0k, Acer PM161QT Touch @ <=₹10.0k. Track SBI & HDFC/ICICI 10% instant card checkout windows.",
+      "title": "[HARDWARE PROCUREMENT RADAR] Acer 34\" Ultrawide + AM5 High-ROI Dev Rig",
+      "description": "Live 24/7 sniper radar across Amazon & Flipkart for Sir's phased workstation: 1) Acer Nitro ED340CUR X0 (34\" UWQHD 200Hz Curved) @ <=₹23.0k, 2) Crucial/WD 1TB Gen4 NVMe @ <=₹5.5k, 3) AMD Ryzen 5 7600 @ <=₹16.5k, 4) MSI B650M Gaming WiFi @ <=₹9.9k, 5) Cooler Master MWE 650 V3 Bronze @ <=₹4.5k, 6) 32GB DDR5 6000MHz @ <=₹8.5k. Instant Telegram breach alerts armed.",
       "priority": "HIGH",
       "status": "IN_PROGRESS",
-      "dueDate": "2026-10-05T06:36:37.821Z",
+      "dueDate": "2026-12-31T23:59:59.000Z",
       "tags": [
         "procurement",
         "hardware",
-        "flagship-sale",
-        "monitor",
         "ultrawide",
+        "workstation",
+        "am5-rig",
+        "price-sentry",
         "radar"
       ],
       "id": "task-1790577397822-procure",
@@ -250,11 +251,6 @@
       ],
       "executionAudit": [
         {
-          "timestamp": "2026-10-02T18:46:45.520Z",
-          "status": "IN_PROGRESS",
-          "notes": "[Autonomous Radar Telemetry] Status: CRITICAL_WATCH. Strategic Sentry Summary: Overall European & Global Escalation posture is at CRITICAL_WATCH (Peak Index: 88/100 in Eastern Europe). Red Sea & Baltic corridors remain on high watch. Global logistics and defensive supply chains require ongoing continuous radar monitoring."
-        },
-        {
           "timestamp": "2026-10-02T19:01:44.985Z",
           "status": "IN_PROGRESS",
           "notes": "[Autonomous Radar Telemetry] Status: CRITICAL_WATCH. Strategic Sentry Summary: Overall European & Global Escalation posture is at CRITICAL_WATCH (Peak Index: 88/100 in Eastern Europe). Red Sea & Baltic corridors remain on high watch. Global logistics and defensive supply chains require ongoing continuous radar monitoring."
@@ -301,6 +297,11 @@
         },
         {
           "timestamp": "2026-10-02T21:16:50.402Z",
+          "status": "IN_PROGRESS",
+          "notes": "[Autonomous Radar Telemetry] Status: CRITICAL_WATCH. Strategic Sentry Summary: Overall European & Global Escalation posture is at CRITICAL_WATCH (Peak Index: 88/100 in Eastern Europe). Red Sea & Baltic corridors remain on high watch. Global logistics and defensive supply chains require ongoing continuous radar monitoring."
+        },
+        {
+          "timestamp": "2026-10-02T21:31:51.362Z",
           "status": "IN_PROGRESS",
           "notes": "[Autonomous Radar Telemetry] Status: CRITICAL_WATCH. Strategic Sentry Summary: Overall European & Global Escalation posture is at CRITICAL_WATCH (Peak Index: 88/100 in Eastern Europe). Red Sea & Baltic corridors remain on high watch. Global logistics and defensive supply chains require ongoing continuous radar monitoring."
         }
