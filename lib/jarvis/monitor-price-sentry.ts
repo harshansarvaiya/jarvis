@@ -54,6 +54,14 @@ const DEFAULT_TARGETS: Record<string, MonitorTarget> = {
     targetPriceThreshold: 10000,
     minValidPrice: 7000,
   },
+  'acer-ed340cur-x0-amazon': {
+    id: 'acer-ed340cur-x0-amazon',
+    name: 'Acer Nitro ED340CUR X0 (34" UWQHD 200Hz Curved) - Amazon',
+    url: 'https://www.amazon.in/dp/B0GXPDRDGJ',
+    platform: 'amazon',
+    targetPriceThreshold: 23000,
+    minValidPrice: 18000,
+  },
 };
 
 function getRedisClient(): Redis | null {
@@ -94,7 +102,7 @@ function extractPriceFromJsonLd(html: string, minValid: number): number | null {
 }
 
 /**
- * Robust price extraction via HTTP with strict structured parsing
+ * Robust price extraction via HTTP with strict structured parsing & curl anti-bot fallback
  */
 async function fetchPriceForTarget(target: MonitorTarget): Promise<{ price: number | null; inStock: boolean }> {
   try {
@@ -104,12 +112,36 @@ async function fetchPriceForTarget(target: MonitorTarget): Promise<{ price: numb
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     };
 
-    const res = await fetch(target.url, { headers, redirect: 'follow' });
-    if (!res.ok) {
-      return { price: null, inStock: false };
+    let html = '';
+    try {
+      const res = await fetch(target.url, { headers, redirect: 'follow' });
+      if (res.ok) {
+        html = await res.text();
+      }
+    } catch {}
+
+    // If bot-shielded or blocked by Amazon/Flipkart datacenter filters, use native curl fallback
+    if (!html || html.length < 5000 || html.includes('api-services-support@amazon.com') || html.includes('Type the characters you see in this image')) {
+      try {
+        const { execFile } = await import('child_process');
+        const { promisify } = await import('util');
+        const execFileAsync = promisify(execFile);
+        const { stdout } = await execFileAsync('curl', [
+          '-s',
+          '-L',
+          '-A', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          '-H', 'Accept-Language: en-US,en;q=0.9',
+          target.url,
+        ], { maxBuffer: 10 * 1024 * 1024 });
+        html = stdout;
+      } catch (curlErr: any) {
+        console.warn(`[Price Sentry] curl fallback failed for ${target.name}:`, curlErr.message);
+      }
     }
 
-    const html = await res.text();
+    if (!html) {
+      return { price: null, inStock: false };
+    }
 
     if (target.platform === 'flipkart') {
       const isOutOfStock = html.includes('This item is currently out of stock') || html.includes('Sold Out');
@@ -133,11 +165,6 @@ async function fetchPriceForTarget(target: MonitorTarget): Promise<{ price: numb
         }
       }
     } else if (target.platform === 'amazon') {
-      const isUnavailable = html.includes('Currently unavailable') || html.includes('we don\'t know when or if this item will be back in stock');
-      if (isUnavailable) {
-        return { price: null, inStock: false };
-      }
-
       // Method 1: Schema.org JSON-LD
       const jsonLdPrice = extractPriceFromJsonLd(html, target.minValidPrice);
       if (jsonLdPrice !== null) {
@@ -160,6 +187,12 @@ async function fetchPriceForTarget(target: MonitorTarget): Promise<{ price: numb
         if (!isNaN(cleanPrice) && cleanPrice >= target.minValidPrice && cleanPrice <= 50000) {
           return { price: cleanPrice, inStock: true };
         }
+      }
+
+      // Only mark out-of-stock if availability container explicitly declares it
+      const isUnavailable = /id=["\x27]availability["\x27][^>]*>[\s\S]*?(Currently unavailable|we don['\x27]t know when)/i.test(html);
+      if (isUnavailable) {
+        return { price: null, inStock: false };
       }
     }
 
@@ -219,9 +252,14 @@ export async function runMonitorPriceSentrySweep(
 
         if (shouldNotify) {
           target.lastNotifiedPrice = price;
-          const discountDesc = target.id.includes('xv272u')
-            ? `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Was ₹19,000+!)\n• Card Checkout Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`
-            : `\n• Price Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Dropped from ₹10,699!)\n• Card Cashback Net: ~₹${Math.max(0, price - 500).toLocaleString('en-IN')}`;
+          let discountDesc = '';
+          if (target.id.includes('ed340cur')) {
+            discountDesc = `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Was ₹23,599!)\n• Card Checkout Net Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`;
+          } else if (target.id.includes('xv272u')) {
+            discountDesc = `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Was ₹19,000+!)\n• Card Checkout Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`;
+          } else {
+            discountDesc = `\n• Price Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Dropped from ₹10,699!)\n• Card Cashback Net: ~₹${Math.max(0, price - 500).toLocaleString('en-IN')}`;
+          }
 
           const alertTitle = `🎯 TARGET HIT: ${target.name.split(' - ')[0]} @ ₹${price.toLocaleString('en-IN')}`;
           const alertBody = `Sir, your tracked display has hit your purchase trigger threshold!${discountDesc}\n\n🔗 Direct Link: ${target.url}\n\n⚡ Recommendation: Strike immediately before flash allocations deplete.`;
