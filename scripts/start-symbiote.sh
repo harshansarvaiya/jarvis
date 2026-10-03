@@ -12,4 +12,4 @@ echo " Phase Zero Link: Eyes, Ears, Keystrokes, and Host Actuation   "
 echo " Connected Mesh: https://jarvis-iota-beige.vercel.app          "
 echo "==============================================================="
 
-npx tsx scripts/satellite-node.ts --name "Sir's Workstation" --id "workstation-apex"
+npx --yes tsx scripts/satellite-node.ts --name "Sir's Workstation" --id "workstation-apex"
