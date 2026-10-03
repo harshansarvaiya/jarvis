@@ -664,6 +664,59 @@ async function processDirective(
       );
       return;
     } else if (
+      cleanUserText === '/snap' ||
+      cleanUserText === '/screenshot' ||
+      cleanUserText.toLowerCase() === 'snap screen' ||
+      cleanUserText.toLowerCase() === 'take screenshot'
+    ) {
+      gateway.sendTypingAction(chatId).catch(() => {});
+      const { listRegisteredSatellites, dispatchSatelliteCommand } = await import('../lib/jarvis/satellite');
+      const satellites = await listRegisteredSatellites();
+      const online = satellites.find((s) => s.status === 'ONLINE' && s.capabilities.includes('screenshot'));
+      if (!online) {
+        await gateway.sendMessage(
+          chatId,
+          `⚠️ **No online satellite with screenshot capability found.**\n\nEnsure your laptop node is running (\`scripts/start-symbiote.bat\`).`,
+          { replyToMessageId }
+        );
+        return;
+      }
+
+      await gateway.sendMessage(chatId, `📸 Capturing live screen from \`${online.name}\`...`, { replyToMessageId });
+      const res = await dispatchSatelliteCommand(online.id, 'ACTION', { action: 'SCREENSHOT', params: {} }, 25000, 'Sir/Telegram');
+      if (res.success && res.output.startsWith('data:image/')) {
+        const base64Data = res.output.split(',')[1];
+        const buffer = Buffer.from(base64Data, 'base64');
+        await gateway.sendPhoto(chatId, buffer, {
+          caption: `📸 **Workstation Visual Uplink**\n\n• Device: \`${online.name}\` (\`${online.id}\`)\n• Latency: \`${res.durationMs}ms\``,
+          replyToMessageId,
+        });
+      } else {
+        await gateway.sendMessage(chatId, `⚠️ **Snapshot Failed**: ${res.error || res.output}`, { replyToMessageId });
+      }
+      return;
+    } else if (cleanUserText.startsWith('/speak ') || cleanUserText.startsWith('/say ')) {
+      const textToSpeak = cleanUserText.replace(/^\/(?:speak|say)\s+/i, '').trim();
+      const { listRegisteredSatellites, dispatchSatelliteCommand } = await import('../lib/jarvis/satellite');
+      const satellites = await listRegisteredSatellites();
+      const online = satellites.find((s) => s.status === 'ONLINE' && s.capabilities.includes('speak'));
+      if (!online) {
+        await gateway.sendMessage(
+          chatId,
+          `⚠️ **No online satellite with speaker capability found.**`,
+          { replyToMessageId }
+        );
+        return;
+      }
+
+      const res = await dispatchSatelliteCommand(online.id, 'ACTION', { action: 'SPEAK', params: { text: textToSpeak } }, 15000, 'Sir/Telegram');
+      if (res.success) {
+        await gateway.sendMessage(chatId, `🔊 **Spoken aloud on \`${online.name}\`:**\n\n"${textToSpeak}"`, { replyToMessageId });
+      } else {
+        await gateway.sendMessage(chatId, `⚠️ **Speech Failed**: ${res.error}`, { replyToMessageId });
+      }
+      return;
+    } else if (
       cleanUserText === '/satellites' ||
       cleanUserText === '/devices' ||
       cleanUserText === '/mesh' ||
@@ -738,8 +791,12 @@ async function processDirective(
 
         if (dev.status === 'ONLINE') {
           kb.inline_keyboard.push([
-            { text: `⚡ Ping ${dev.name.slice(0, 18)}`, callback_data: `sat_ping:${dev.id}` },
-            { text: `🔔 Notify ${dev.name.slice(0, 18)}`, callback_data: `sat_notify:${dev.id}` },
+            { text: `⚡ Ping`, callback_data: `sat_ping:${dev.id}` },
+            { text: `🔔 Alert`, callback_data: `sat_notify:${dev.id}` },
+          ]);
+          kb.inline_keyboard.push([
+            { text: `📸 Snap Screen`, callback_data: `sat_snap:${dev.id}` },
+            { text: `🔊 Speak Voice`, callback_data: `sat_speak:${dev.id}` },
           ]);
         }
       }
@@ -983,6 +1040,32 @@ async function handleIncomingMessage(update: TelegramUpdate) {
         await gateway.sendMessage(chatId, `🔔 **Desktop Alert Triggered on ${targetId}**\n\n_${res.output}_`, { replyToMessageId: cq.message?.message_id });
       } else {
         await gateway.sendMessage(chatId, `⚠️ **Failed to trigger alert on ${targetId}**: ${res.error}`, { replyToMessageId: cq.message?.message_id });
+      }
+      return;
+    } else if (cq.data.startsWith('sat_snap:')) {
+      const targetId = cq.data.replace(/^sat_snap:/, '');
+      const { dispatchSatelliteCommand } = await import('../lib/jarvis/satellite');
+      await gateway.sendMessage(chatId, `📸 Capturing screen from \`${targetId}\`...`, { replyToMessageId: cq.message?.message_id });
+      const res = await dispatchSatelliteCommand(targetId, 'ACTION', { action: 'SCREENSHOT', params: {} }, 25000, 'Sir/Telegram');
+      if (res.success && res.output.startsWith('data:image/')) {
+        const base64Data = res.output.split(',')[1];
+        const buffer = Buffer.from(base64Data, 'base64');
+        await gateway.sendPhoto(chatId, buffer, {
+          caption: `📸 **Workstation Visual Uplink**\n\n• Target: \`${targetId}\`\n• Captured: \`${new Date().toLocaleTimeString('en-GB')}\`\n• Latency: \`${res.durationMs}ms\``,
+          replyToMessageId: cq.message?.message_id,
+        });
+      } else {
+        await gateway.sendMessage(chatId, `⚠️ **Snapshot Failed (${targetId})**: ${res.error || res.output}`, { replyToMessageId: cq.message?.message_id });
+      }
+      return;
+    } else if (cq.data.startsWith('sat_speak:')) {
+      const targetId = cq.data.replace(/^sat_speak:/, '');
+      const { dispatchSatelliteCommand } = await import('../lib/jarvis/satellite');
+      const res = await dispatchSatelliteCommand(targetId, 'ACTION', { action: 'SPEAK', params: { text: 'All systems nominal, Sir. Friday is online and operational.' } }, 15000, 'Sir/Telegram');
+      if (res.success) {
+        await gateway.sendMessage(chatId, `🔊 **Spoke on \`${targetId}\` speakers!**\n\n_${res.output}_`, { replyToMessageId: cq.message?.message_id });
+      } else {
+        await gateway.sendMessage(chatId, `⚠️ **Failed to speak on ${targetId}**: ${res.error}`, { replyToMessageId: cq.message?.message_id });
       }
       return;
     } else if (cq.data.startsWith('trade_order:')) {
