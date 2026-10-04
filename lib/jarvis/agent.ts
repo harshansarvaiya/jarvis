@@ -652,6 +652,44 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           },
         };
       }
+
+      // Smart Failover: If paid model hit credit limit, fallback to 550B Ultra Titan (Free)
+      if (routerResult.error && (routerResult.error.includes('credit') || routerResult.error.includes('402'))) {
+        console.warn(`[Red-Team Sandbox] Paid model (${routerModel}) requires OpenRouter credits. Failing over to 550B Free Titan: nvidia/nemotron-3-ultra-550b-a55b:free...`);
+        const fallbackResult = await runOpenAICompatibleAgent(messages, {
+          endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+          apiKey: openrouterKey,
+          model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+          systemPrompt: redTeamSystemPrompt,
+          temperature: autoTuneConfig.temperature,
+          tools: redTeamTools,
+          extraHeaders: {
+            'HTTP-Referer': 'https://github.com/harshansarvaiya/jarvis',
+            'X-Title': 'J.A.R.V.I.S. Mark II',
+          },
+        });
+        if (!fallbackResult.error && fallbackResult.reply) {
+          const latencyMs = Date.now() - startTime;
+          return {
+            reply: fallbackResult.reply,
+            vocalSummary: extractCinematicVocalSummary(fallbackResult.reply),
+            tacticalActions: generateTacticalNextActions(lastUserMessage.content, fallbackResult.reply, fallbackResult.toolCallsExecuted),
+            toolCallsExecuted: fallbackResult.toolCallsExecuted,
+            telemetry: {
+              engineUsed: `🔴 RED-TEAM SANDBOX (Nemotron 550B Free Titan)`,
+              provider: 'openrouter',
+              model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+              latencyMs,
+              archetype: 'RED_TEAM_SANDBOX',
+              failoverOccurred: true,
+              recalledEpisodesCount: recalledEpisodes.length,
+              persona,
+              samplingArchetype: autoTuneConfig.archetype,
+              samplingTemperature: autoTuneConfig.temperature,
+            },
+          };
+        }
+      }
     }
   }
 
