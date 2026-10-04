@@ -2678,6 +2678,17 @@ export async function executeJarvisTool(
   }
 
   try {
+    // Broadcast action to Dual-Citizen State Bus
+    import('./state-bus').then(({ publishStateEvent }) => {
+      publishStateEvent({
+        type: 'agent:action',
+        source: 'friday',
+        title: `Tool: ${toolName}`,
+        detail: args && Object.keys(args).length > 0 ? JSON.stringify(args).slice(0, 80) : undefined,
+        payload: { toolName },
+      }).catch(() => {});
+    }).catch(() => {});
+
     switch (toolName) {
       case 'manage_task': {
         const { action, taskId, title, description, priority, dueDate, tags, actionName, command, server, actionOutput } = args;

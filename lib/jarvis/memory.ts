@@ -319,6 +319,18 @@ export function addTask(taskData: Omit<Task, 'id' | 'createdAt'>): Task {
   state.tasks.unshift(newTask);
   addLog(state, 'ACTION', `Task created: "${newTask.title}" [${newTask.priority}]`);
   saveJarvisState(state);
+
+  // Broadcast to Dual-Citizen State Bus
+  import('./state-bus').then(({ publishStateEvent }) => {
+    publishStateEvent({
+      type: 'state:task_updated',
+      source: 'jarvis',
+      title: `Task Created: "${newTask.title}"`,
+      detail: `Priority: ${newTask.priority}`,
+      payload: { task: newTask, action: 'create' },
+    }).catch(() => {});
+  }).catch(() => {});
+
   return newTask;
 }
 
@@ -332,9 +344,22 @@ export function updateTask(id: string, updates: Partial<Task>): Task | null {
   }
 
   state.tasks[index] = { ...state.tasks[index], ...updates };
-  addLog(state, 'ACTION', `Task updated: "${state.tasks[index].title}" [status: ${state.tasks[index].status}]`);
+  const updatedTask = state.tasks[index];
+  addLog(state, 'ACTION', `Task updated: "${updatedTask.title}" [status: ${updatedTask.status}]`);
   saveJarvisState(state);
-  return state.tasks[index];
+
+  // Broadcast to Dual-Citizen State Bus
+  import('./state-bus').then(({ publishStateEvent }) => {
+    publishStateEvent({
+      type: 'state:task_updated',
+      source: 'jarvis',
+      title: `Task Updated: "${updatedTask.title}"`,
+      detail: `Status: ${updatedTask.status}`,
+      payload: { task: updatedTask, action: 'update' },
+    }).catch(() => {});
+  }).catch(() => {});
+
+  return updatedTask;
 }
 
 export function deleteTask(id: string): boolean {
@@ -344,6 +369,18 @@ export function deleteTask(id: string): boolean {
   if (state.tasks.length !== initialLength) {
     addLog(state, 'ACTION', `Task deleted: ${id}`);
     saveJarvisState(state);
+
+    // Broadcast to Dual-Citizen State Bus
+    import('./state-bus').then(({ publishStateEvent }) => {
+      publishStateEvent({
+        type: 'state:task_updated',
+        source: 'jarvis',
+        title: `Task Deleted`,
+        detail: `ID: ${id}`,
+        payload: { id, action: 'delete' },
+      }).catch(() => {});
+    }).catch(() => {});
+
     return true;
   }
   return false;
@@ -444,6 +481,17 @@ export function addMemory(
       }).catch((sErr) => console.warn('[Supermemory Sync] Non-blocking warn:', sErr));
     }).catch(() => {});
   }
+
+  // Broadcast to Dual-Citizen State Bus
+  import('./state-bus').then(({ publishStateEvent }) => {
+    publishStateEvent({
+      type: 'state:memory_updated',
+      source: 'jarvis',
+      title: `Memory Assimilated [${category}]`,
+      detail: content.length > 80 ? content.slice(0, 80) + '…' : content,
+      payload: { id: newMemory.id, category, tier: inferredTier },
+    }).catch(() => {});
+  }).catch(() => {});
 
   return newMemory;
 }

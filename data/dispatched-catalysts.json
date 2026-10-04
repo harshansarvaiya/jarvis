@@ -1,878 +1,5 @@
 [
   {
-    "id": "205501b9c4c4b064",
-    "normalizedHeadline": "rbi wait and watch phase is over as inflation demands a rate hike",
-    "keywords": [
-      "rbi",
-      "wait",
-      "watch",
-      "phase",
-      "inflation",
-      "demands",
-      "rate",
-      "hike"
-    ],
-    "headline": "RBI’s wait and watch phase is over as inflation demands a rate hike - The Economic Times",
-    "dispatchedAt": 1790797598947
-  },
-  {
-    "id": "68571d84e9048fbb",
-    "normalizedHeadline": "us crude oil output rose in july while petroleum demand declined eia says",
-    "keywords": [
-      "crude",
-      "oil",
-      "output",
-      "rose",
-      "july",
-      "while",
-      "petroleum",
-      "demand",
-      "declined",
-      "eia"
-    ],
-    "headline": "US crude oil output rose in July, while petroleum demand declined, EIA says",
-    "dispatchedAt": 1790797640140
-  },
-  {
-    "id": "c417dcc6f4345bf9",
-    "normalizedHeadline": "pms has potential to grow over 20 pc cagr as investment participation deepens sebi chairman",
-    "keywords": [
-      "pms",
-      "has",
-      "potential",
-      "grow",
-      "cagr",
-      "investment",
-      "participation",
-      "deepens",
-      "sebi",
-      "chairman"
-    ],
-    "headline": "PMS has potential to grow over 20 pc CAGR as investment participation deepens: SEBI Chairman - thehawk.in",
-    "dispatchedAt": 1790797969215
-  },
-  {
-    "id": "76e4c20227d44d5c",
-    "normalizedHeadline": "no proposal on allowing nse bse to trade their own shares at present sebi chief",
-    "keywords": [
-      "proposal",
-      "allowing",
-      "nse",
-      "bse",
-      "trade",
-      "own",
-      "shares",
-      "present",
-      "sebi",
-      "chief"
-    ],
-    "headline": "No proposal on allowing NSE, BSE to trade their own shares at present: SEBI chief - thehawk.in",
-    "dispatchedAt": 1790799176142
-  },
-  {
-    "id": "e36b06b053bffc60",
-    "normalizedHeadline": "defence electronics maker tonbo imaging receives sebi approval for ipo",
-    "keywords": [
-      "defence",
-      "electronics",
-      "maker",
-      "tonbo",
-      "imaging",
-      "receives",
-      "sebi",
-      "approval",
-      "ipo"
-    ],
-    "headline": "Defence Electronics Maker Tonbo Imaging Receives SEBI Approval For IPO - BW Businessworld",
-    "dispatchedAt": 1790803312621
-  },
-  {
-    "id": "4582c2f017f96c27",
-    "normalizedHeadline": "manoj kumar asks apmi to work with sebi on simplifying pms client onboarding",
-    "keywords": [
-      "manoj",
-      "kumar",
-      "asks",
-      "apmi",
-      "work",
-      "sebi",
-      "simplifying",
-      "pms",
-      "client",
-      "onboarding"
-    ],
-    "headline": "Manoj Kumar asks APMI to work with SEBI on simplifying PMS client onboarding - Cafemutual",
-    "dispatchedAt": 1790811716981
-  },
-  {
-    "id": "15660251df8fb78a",
-    "normalizedHeadline": "pms industry has room to grow but managers must prove their value sebi chief",
-    "keywords": [
-      "pms",
-      "industry",
-      "has",
-      "room",
-      "grow",
-      "but",
-      "managers",
-      "must",
-      "prove",
-      "value",
-      "sebi",
-      "chief"
-    ],
-    "headline": "PMS industry has room to grow but managers must prove their value: SEBI chief - Cafemutual",
-    "dispatchedAt": 1790812017727
-  },
-  {
-    "id": "179e2e87ff16b58e",
-    "normalizedHeadline": "investors aware of market cycles sebi chief",
-    "keywords": [
-      "investors",
-      "aware",
-      "market",
-      "cycles",
-      "sebi",
-      "chief"
-    ],
-    "headline": "Investors aware of market cycles: SEBI chief - IndiaIPO",
-    "dispatchedAt": 1790813218238
-  },
-  {
-    "id": "b6c1876bca1ed3fe",
-    "normalizedHeadline": "sebi rbi join hands to make onboarding easier for fpis",
-    "keywords": [
-      "sebi",
-      "rbi",
-      "join",
-      "hands",
-      "make",
-      "onboarding",
-      "easier",
-      "fpis"
-    ],
-    "headline": "Sebi, RBI join hands to make onboarding easier for FPIs - The Economic Times",
-    "dispatchedAt": 1790813518854
-  },
-  {
-    "id": "62f42e45eaeaf763",
-    "normalizedHeadline": "usual october cheer could be missing after rout last month",
-    "keywords": [
-      "usual",
-      "october",
-      "cheer",
-      "could",
-      "missing",
-      "rout",
-      "last",
-      "month"
-    ],
-    "headline": "Usual October cheer could be missing after rout last month",
-    "dispatchedAt": 1790814118398
-  },
-  {
-    "id": "b15a6a27b65d8481",
-    "normalizedHeadline": "can october turn the tide for indian stocks after september rout",
-    "keywords": [
-      "can",
-      "october",
-      "turn",
-      "tide",
-      "indian",
-      "stocks",
-      "september",
-      "rout"
-    ],
-    "headline": "Can October turn the tide for Indian stocks after September rout?",
-    "dispatchedAt": 1790815920577
-  },
-  {
-    "id": "15eb3cfa7809f5c5",
-    "normalizedHeadline": "ipo rush continues 50",
-    "keywords": [
-      "ipo",
-      "rush",
-      "continues"
-    ],
-    "headline": "IPO rush continues: 50-plus companies file DRHPs ahead of Sebi deadline",
-    "dispatchedAt": 1790817721498
-  },
-  {
-    "id": "75412f0ebfacb36f",
-    "normalizedHeadline": "daily voice shriram life cio expects 50 bps rbi rate hike by december sees it as a contrarian bet",
-    "keywords": [
-      "daily",
-      "voice",
-      "shriram",
-      "life",
-      "cio",
-      "expects",
-      "bps",
-      "rbi",
-      "rate",
-      "hike",
-      "december",
-      "sees",
-      "contrarian",
-      "bet"
-    ],
-    "headline": "Daily Voice: Shriram Life CIO expects 50 bps RBI rate hike by December; sees IT as a contrarian bet - Moneycontrol.com",
-    "dispatchedAt": 1790818323284
-  },
-  {
-    "id": "b52074c01ce53ff7",
-    "normalizedHeadline": "growpital case sebi to refund money directly to investors for first time",
-    "keywords": [
-      "growpital",
-      "case",
-      "sebi",
-      "refund",
-      "money",
-      "directly",
-      "investors",
-      "first",
-      "time"
-    ],
-    "headline": "Growpital case: Sebi to refund money directly to investors for first time",
-    "dispatchedAt": 1790819823169
-  },
-  {
-    "id": "2f75b65481ee23c1",
-    "normalizedHeadline": "indian markets set for weak start as gift nifty falls 73 points crude oil us yields in focus",
-    "keywords": [
-      "indian",
-      "markets",
-      "set",
-      "weak",
-      "start",
-      "gift",
-      "nifty",
-      "falls",
-      "points",
-      "crude",
-      "oil",
-      "yields",
-      "focus"
-    ],
-    "headline": "Indian Markets Set For Weak Start As GIFT Nifty Falls 73 Points; Crude Oil, US Yields In Focus - News18",
-    "dispatchedAt": 1790821025376
-  },
-  {
-    "id": "0ffeaf105f2ec465",
-    "normalizedHeadline": "oil prices barely changed as investors assess us",
-    "keywords": [
-      "oil",
-      "prices",
-      "barely",
-      "changed",
-      "investors",
-      "assess"
-    ],
-    "headline": "Oil prices barely changed as investors assess US-Iran peace talks and Gulf exports",
-    "dispatchedAt": 1790821624430
-  },
-  {
-    "id": "6cf906f9d1662d90",
-    "normalizedHeadline": "oil price today october 1 crude oil at 98 as investors assess supply recovery peace deal talks what are analysts saying",
-    "keywords": [
-      "oil",
-      "price",
-      "today",
-      "october",
-      "crude",
-      "investors",
-      "assess",
-      "supply",
-      "recovery",
-      "peace",
-      "deal",
-      "talks",
-      "analysts",
-      "saying"
-    ],
-    "headline": "Oil Price Today (October 1): Crude oil at $98 as investors assess supply recovery, peace deal talks. What are analysts saying?",
-    "dispatchedAt": 1790822224739
-  },
-  {
-    "id": "cadab58694c0be59",
-    "normalizedHeadline": "nse shares in focus after sebi nod for corporate bond index futures",
-    "keywords": [
-      "nse",
-      "shares",
-      "focus",
-      "sebi",
-      "nod",
-      "corporate",
-      "bond",
-      "index",
-      "futures"
-    ],
-    "headline": "NSE shares in focus after SEBI nod for corporate bond index futures - Business Today",
-    "dispatchedAt": 1790824626771
-  },
-  {
-    "id": "d14a8670726afa06",
-    "normalizedHeadline": "rbi keeps repo rate unchanged projects india real gdp growth for current fiscal at 6 9 akashvani news",
-    "keywords": [
-      "rbi",
-      "keeps",
-      "repo",
-      "rate",
-      "unchanged",
-      "projects",
-      "india",
-      "real",
-      "gdp",
-      "growth",
-      "current",
-      "fiscal",
-      "akashvani",
-      "news"
-    ],
-    "headline": "RBI keeps repo rate unchanged; Projects India’s real GDP growth for current fiscal at 6.9% | Akashvani News - News On AIR",
-    "dispatchedAt": 1790825226870
-  },
-  {
-    "id": "5f71bd687a3e1bf9",
-    "normalizedHeadline": "global market kospi falls as oil prices middle east uncertainty weigh",
-    "keywords": [
-      "global",
-      "market",
-      "kospi",
-      "falls",
-      "oil",
-      "prices",
-      "middle",
-      "east",
-      "uncertainty",
-      "weigh"
-    ],
-    "headline": "Global Market: Kospi falls as oil prices, Middle East uncertainty weigh",
-    "dispatchedAt": 1790828110661
-  },
-  {
-    "id": "1b68e6bbf831282d",
-    "normalizedHeadline": "code red nse breadth breaks down as 350 out of 500 stocks crash up to 60 in two month selloff",
-    "keywords": [
-      "code",
-      "red",
-      "nse",
-      "breadth",
-      "breaks",
-      "down",
-      "350",
-      "out",
-      "500",
-      "stocks",
-      "crash",
-      "two",
-      "month",
-      "selloff"
-    ],
-    "headline": "Code red! NSE breadth breaks down as 350 out of 500 stocks crash up to 60% in two month selloff",
-    "dispatchedAt": 1790830216408
-  },
-  {
-    "id": "f82f3868c1a060ef",
-    "normalizedHeadline": "traffic safety solutions provider kataline files ipo papers with sebi",
-    "keywords": [
-      "traffic",
-      "safety",
-      "solutions",
-      "provider",
-      "kataline",
-      "files",
-      "ipo",
-      "papers",
-      "sebi"
-    ],
-    "headline": "Traffic safety solutions provider Kataline files IPO papers with Sebi",
-    "dispatchedAt": 1790830816867
-  },
-  {
-    "id": "d76b96b54db593b0",
-    "normalizedHeadline": "no relook at bourses self listing sebi",
-    "keywords": [
-      "relook",
-      "bourses",
-      "self",
-      "listing",
-      "sebi"
-    ],
-    "headline": "No relook at bourses’ self-listing: Sebi - The Times of India",
-    "dispatchedAt": 1790831417621
-  },
-  {
-    "id": "79174174b3d133a2",
-    "normalizedHeadline": "dosti realty moneytree realty file ipo papers with sebi through confidential route",
-    "keywords": [
-      "dosti",
-      "realty",
-      "moneytree",
-      "file",
-      "ipo",
-      "papers",
-      "sebi",
-      "through",
-      "confidential",
-      "route"
-    ],
-    "headline": "Dosti Realty, Moneytree Realty file IPO papers with SEBI through confidential route - BusinessLine",
-    "dispatchedAt": 1790839822856
-  },
-  {
-    "id": "dcaf4aede42292f4",
-    "normalizedHeadline": "sebi censures eqwires research analyst for misleading claims handling client trading account",
-    "keywords": [
-      "sebi",
-      "censures",
-      "eqwires",
-      "research",
-      "analyst",
-      "misleading",
-      "claims",
-      "handling",
-      "client",
-      "trading",
-      "account"
-    ],
-    "headline": "SEBI Censures Eqwires Research Analyst for Misleading Claims, Handling Client Trading Account - Moneylife",
-    "dispatchedAt": 1790840423113
-  },
-  {
-    "id": "329d2a1018aa39c8",
-    "normalizedHeadline": "global agentic regulator hackathon won by sebi team",
-    "keywords": [
-      "global",
-      "agentic",
-      "regulator",
-      "hackathon",
-      "won",
-      "sebi",
-      "team"
-    ],
-    "headline": "Global Agentic Regulator Hackathon won by SEBI team - Global Government Finance",
-    "dispatchedAt": 1790841023510
-  },
-  {
-    "id": "shock-brent-2026-10-01T08-100",
-    "normalizedHeadline": "brent crude surges 2 32 to 100 30 bbl",
-    "keywords": [
-      "brent",
-      "crude",
-      "surges",
-      "100",
-      "bbl"
-    ],
-    "headline": "Brent Crude Surges +2.32% to $100.30/bbl",
-    "dispatchedAt": 1790844025131
-  },
-  {
-    "id": "86c086e2f45b826e",
-    "normalizedHeadline": "sensex down 1 000 pts nifty below 22 300 rebound in crude oil prices among key factors behind market",
-    "keywords": [
-      "sensex",
-      "down",
-      "000",
-      "pts",
-      "nifty",
-      "below",
-      "300",
-      "rebound",
-      "crude",
-      "oil",
-      "prices",
-      "among",
-      "key",
-      "factors",
-      "behind",
-      "market"
-    ],
-    "headline": "Sensex down 1,000 pts, Nifty below 22,300: Rebound in crude oil prices among key factors behind market... - Moneycontrol.com",
-    "dispatchedAt": 1790844326239
-  },
-  {
-    "id": "d5ad2c59c4814a63",
-    "normalizedHeadline": "gas maker inox air products files ipo papers with sebi public issue to entirely comprise ofs",
-    "keywords": [
-      "gas",
-      "maker",
-      "inox",
-      "air",
-      "products",
-      "files",
-      "ipo",
-      "papers",
-      "sebi",
-      "public",
-      "issue",
-      "entirely",
-      "comprise",
-      "ofs"
-    ],
-    "headline": "Gas maker Inox Air Products files IPO papers with Sebi, public issue to entirely comprise OFS",
-    "dispatchedAt": 1790847026982
-  },
-  {
-    "id": "cae08bfafe7b4e76",
-    "normalizedHeadline": "global market eurozone bonds face pressure as energy shock fuels rate hike bets",
-    "keywords": [
-      "global",
-      "market",
-      "eurozone",
-      "bonds",
-      "face",
-      "pressure",
-      "energy",
-      "shock",
-      "fuels",
-      "rate",
-      "hike",
-      "bets"
-    ],
-    "headline": "Global Market: Eurozone bonds face pressure as energy shock fuels rate hike bets",
-    "dispatchedAt": 1790847327631
-  },
-  {
-    "id": "6bf5d7b371771fb5",
-    "normalizedHeadline": "no self trading in bourse shares sebi",
-    "keywords": [
-      "self",
-      "trading",
-      "bourse",
-      "shares",
-      "sebi"
-    ],
-    "headline": "No self-trading in bourse shares: SEBI - Pioneer Daily",
-    "dispatchedAt": 1790850629812
-  },
-  {
-    "id": "dfb9a25667ebb273",
-    "normalizedHeadline": "sebi new pms rules how the 25 lakh route and wider asset choices could affect investors cnbc tv18",
-    "keywords": [
-      "sebi",
-      "new",
-      "pms",
-      "rules",
-      "how",
-      "lakh",
-      "route",
-      "wider",
-      "asset",
-      "choices",
-      "could",
-      "affect",
-      "investors",
-      "cnbc",
-      "tv18"
-    ],
-    "headline": "SEBI’s new PMS rules: How the ₹25 lakh route and wider asset choices could affect investors - CNBC TV18 - LinkedIn",
-    "dispatchedAt": 1790855432986
-  },
-  {
-    "id": "fb4aae70a05128ae",
-    "normalizedHeadline": "market wrap infosys hdfc bank bajaj auto maruti suzuki among top gainers and losers on nifty and sensex on thursday",
-    "keywords": [
-      "market",
-      "wrap",
-      "infosys",
-      "hdfc",
-      "bank",
-      "bajaj",
-      "auto",
-      "maruti",
-      "suzuki",
-      "among",
-      "top",
-      "gainers",
-      "losers",
-      "nifty",
-      "sensex",
-      "thursday"
-    ],
-    "headline": "Market wrap: Infosys, HDFC Bank, Bajaj Auto, Maruti Suzuki among top gainers and losers on Nifty and Sensex on Thursday",
-    "dispatchedAt": 1790856032601
-  },
-  {
-    "id": "43680093fc19a7eb",
-    "normalizedHeadline": "global bond rout hoists benchmark indian yield to mid",
-    "keywords": [
-      "global",
-      "bond",
-      "rout",
-      "hoists",
-      "benchmark",
-      "indian",
-      "yield",
-      "mid"
-    ],
-    "headline": "Global bond rout hoists benchmark Indian yield to mid-2024 high before RBI policy",
-    "dispatchedAt": 1790858734171
-  },
-  {
-    "id": "61c3a7e8b75afa17",
-    "normalizedHeadline": "sebi mandates investor awareness messages on stock brokers websites trading apps",
-    "keywords": [
-      "sebi",
-      "mandates",
-      "investor",
-      "awareness",
-      "messages",
-      "stock",
-      "brokers",
-      "websites",
-      "trading",
-      "apps"
-    ],
-    "headline": "Sebi mandates investor awareness messages on stock brokers’ websites, trading apps - Fortune India",
-    "dispatchedAt": 1790861436588
-  },
-  {
-    "id": "d88ce52166e0fdee",
-    "normalizedHeadline": "carlsberg india ipo gets sebi approval along with three other public offers check details",
-    "keywords": [
-      "carlsberg",
-      "india",
-      "ipo",
-      "gets",
-      "sebi",
-      "approval",
-      "along",
-      "three",
-      "other",
-      "public",
-      "offers",
-      "check",
-      "details"
-    ],
-    "headline": "Carlsberg India IPO gets Sebi approval along with three other public offers. Check details",
-    "dispatchedAt": 1790862036449
-  },
-  {
-    "id": "002b659bfea900ed",
-    "normalizedHeadline": "sebi to make investor awareness messages mandatory on broker apps sites",
-    "keywords": [
-      "sebi",
-      "make",
-      "investor",
-      "awareness",
-      "messages",
-      "mandatory",
-      "broker",
-      "apps",
-      "sites"
-    ],
-    "headline": "Sebi to make investor awareness messages mandatory on broker apps, sites - Business Standard",
-    "dispatchedAt": 1790862337769
-  },
-  {
-    "id": "e2acc0a05d187aaf",
-    "normalizedHeadline": "inox clean energy ipo papers kept in abeyance by sebi",
-    "keywords": [
-      "inox",
-      "clean",
-      "energy",
-      "ipo",
-      "papers",
-      "kept",
-      "abeyance",
-      "sebi"
-    ],
-    "headline": "Inox Clean Energy IPO papers kept in abeyance by Sebi",
-    "dispatchedAt": 1790862937109
-  },
-  {
-    "id": "278cbe9f65edb891",
-    "normalizedHeadline": "jio platforms ipo in final stages after concluding worldwide roadshows",
-    "keywords": [
-      "jio",
-      "platforms",
-      "ipo",
-      "final",
-      "stages",
-      "concluding",
-      "worldwide",
-      "roadshows"
-    ],
-    "headline": "Jio Platforms IPO in final stages after concluding worldwide roadshows",
-    "dispatchedAt": 1790863537542
-  },
-  {
-    "id": "039587e48c4d247a",
-    "normalizedHeadline": "jio ipo nears launch drhp filed sebi clears path",
-    "keywords": [
-      "jio",
-      "ipo",
-      "nears",
-      "launch",
-      "drhp",
-      "filed",
-      "sebi",
-      "clears",
-      "path"
-    ],
-    "headline": "Jio IPO nears launch: DRHP filed, SEBI clears path - YourStory.com",
-    "dispatchedAt": 1790863838899
-  },
-  {
-    "id": "225254146b11feaf",
-    "normalizedHeadline": "sebi revamps document number verification system adds subject matter as mandatory field",
-    "keywords": [
-      "sebi",
-      "revamps",
-      "document",
-      "number",
-      "verification",
-      "system",
-      "adds",
-      "subject",
-      "matter",
-      "mandatory",
-      "field"
-    ],
-    "headline": "Sebi revamps Document Number Verification System, adds subject matter as mandatory field",
-    "dispatchedAt": 1790865038249
-  },
-  {
-    "id": "a5faf00b7eedfea1",
-    "normalizedHeadline": "rbi set for 50 75 bps rate hike as rupee oil and global risks mount says bandhan life",
-    "keywords": [
-      "rbi",
-      "set",
-      "bps",
-      "rate",
-      "hike",
-      "rupee",
-      "oil",
-      "global",
-      "risks",
-      "mount",
-      "bandhan",
-      "life"
-    ],
-    "headline": "RBI set for 50–75 bps rate hike as Rupee, Oil and Global risks mount, says Bandhan Life - BusinessLine",
-    "dispatchedAt": 1790865640399
-  },
-  {
-    "id": "eaf36172209f66f6",
-    "normalizedHeadline": "sindhuja raises 100 crore via ncds carlsberg gets sebi approval for ipo",
-    "keywords": [
-      "sindhuja",
-      "raises",
-      "100",
-      "crore",
-      "via",
-      "ncds",
-      "carlsberg",
-      "gets",
-      "sebi",
-      "approval",
-      "ipo"
-    ],
-    "headline": "Sindhuja raises ₹100 crore via NCDs; Carlsberg gets Sebi approval for IPO - Business Standard",
-    "dispatchedAt": 1790865940364
-  },
-  {
-    "id": "ba4123f17b28d260",
-    "normalizedHeadline": "punjab national bank receives administrative warning letter from sebi for insider trading violations",
-    "keywords": [
-      "punjab",
-      "national",
-      "bank",
-      "receives",
-      "administrative",
-      "warning",
-      "letter",
-      "sebi",
-      "insider",
-      "trading",
-      "violations"
-    ],
-    "headline": "Punjab National Bank Receives Administrative Warning Letter From SEBI For Insider Trading Violations - TradingView",
-    "dispatchedAt": 1790868041500
-  },
-  {
-    "id": "a67446acf794ea96",
-    "normalizedHeadline": "ipo bound carlsberg india gets sebi approval months after confidential filing",
-    "keywords": [
-      "ipo",
-      "bound",
-      "carlsberg",
-      "india",
-      "gets",
-      "sebi",
-      "approval",
-      "months",
-      "confidential",
-      "filing"
-    ],
-    "headline": "IPO Bound: Carlsberg India Gets SEBI Approval Months After Confidential Filing - NDTV Profit",
-    "dispatchedAt": 1790869542848
-  },
-  {
-    "id": "7fc05778a95030d0",
-    "normalizedHeadline": "sebi revamps document verification system to curb fake letters and notices",
-    "keywords": [
-      "sebi",
-      "revamps",
-      "document",
-      "verification",
-      "system",
-      "curb",
-      "fake",
-      "letters",
-      "notices"
-    ],
-    "headline": "Sebi revamps document verification system to curb fake letters and notices - Business Standard",
-    "dispatchedAt": 1790872844401
-  },
-  {
-    "id": "d72049723c0c35dd",
-    "normalizedHeadline": "do not defame cas system warns sebi chief",
-    "keywords": [
-      "not",
-      "defame",
-      "cas",
-      "system",
-      "warns",
-      "sebi",
-      "chief"
-    ],
-    "headline": "Do not defame CAS system, warns SEBI Chief - theindianawaaz.com",
-    "dispatchedAt": 1790884551364
-  },
-  {
-    "id": "65a2b81e4fa8dc0c",
-    "normalizedHeadline": "us stocks us market rebounds to close higher as surging treasury yields recede",
-    "keywords": [
-      "stocks",
-      "market",
-      "rebounds",
-      "close",
-      "higher",
-      "surging",
-      "treasury",
-      "yields",
-      "recede"
-    ],
-    "headline": "US stocks: US market rebounds to close higher as surging Treasury yields recede",
-    "dispatchedAt": 1790887252070
-  },
-  {
-    "id": "0f9dfa2c5ebbbb13",
-    "normalizedHeadline": "crude oil prediction for tomorrow 1 oct 2026",
-    "keywords": [
-      "crude",
-      "oil",
-      "prediction",
-      "tomorrow",
-      "oct",
-      "2026"
-    ],
-    "headline": "Crude Oil Prediction for Tomorrow: 1 Oct 2026 - univest.in",
-    "dispatchedAt": 1790891155421
-  },
-  {
     "id": "a16e9ae2d48919f4",
     "normalizedHeadline": "carlsberg india matangi rubber ujin pharma and tmc transformers get sebi nod for ipos",
     "keywords": [
@@ -1354,5 +481,484 @@
     ],
     "headline": "SEBI updates online tool for verifying authenticity of official letters and notices - TaxCorp AI",
     "dispatchedAt": 1790974607292
+  },
+  {
+    "id": "45f53cf9365bffa8",
+    "normalizedHeadline": "a modest repo rate hike will be in order",
+    "keywords": [
+      "modest",
+      "repo",
+      "rate",
+      "hike",
+      "order"
+    ],
+    "headline": "A modest repo rate hike will be in order - BusinessLine",
+    "dispatchedAt": 1790988262037
+  },
+  {
+    "id": "6e60ef06781a80c4",
+    "normalizedHeadline": "canara robeco innovation fund 7 things to know about the new fund filed with sebi",
+    "keywords": [
+      "canara",
+      "robeco",
+      "innovation",
+      "fund",
+      "things",
+      "know",
+      "new",
+      "filed",
+      "sebi"
+    ],
+    "headline": "Canara Robeco Innovation Fund: 7 things to know about the new fund filed with SEBI - Upstox",
+    "dispatchedAt": 1790993965481
+  },
+  {
+    "id": "0da3e694dedcc838",
+    "normalizedHeadline": "a tricky rate hike to consider but change in rbi policy stance unlikely",
+    "keywords": [
+      "tricky",
+      "rate",
+      "hike",
+      "consider",
+      "but",
+      "change",
+      "rbi",
+      "policy",
+      "stance",
+      "unlikely"
+    ],
+    "headline": "A tricky rate hike to consider, but change in RBI’s policy stance unlikely - Moneycontrol.com",
+    "dispatchedAt": 1790996066901
+  },
+  {
+    "id": "bb2b489b651ee47c",
+    "normalizedHeadline": "rbi mpc meeting sbi research bofa predict repo rate hike announcement",
+    "keywords": [
+      "rbi",
+      "mpc",
+      "meeting",
+      "sbi",
+      "research",
+      "bofa",
+      "predict",
+      "repo",
+      "rate",
+      "hike",
+      "announcement"
+    ],
+    "headline": "RBI MPC Meeting: SBI Research, BofA Predict Repo Rate Hike Announcement - ETV Bharat",
+    "dispatchedAt": 1791009575427
+  },
+  {
+    "id": "7f07c7178848e6af",
+    "normalizedHeadline": "sebi revamps document verification system to strengthen authentication of letters notices mid",
+    "keywords": [
+      "sebi",
+      "revamps",
+      "document",
+      "verification",
+      "system",
+      "strengthen",
+      "authentication",
+      "letters",
+      "notices",
+      "mid"
+    ],
+    "headline": "SEBI revamps document verification system to strengthen authentication of letters, notices - Mid-Day",
+    "dispatchedAt": 1791010175946
+  },
+  {
+    "id": "2d8643ecab1b5610",
+    "normalizedHeadline": "sebi working on second surveillance system to identify bad elements among listed cos varshney",
+    "keywords": [
+      "sebi",
+      "working",
+      "second",
+      "surveillance",
+      "system",
+      "identify",
+      "bad",
+      "elements",
+      "among",
+      "listed",
+      "cos",
+      "varshney"
+    ],
+    "headline": "Sebi working on second surveillance system to identify bad elements among listed cos: Varshney - Livemint",
+    "dispatchedAt": 1791010475943
+  },
+  {
+    "id": "d2f28863e00514f9",
+    "normalizedHeadline": "press release sebi widens probe in pacheli industrial finance pump and dump case to statutory auditors gsa associates demand to bar partners from independent directorships till enquiry over",
+    "keywords": [
+      "press",
+      "release",
+      "sebi",
+      "widens",
+      "probe",
+      "pacheli",
+      "industrial",
+      "finance",
+      "pump",
+      "dump",
+      "case",
+      "statutory",
+      "auditors",
+      "gsa",
+      "associates",
+      "demand",
+      "bar",
+      "partners",
+      "independent",
+      "directorships",
+      "till",
+      "enquiry"
+    ],
+    "headline": "Press Release || SEBI Widens Probe in Pacheli Industrial Finance Pump and Dump Case to Statutory Auditors GSA & Associates; Demand to Bar Partners from Independent Directorships Till Enquiry Over - Newspatrolling.com",
+    "dispatchedAt": 1791010777205
+  },
+  {
+    "id": "b9406c0011a72651",
+    "normalizedHeadline": "sebi new surveillance system targets bad elements ipos",
+    "keywords": [
+      "sebi",
+      "new",
+      "surveillance",
+      "system",
+      "targets",
+      "bad",
+      "elements",
+      "ipos"
+    ],
+    "headline": "Sebi's New Surveillance System Targets 'Bad Elements' & IPOs - Rediff MoneyWiz",
+    "dispatchedAt": 1791011076638
+  },
+  {
+    "id": "d70c8b9005d205ce",
+    "normalizedHeadline": "fpi investments driven by net returns working to simplify access sebi chief tuhin kanta pandey",
+    "keywords": [
+      "fpi",
+      "investments",
+      "driven",
+      "net",
+      "returns",
+      "working",
+      "simplify",
+      "access",
+      "sebi",
+      "chief",
+      "tuhin",
+      "kanta",
+      "pandey"
+    ],
+    "headline": "FPI investments driven by net returns; working to simplify access: SEBI chief Tuhin Kanta Pandey - Moneycontrol.com",
+    "dispatchedAt": 1791014679251
+  },
+  {
+    "id": "5b2e570ce663f15c",
+    "normalizedHeadline": "sebi to soon issue framework on closing auction session receives over 3 500 comments",
+    "keywords": [
+      "sebi",
+      "soon",
+      "issue",
+      "framework",
+      "closing",
+      "auction",
+      "session",
+      "receives",
+      "500",
+      "comments"
+    ],
+    "headline": "Sebi To Soon Issue Framework On Closing Auction Session; Receives Over 3,500 Comments - ETV Bharat",
+    "dispatchedAt": 1791016779698
+  },
+  {
+    "id": "25fc22f51a2b8bec",
+    "normalizedHeadline": "india needs trust driven capital markets sebi reviewing derivative expiry settlement rules tuhin kanta",
+    "keywords": [
+      "india",
+      "needs",
+      "trust",
+      "driven",
+      "capital",
+      "markets",
+      "sebi",
+      "reviewing",
+      "derivative",
+      "expiry",
+      "settlement",
+      "rules",
+      "tuhin",
+      "kanta"
+    ],
+    "headline": "India needs trust-driven capital markets; SEBI reviewing derivative expiry settlement rules: Tuhin Kanta... - Moneycontrol.com",
+    "dispatchedAt": 1791017080018
+  },
+  {
+    "id": "6de6b0eaf2d07e73",
+    "normalizedHeadline": "rbi rate hike unlikely to trigger broad based nbfc asset quality stress report",
+    "keywords": [
+      "rbi",
+      "rate",
+      "hike",
+      "unlikely",
+      "trigger",
+      "broad",
+      "based",
+      "nbfc",
+      "asset",
+      "quality",
+      "stress",
+      "report"
+    ],
+    "headline": "RBI rate hike unlikely to trigger broad-based NBFC asset quality stress: Report - ANI News",
+    "dispatchedAt": 1791017380227
+  },
+  {
+    "id": "b550037b878d2856",
+    "normalizedHeadline": "over 3 500 responses on cas sebi to quickly move ahead with proposals",
+    "keywords": [
+      "500",
+      "responses",
+      "cas",
+      "sebi",
+      "quickly",
+      "move",
+      "ahead",
+      "proposals"
+    ],
+    "headline": "Over 3,500 responses on CAS: Sebi to quickly move ahead with proposals - The Times of India",
+    "dispatchedAt": 1791021283255
+  },
+  {
+    "id": "668e513ba1f7197f",
+    "normalizedHeadline": "sebi examining position limits for non",
+    "keywords": [
+      "sebi",
+      "examining",
+      "position",
+      "limits",
+      "non"
+    ],
+    "headline": "Sebi examining position limits for non-agri contracts to boost liquidity",
+    "dispatchedAt": 1791021582893
+  },
+  {
+    "id": "2c2f3100f2ea1ddc",
+    "normalizedHeadline": "sebi eyes non agri contract limits to boost market liquidity",
+    "keywords": [
+      "sebi",
+      "eyes",
+      "non",
+      "agri",
+      "contract",
+      "limits",
+      "boost",
+      "market",
+      "liquidity"
+    ],
+    "headline": "Sebi Eyes Non-Agri Contract Limits to Boost Market Liquidity - Rediff MoneyWiz",
+    "dispatchedAt": 1791022484414
+  },
+  {
+    "id": "873a0998fe87bf0b",
+    "normalizedHeadline": "sebi reviewing derivatives expiry settlement framework after cas rollout chairman pandey",
+    "keywords": [
+      "sebi",
+      "reviewing",
+      "derivatives",
+      "expiry",
+      "settlement",
+      "framework",
+      "cas",
+      "rollout",
+      "chairman",
+      "pandey"
+    ],
+    "headline": "SEBI Reviewing Derivatives Expiry Settlement Framework after CAS Rollout: Chairman Pandey - The Financial World",
+    "dispatchedAt": 1791025785777
+  },
+  {
+    "id": "6ef557fd0b552ffa",
+    "normalizedHeadline": "sebi chairman tuhin kanta pandey calls for stronger capital markets to boost investor confidence",
+    "keywords": [
+      "sebi",
+      "chairman",
+      "tuhin",
+      "kanta",
+      "pandey",
+      "calls",
+      "stronger",
+      "capital",
+      "markets",
+      "boost",
+      "investor",
+      "confidence"
+    ],
+    "headline": "SEBI Chairman Tuhin Kanta Pandey calls for stronger capital markets to boost investor confidence - News On AIR",
+    "dispatchedAt": 1791029988550
+  },
+  {
+    "id": "fb17486eddbc4bac",
+    "normalizedHeadline": "sebi receives 20 000 comments on proposed cas changes framework to follow soon",
+    "keywords": [
+      "sebi",
+      "receives",
+      "000",
+      "comments",
+      "proposed",
+      "cas",
+      "changes",
+      "framework",
+      "follow",
+      "soon"
+    ],
+    "headline": "Sebi receives 20,000 comments on proposed CAS changes; framework to follow soon - Business Today",
+    "dispatchedAt": 1791041395421
+  },
+  {
+    "id": "5c53ead8498a8647",
+    "normalizedHeadline": "sebi receives 20 000 comments on closing auction session market timings consultation paper",
+    "keywords": [
+      "sebi",
+      "receives",
+      "000",
+      "comments",
+      "closing",
+      "auction",
+      "session",
+      "market",
+      "timings",
+      "consultation",
+      "paper"
+    ],
+    "headline": "SEBI receives 20,000 comments on Closing Auction Session, market timings consultation paper - Moneycontrol.com",
+    "dispatchedAt": 1791041695273
+  },
+  {
+    "id": "33b5c8210203d2eb",
+    "normalizedHeadline": "world investor week 2026 sebi tools every investor should know",
+    "keywords": [
+      "world",
+      "investor",
+      "week",
+      "2026",
+      "sebi",
+      "tools",
+      "every",
+      "should",
+      "know"
+    ],
+    "headline": "World Investor Week 2026: SEBI Tools Every Investor Should Know - BusinessLine",
+    "dispatchedAt": 1791047099138
+  },
+  {
+    "id": "df81c6352008d651",
+    "normalizedHeadline": "hal to take full control of hatsoff helicopter simulator training venture",
+    "keywords": [
+      "hal",
+      "take",
+      "full",
+      "control",
+      "hatsoff",
+      "helicopter",
+      "simulator",
+      "training",
+      "venture"
+    ],
+    "headline": "HAL to take full control of HATSOFF helicopter simulator training venture - Dalal Street Investment Journal",
+    "dispatchedAt": 1791054003417
+  },
+  {
+    "id": "c693edd3f2a812cf",
+    "normalizedHeadline": "10 year yield seen up oct end on heavy supply rbi rate hike",
+    "keywords": [
+      "year",
+      "yield",
+      "seen",
+      "oct",
+      "end",
+      "heavy",
+      "supply",
+      "rbi",
+      "rate",
+      "hike"
+    ],
+    "headline": "10-year yield seen up Oct-end on heavy supply, RBI rate hike - Informist",
+    "dispatchedAt": 1791063910224
+  },
+  {
+    "id": "6eb87ca14513473f",
+    "normalizedHeadline": "rbi repo rate crisil says india inc can absorb 50 bps rate hike as corporate balance sheets remain strong",
+    "keywords": [
+      "rbi",
+      "repo",
+      "rate",
+      "crisil",
+      "india",
+      "inc",
+      "can",
+      "absorb",
+      "bps",
+      "hike",
+      "corporate",
+      "balance",
+      "sheets",
+      "remain",
+      "strong"
+    ],
+    "headline": "RBI repo rate: Crisil says India Inc can absorb 50-bps rate hike as corporate balance sheets remain strong - Business Today",
+    "dispatchedAt": 1791067211312
+  },
+  {
+    "id": "b98244c847739ef4",
+    "normalizedHeadline": "sebi gets 20 000 comments on cas market timings and derivatives settlement changes",
+    "keywords": [
+      "sebi",
+      "gets",
+      "000",
+      "comments",
+      "cas",
+      "market",
+      "timings",
+      "derivatives",
+      "settlement",
+      "changes"
+    ],
+    "headline": "SEBI gets 20,000 comments on CAS, market timings and derivatives settlement changes - IndiaIPO",
+    "dispatchedAt": 1791070813526
+  },
+  {
+    "id": "8f940f21a96b466a",
+    "normalizedHeadline": "sebi cas review draws over 20k responses traders resist vwap shift",
+    "keywords": [
+      "sebi",
+      "cas",
+      "review",
+      "draws",
+      "20k",
+      "responses",
+      "traders",
+      "resist",
+      "vwap",
+      "shift"
+    ],
+    "headline": "Sebi CAS review draws over 20K responses; traders resist VWAP shift - Business Standard",
+    "dispatchedAt": 1791084323687
+  },
+  {
+    "id": "574eb57c8bba817a",
+    "normalizedHeadline": "sebi clears corporate bond index futures for nse",
+    "keywords": [
+      "sebi",
+      "clears",
+      "corporate",
+      "bond",
+      "index",
+      "futures",
+      "nse"
+    ],
+    "headline": "SEBI Clears Corporate Bond Index Futures For NSE - BW Businessworld",
+    "dispatchedAt": 1791092728408
   }
 ]

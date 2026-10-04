@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { ArcReactorOrb } from '@/components/ArcReactorOrb';
 import { DirectiveBadge } from '@/components/DirectiveBadge';
+import { LiveStateBusDock } from '@/components/LiveStateBusDock';
 import { TaskMatrix } from '@/components/TaskMatrix';
 import { MemoryVault } from '@/components/MemoryVault';
 import { SystemHealthMatrix } from '@/components/SystemHealthMatrix';
@@ -494,7 +495,7 @@ export default function JarvisDashboard() {
     setMessages([INITIAL_WELCOME_MESSAGE]);
   };
 
-  // Continuous background synchronization across devices (every 8 seconds when unlocked)
+  // Continuous background synchronization across devices (backed up by reactive State Bus)
   useEffect(() => {
     if (!isUnlocked) return;
 
@@ -504,10 +505,10 @@ export default function JarvisDashboard() {
     fetchMemories();
 
     const intervalId = setInterval(() => {
-      // Background poll for new cross-device messages and tasks
+      // Conservative safety poll (reactive State Bus handles instantaneous updates)
       fetchChatHistory();
       fetchTasks();
-    }, 8000);
+    }, 25000);
 
     return () => clearInterval(intervalId);
   }, [isUnlocked]);
@@ -1097,6 +1098,16 @@ export default function JarvisDashboard() {
           </button>
         </div>
       </header>
+ 
+      {/* Real-time Dual-Citizen State Bus HUD Dock */}
+      <div className="px-3 sm:px-4 pt-2.5 max-w-7xl w-full mx-auto shrink-0 z-30">
+        <LiveStateBusDock
+          onTaskUpdated={fetchTasks}
+          onMemoryUpdated={fetchMemories}
+          onChatMessage={fetchChatHistory}
+          authFetch={authFetch}
+        />
+      </div>
 
       {/* ========================================================================= */}
       {/* MOBILE VIEW (lg:hidden) — Dedicated Screen Per Tab for an Uncluttered Look */}

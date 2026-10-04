@@ -269,6 +269,43 @@ class LocalDiskProvider implements StorageProvider {
         }
         fs.writeFileSync(customFile, JSON.stringify(list, null, 2), 'utf-8');
         return list.length;
+      } else if (cmd === 'lpush') {
+        let list: any[] = [];
+        if (fs.existsSync(customFile)) {
+          try {
+            const parsed = JSON.parse(fs.readFileSync(customFile, 'utf-8'));
+            if (Array.isArray(parsed)) list = parsed;
+          } catch {}
+        }
+        for (let i = 1; i < args.length; i++) {
+          list.unshift(args[i]);
+        }
+        fs.writeFileSync(customFile, JSON.stringify(list, null, 2), 'utf-8');
+        return list.length;
+      } else if (cmd === 'ltrim') {
+        if (fs.existsSync(customFile)) {
+          try {
+            let list = JSON.parse(fs.readFileSync(customFile, 'utf-8'));
+            if (Array.isArray(list)) {
+              const start = Number(args[1]) || 0;
+              const stop = Number(args[2]);
+              list = stop === -1 ? list.slice(start) : list.slice(start, stop + 1);
+              fs.writeFileSync(customFile, JSON.stringify(list, null, 2), 'utf-8');
+            }
+          } catch {}
+        }
+        return 'OK';
+      } else if (cmd === 'lrange') {
+        if (!fs.existsSync(customFile)) return [];
+        try {
+          const list = JSON.parse(fs.readFileSync(customFile, 'utf-8'));
+          if (!Array.isArray(list)) return [];
+          const start = Number(args[1]) || 0;
+          const stop = Number(args[2]);
+          return stop === -1 ? list.slice(start) : list.slice(start, stop + 1);
+        } catch {
+          return [];
+        }
       } else if (cmd === 'keys') {
         if (!fs.existsSync(this.dataDir)) return [];
         const pattern = String(args[0] || '*').replace(/[^a-zA-Z0-9_*?-]/g, '');
@@ -477,10 +514,33 @@ export async function getUniversalChatHistory(limit = 100): Promise<ChatMessageR
 
 export async function appendUniversalChatMessage(msg: ChatMessageRecord): Promise<void> {
   await getStorage().appendChatMessage(msg);
+  import('./state-bus').then(({ publishStateEvent }) => {
+    publishStateEvent({
+      type: 'state:chat_message',
+      source: (msg.source as any) || (msg.role === 'user' ? 'user' : 'jarvis'),
+      channel: msg.channel || 'web-pwa',
+      title: `${msg.role === 'user' ? 'Sir' : msg.source === 'friday' ? '🛡️ Friday' : '⚡ Jarvis'}: ${msg.content.slice(0, 60)}`,
+      detail: msg.content.length > 60 ? msg.content.slice(0, 120) + '…' : undefined,
+      payload: { id: msg.id, role: msg.role, source: msg.source },
+    }).catch(() => {});
+  }).catch(() => {});
 }
 
 export async function appendUniversalChatMessages(msgs: ChatMessageRecord[]): Promise<void> {
   await getStorage().appendChatMessages(msgs);
+  if (msgs.length > 0) {
+    const last = msgs[msgs.length - 1];
+    import('./state-bus').then(({ publishStateEvent }) => {
+      publishStateEvent({
+        type: 'state:chat_message',
+        source: (last.source as any) || (last.role === 'user' ? 'user' : 'jarvis'),
+        channel: last.channel || 'web-pwa',
+        title: `${last.role === 'user' ? 'Sir' : last.source === 'friday' ? '🛡️ Friday' : '⚡ Jarvis'}: ${last.content.slice(0, 60)}`,
+        detail: last.content.length > 60 ? last.content.slice(0, 120) + '…' : undefined,
+        payload: { id: last.id, count: msgs.length },
+      }).catch(() => {});
+    }).catch(() => {});
+  }
 }
 
 export async function clearUniversalChatHistory(): Promise<void> {
@@ -496,7 +556,18 @@ export async function appendAgentChatMessage(
   source: ChatMessageRecord['source'],
   channel: ChatMessageRecord['channel']
 ): Promise<void> {
-  await getStorage().appendChatMessage({ ...msg, source, channel });
+  const fullMsg: ChatMessageRecord = { ...msg, source, channel };
+  await getStorage().appendChatMessage(fullMsg);
+  import('./state-bus').then(({ publishStateEvent }) => {
+    publishStateEvent({
+      type: 'state:chat_message',
+      source: (source as any) || 'jarvis',
+      channel: channel || 'telegram',
+      title: `${source === 'friday' ? '🛡️ Friday' : '⚡ Jarvis'}: ${msg.content.slice(0, 60)}`,
+      detail: msg.content.length > 60 ? msg.content.slice(0, 120) + '…' : undefined,
+      payload: { id: msg.id, role: msg.role, source },
+    }).catch(() => {});
+  }).catch(() => {});
 }
 
 /**
