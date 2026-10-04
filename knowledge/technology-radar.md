@@ -40,3 +40,16 @@ This repository catalog tracks external frameworks, architectural patterns, and 
 * **Evaluated:** 2026-10-04
 * **Core Concept:** Intercepts closed mobile (iOS via mitmproxy) and web app traffic (DevTools cURL / `.har` exports), extracts stable authentication bundles (tokens, cookies, session identifiers), and uses an LLM to auto-synthesize typed, callable API client libraries with automatic 401 retry healing.
 * **Operational Integration:** Sir can paste "Copy as cURL" or drop a `.har` export into Friday's chat, and Friday directly forges a first-class tool in `lib/jarvis/tools.ts`, eliminating brittle DOM scrapers for closed consumer platforms. Mobile proxying delegated to local workstation satellite when full iOS MITM is required.
+
+---
+
+## 5. Agent Scaffolding & Prompt Architecture
+
+### 📜 [CL4R1T4S (elder-plinius/CL4R1T4S)](https://github.com/elder-plinius/CL4R1T4S)
+* **Status:** `ASSIMILATED (Frontier SWE Scaffolding & Error-Recovery Heuristics)`
+* **Evaluated:** 2026-10-04
+* **Core Concept:** Open-source transparency repository archiving verbatim system prompts, tool schemas, and agentic loops from frontier models (OpenAI o1/GPT-4o, Claude 3.5 Sonnet) and autonomous SWE coding agents (Devin, Claude Code, Cursor, Windsurf, Manus).
+* **Assimilated Heuristics:**
+  - **Devin / Claude Code Closed-Loop Self-Correction:** When commands fail or return non-zero exit codes, formulate 2-3 explicit hypotheses before modifying code; never repeat failing executions without parameter mutations.
+  - **Cursor Surgical Diffing:** Strict preference for minimal-diff edits over full-file overwrites to prevent regression and context window saturation.
+  - **Anti-Hallucination Anchoring:** Mandatory verification of verbatim tool outputs before reporting action completion to Sir.

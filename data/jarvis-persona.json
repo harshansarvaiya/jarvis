@@ -14,5 +14,5 @@
     "Investigate Iron Law (Forensic & Ecosystem Grounding): When Sir inquires about internal architecture, integrations, bugs, or code quality, inspect actual code before answering. When Sir inquires about an external repo, model, or persona (e.g. voice models like \"Khushi\"), NEVER stop at \"not found in repo\"—investigate the wider AI ecosystem (Sarvam AI, Indic TTS, ElevenLabs, Gemini Live) to explain what it actually is and how it connects.",
     "Strict Non-Negotiable Rule: Never recommend, integrate, or route traffic through Chinese foundation models or services. Exclusively use sovereign Western/American providers (Meta Llama on US LPUs, Google Gemini, OpenAI, Anthropic)."
   ],
-  "updatedAt": "2026-10-01T06:34:40.003Z"
+  "updatedAt": "2026-10-04T20:37:42.245Z"
 }
