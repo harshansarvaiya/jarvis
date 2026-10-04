@@ -388,3 +388,143 @@ export class ProviderCircuitBreaker {
 
 export const globalCircuitBreaker = new ProviderCircuitBreaker();
 
+// ============================================================================
+// 9. SWE ERROR-RECOVERY CHAINS (Devin / Claude Code Closed-Loop Self-Correction)
+// ============================================================================
+
+export type SweErrorCategory =
+  | 'TYPESCRIPT_OR_SYNTAX'
+  | 'DIFF_OR_CONTENT_MISMATCH'
+  | 'COMMAND_EXECUTION_FAILURE'
+  | 'FILE_NOT_FOUND'
+  | 'PERMISSION_OR_SECURITY'
+  | 'TIMEOUT_OR_NETWORK'
+  | 'UNKNOWN';
+
+export interface SweErrorRecoveryPlan {
+  toolName: string;
+  errorCategory: SweErrorCategory;
+  hypotheses: [string, string, string];
+  recommendedAction: string;
+  suggestedCorrection?: {
+    toolName: string;
+    suggestedArgs: Record<string, any>;
+  };
+  promptMandate: string;
+}
+
+/**
+ * Closed-Loop SWE Error-Recovery Chain (CL4R1T4S / Devin / Claude Code Standard)
+ * Formulates 3 explicit, mutually exclusive hypotheses upon any tool failure or non-zero exit code,
+ * providing the agent with an immediate forensic pivot to prevent circular execution thrashing.
+ */
+export function generateSweErrorRecoveryPlan(
+  toolName: string,
+  args: Record<string, any>,
+  errorOutput: string,
+  exitCode?: number
+): SweErrorRecoveryPlan {
+  const cleanError = (errorOutput || '').toLowerCase();
+
+  // 1. TypeScript or Syntax Diagnostics
+  if (
+    (cleanError.includes('ts') && (cleanError.includes('error ts') || /\bts\d{4}\b/i.test(cleanError))) ||
+    cleanError.includes('syntaxerror') ||
+    cleanError.includes('cannot find module') ||
+    cleanError.includes('typeerror')
+  ) {
+    const targetFile = String(args.path || '');
+    return {
+      toolName,
+      errorCategory: 'TYPESCRIPT_OR_SYNTAX',
+      hypotheses: [
+        'Missing, misspelled, or incompatible type import/export declaration.',
+        'Argument or parameter count mismatch with underlying function signature.',
+        'Stale cached type declaration or unresolved package dependency.',
+      ],
+      recommendedAction: 'Inspect surrounding code at the error site using read_workspace_file, then apply a surgical edit_workspace_file with exact type signatures before re-verifying.',
+      suggestedCorrection: targetFile ? {
+        toolName: 'read_workspace_file',
+        suggestedArgs: { path: targetFile },
+      } : undefined,
+      promptMandate: '[SWE ERROR RECOVERY - COMPILER/SYNTAX FAILURE]: Compilation or syntax diagnostic failed. Do NOT guess the fix. Formulate 2-3 hypotheses, read the exact file context, and mutate code surgically.',
+    };
+  }
+
+  // 2. Search & Replace Diffing Mismatches
+  if (
+    cleanError.includes('target content not found') ||
+    cleanError.includes('could not be matched') ||
+    cleanError.includes('check line indentation') ||
+    (toolName === 'edit_workspace_file' && cleanError.includes('fail'))
+  ) {
+    const targetPath = String(args.path || '');
+    return {
+      toolName,
+      errorCategory: 'DIFF_OR_CONTENT_MISMATCH',
+      hypotheses: [
+        'Target content block indentation or trailing spaces diverged from verbatim disk content.',
+        'A previous mutation shifted the line offsets or tokens in this range.',
+        'Target content snippet was either too long or had ambiguous multi-matches in the file.',
+      ],
+      recommendedAction: `Call read_workspace_file on "${targetPath}" to retrieve verbatim lines, then supply 2-3 unique anchor lines in edit_workspace_file.`,
+      suggestedCorrection: targetPath ? {
+        toolName: 'read_workspace_file',
+        suggestedArgs: { path: targetPath },
+      } : undefined,
+      promptMandate: '[SWE ERROR RECOVERY - SURGICAL DIFF MISMATCH]: Target snippet did not match verbatim disk lines. Read the file lines first to capture exact indentation.',
+    };
+  }
+
+  // 3. Shell Command Failures
+  if (toolName === 'cloud_execute_command' || (exitCode !== undefined && exitCode !== 0)) {
+    const isNotFound = exitCode === 127 || cleanError.includes('not found') || cleanError.includes('no such file');
+    return {
+      toolName,
+      errorCategory: 'COMMAND_EXECUTION_FAILURE',
+      hypotheses: [
+        isNotFound ? 'CLI binary is not in system PATH; try ./node_modules/.bin/ or npx.' : 'Command flags or arguments were incompatible with Ubuntu 24.04 Linux environment.',
+        'Working directory or relative path assumption was inaccurate.',
+        'Environment variable or dependency state missing in shell context.',
+      ],
+      recommendedAction: "Inspect directory layout or file existence with 'ls -la' or check binary availability in ./node_modules/.bin before re-running.",
+      promptMandate: `[SWE ERROR RECOVERY - COMMAND EXIT ${exitCode !== undefined ? exitCode : 'NON-ZERO'}]: Command execution failed. Never re-execute the exact same command string without mutating parameters.`,
+    };
+  }
+
+  // 4. File Not Found
+  if (cleanError.includes('enoent') || cleanError.includes('file does not exist') || cleanError.includes('no such file or directory')) {
+    const filePath = String(args.path || '');
+    const fileName = filePath ? filePath.split('/').pop() || '*' : '*';
+    return {
+      toolName,
+      errorCategory: 'FILE_NOT_FOUND',
+      hypotheses: [
+        'File path was specified relative to wrong subdirectory rather than workspace root.',
+        'File has not been created yet (requires createIfMissing: true).',
+        'File was moved, renamed, or deleted in earlier turn.',
+      ],
+      recommendedAction: 'Use find_files or grep_workspace to locate the file, or specify createIfMissing: true if forging a new file.',
+      suggestedCorrection: {
+        toolName: 'find_files',
+        suggestedArgs: { pattern: fileName },
+      },
+      promptMandate: '[SWE ERROR RECOVERY - FILE NOT FOUND]: Target path not found. Verify workspace path using find_files.',
+    };
+  }
+
+  // 5. Default
+  return {
+    toolName,
+    errorCategory: 'UNKNOWN',
+    hypotheses: [
+      'Input arguments violated schema or semantic contract of the tool.',
+      'Underlying cloud resource or provider returned a transient failure.',
+      'Execution timeout or resource constraint reached.',
+    ],
+    recommendedAction: 'Analyze error trace, adjust parameters, and test an alternative execution vector rather than repeating verbatim.',
+    promptMandate: '[SWE ERROR RECOVERY - EXECUTION ANOMALY]: Operation halted with error. Apply Devin/Claude Code protocol: formulate hypotheses and pivot.',
+  };
+}
+
+

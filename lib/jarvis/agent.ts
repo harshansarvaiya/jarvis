@@ -15,6 +15,7 @@ import {
   detectActivePersona,
   detectActivePersonaAsync,
   ActivePersona,
+  generateSweErrorRecoveryPlan,
 } from './orchestrator';
 import { appendUniversalChatMessage, appendAgentChatMessage, getCrossChannelContext } from './storage';
 import { getPersonaConfig, buildPersonaPromptBlock } from './persona';
@@ -1208,14 +1209,41 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           result: toolResult.result || toolResult.error,
         });
 
-        // Pillar 2 Grounding: Autonomous Empirical Reflection & Retry
+        // Pillar 2 Grounding & Closed-Loop SWE Recovery Chain (CL4R1T4S Devin/Claude Code standard)
         let toolResponsePayload: any = toolResult;
         const isSearchResults = Array.isArray(toolResult?.result?.results);
         const isEmptySearch = isSearchResults && toolResult.result.results.length === 0;
-        if (toolResult.error || isEmptySearch) {
+        const isCommandFailure = call.name === 'cloud_execute_command' && toolResult.result?.exitCode !== undefined && toolResult.result.exitCode !== 0;
+        const isExecutionError = !toolResult.success || !!toolResult.error || isCommandFailure;
+
+        if (isExecutionError) {
+          const rawErr = toolResult.error || toolResult.result?.stderr || toolResult.result?.stdout || 'Execution error';
+          const recoveryPlan = generateSweErrorRecoveryPlan(
+            call.name,
+            call.args || {},
+            rawErr,
+            toolResult.result?.exitCode
+          );
           toolResponsePayload = {
             ...toolResult,
-            reflectionGuidance: `[AUTONOMOUS EMPIRICAL REFLECTION]: The tool execution for "${call.name}" returned zero results or an error. Do not repeat the exact same request. Reformulate search terms, try a broader keyword, or explore an alternative data source to deliver concrete intelligence.`,
+            sweRecoveryPlan: {
+              category: recoveryPlan.errorCategory,
+              hypotheses: recoveryPlan.hypotheses,
+              recommendedAction: recoveryPlan.recommendedAction,
+              suggestedCorrection: recoveryPlan.suggestedCorrection,
+            },
+            reflectionGuidance: `[SWE CLOSED-LOOP SELF-HEALING RECOVERY - DEVIN/CLAUDE CODE PROTOCOL]: Tool "${call.name}" failed (${recoveryPlan.errorCategory}).
+Formulated 3 Hypotheses:
+1. ${recoveryPlan.hypotheses[0]}
+2. ${recoveryPlan.hypotheses[1]}
+3. ${recoveryPlan.hypotheses[2]}
+Mandated Action: ${recoveryPlan.recommendedAction}
+Do NOT repeat the exact same call without mutating parameters or testing one of these hypotheses empirically.`,
+          };
+        } else if (isEmptySearch) {
+          toolResponsePayload = {
+            ...toolResult,
+            reflectionGuidance: `[AUTONOMOUS EMPIRICAL REFLECTION]: The tool execution for "${call.name}" returned zero results. Do not repeat the exact same request. Reformulate search terms, try a broader keyword, or explore an alternative data source to deliver concrete intelligence.`,
           };
         } else if (consecutiveReadCount >= 3) {
           toolResponsePayload = {
