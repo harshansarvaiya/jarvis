@@ -30,3 +30,13 @@ This repository catalog tracks external frameworks, architectural patterns, and 
 * **Status:** `ASSIMILATED (Satellite Mesh Delegation)`
 * **Evaluated:** 2026-10-04
 * **Assimilated Feature:** Integrated into `scripts/satellite-node.ts` and `lib/jarvis/tools.ts` (`reverse_engineer_target`). Heavy Ghidra/Hopper decompilation is delegated to Sir's local workstation satellite to protect GCP Cloud VM stability under Directive 06.
+
+---
+
+## 4. Traffic Interception & API Synthesis
+
+### 🧪 [Mimic (littledivy/mimic)](https://github.com/littledivy/mimic)
+* **Status:** `ASSIMILATED (cURL / HAR Tool Synthesizer Pattern)`
+* **Evaluated:** 2026-10-04
+* **Core Concept:** Intercepts closed mobile (iOS via mitmproxy) and web app traffic (DevTools cURL / `.har` exports), extracts stable authentication bundles (tokens, cookies, session identifiers), and uses an LLM to auto-synthesize typed, callable API client libraries with automatic 401 retry healing.
+* **Operational Integration:** Sir can paste "Copy as cURL" or drop a `.har` export into Friday's chat, and Friday directly forges a first-class tool in `lib/jarvis/tools.ts`, eliminating brittle DOM scrapers for closed consumer platforms. Mobile proxying delegated to local workstation satellite when full iOS MITM is required.
