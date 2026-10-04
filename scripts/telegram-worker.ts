@@ -845,6 +845,60 @@ async function processDirective(
         { replyToMessageId, replyMarkup: keyboard }
       );
       return;
+    } else if (
+      cleanUserText === '/bus' ||
+      cleanUserText === '/telemetry' ||
+      cleanUserText === '/state' ||
+      cleanUserText === '/events' ||
+      cleanUserText.toLowerCase() === 'state bus' ||
+      cleanUserText.toLowerCase() === 'telemetry'
+    ) {
+      const { getRecentStateEvents } = await import('../lib/jarvis/state-bus');
+      const recent = await getRecentStateEvents(8);
+
+      let msg = `⚡ **DUAL-CITIZEN STATE BUS — REAL-TIME RADAR**\n\n`;
+      if (recent.length === 0) {
+        msg += `_Zero recent micro-events recorded on the bus stream. System is resting in idle synchronization._\n\n`;
+      } else {
+        msg += `_Streaming ${recent.length} recent system and agent micro-events:_\n\n`;
+        for (const ev of recent) {
+          const icon =
+            ev.source === 'friday'
+              ? '🛡️ FRIDAY'
+              : ev.source === 'jarvis'
+              ? '⚡ JARVIS'
+              : ev.source === 'sentinel'
+              ? '🛰️ SENTINEL'
+              : '🌐 USER';
+          const time = new Date(ev.timestamp).toLocaleTimeString('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+          });
+          msg += `**[${time} IST] ${icon}**\n` +
+                 `• **${ev.title}**\n`;
+          if (ev.detail) {
+            msg += `  _${ev.detail.length > 90 ? ev.detail.slice(0, 90) + '…' : ev.detail}_\n`;
+          }
+          msg += `\n`;
+        }
+      }
+
+      msg += `_Master HUD:_ [Live PWA Dashboard](https://jarvis-iota-beige.vercel.app)`;
+
+      const keyboard: TelegramInlineKeyboardMarkup = {
+        inline_keyboard: [
+          [
+            { text: '🔄 Refresh State Bus', callback_data: 'cmd:state_bus' },
+            { text: '🌐 Open Web HUD', url: 'https://jarvis-iota-beige.vercel.app' },
+          ],
+        ],
+      };
+
+      await gateway.sendMessage(chatId, msg, { replyToMessageId, replyMarkup: keyboard });
+      return;
     }
 
     if (!cleanUserText && rawText) {
@@ -1021,6 +1075,9 @@ async function handleIncomingMessage(update: TelegramUpdate) {
       return;
     } else if (cq.data === 'cmd:satellites') {
       await processDirective(chatId, '/satellites', undefined, cq.message?.message_id);
+      return;
+    } else if (cq.data === 'cmd:state_bus') {
+      await processDirective(chatId, '/bus', undefined, cq.message?.message_id);
       return;
     } else if (cq.data.startsWith('sat_ping:')) {
       const targetId = cq.data.replace(/^sat_ping:/, '');
@@ -1369,6 +1426,7 @@ async function startTelegramGateway() {
   // Register native Telegram autocomplete commands
   gateway.setMyCommands([
     { command: 'call', description: '📞 Launch Full-Duplex Voice Sheet (AirPods / TMA)' },
+    { command: 'bus', description: '⚡ Real-time Dual-Citizen State Bus stream' },
     { command: 'friday', description: '🛡️ Apex Tactical Mind directive' },
     { command: 'jarvis', description: '⚡ Tactical Chief of Staff & Butler' },
     { command: 'monetization', description: '💰 08:00 AM Revenue, Bounties & B2B Leads' },
