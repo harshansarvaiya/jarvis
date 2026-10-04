@@ -34,6 +34,7 @@ export interface OpenAICompatibleOptions {
   temperature?: number;
   maxTokens?: number;
   extraHeaders?: Record<string, string>;
+  tools?: any[];
 }
 
 export async function runOpenAICompatibleAgent(
@@ -44,12 +45,12 @@ export async function runOpenAICompatibleAgent(
   toolCallsExecuted: Array<{ name: string; args: any; result: any }>;
   error?: string;
 }> {
-  const { endpoint, apiKey, model, systemPrompt, temperature = 0.4, maxTokens = 1536, extraHeaders = {} } = options;
+  const { endpoint, apiKey, model, systemPrompt, temperature = 0.4, maxTokens = 1536, extraHeaders = {}, tools: customTools } = options;
 
   const toolCallsExecuted: Array<{ name: string; args: any; result: any }> = [];
 
   // 1. Format tools according to standard OpenAI function calling specification
-  const formattedTools = JARVIS_TOOLS.map((t) => ({
+  const formattedTools = customTools || JARVIS_TOOLS.map((t) => ({
     type: 'function',
     function: {
       name: t.name,

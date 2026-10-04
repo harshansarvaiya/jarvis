@@ -9,12 +9,12 @@
  * Injects execution telemetry, cinematic vocal summaries, and proactive tactical next-steps.
  */
 
-export type OperationalArchetype = 'MULTIMODAL_PERCEPTION' | 'REFLEX_SPEED' | 'DEEP_SYNTHESIS';
+export type OperationalArchetype = 'MULTIMODAL_PERCEPTION' | 'REFLEX_SPEED' | 'DEEP_SYNTHESIS' | 'RED_TEAM_SANDBOX';
 export type ActivePersona = 'FRIDAY' | 'JARVIS';
 
 export interface OrchestrationTelemetry {
   engineUsed: string;
-  provider: 'groq' | 'google' | 'vertex-ai' | 'github-models' | 'offline';
+  provider: 'groq' | 'google' | 'vertex-ai' | 'github-models' | 'openrouter' | 'offline';
   model: string;
   latencyMs: number;
   archetype: OperationalArchetype;
@@ -224,6 +224,15 @@ export function classifyOperationalIntent(
   }
 
   const clean = userPrompt.toLowerCase().trim();
+
+  // 0.5 Red-Team Cognitive Sandbox Triage
+  const redTeamTriggers = ['redteam', 'red team', 'red-team', 'hermes', 'dolphin', 'unfiltered model', 'uncensored model'];
+  if (redTeamTriggers.some((t) => clean.includes(t))) {
+    return {
+      archetype: 'RED_TEAM_SANDBOX',
+      reason: 'Red-Team Adversarial Sparring / Unfiltered Cognitive Request — Routing to Hermes 3 Sandbox.',
+    };
+  }
 
   // 1. System Telemetry & Operational Reflex Triggers
   const reflexTriggers = [
@@ -576,6 +585,17 @@ export function autoTuneSamplingParameters(
       topP: 0.8,
       thinkingBudget: 2048,
       rationale: 'Active tool failure recovery detected: Enforcing near-zero entropy (0.05) for deterministic self-correction.',
+    };
+  }
+
+  // 0. Red-Team / Hermes Unfiltered Sparring
+  if (clean.includes('redteam') || clean.includes('red-team') || clean.includes('hermes') || clean.includes('dolphin')) {
+    return {
+      archetype: 'STRATEGIC_SPARRING',
+      temperature: 0.7,
+      topP: 0.95,
+      thinkingBudget: 2048,
+      rationale: 'Red-Team Unfiltered Sparring: Calibrated for expansive lateral reasoning (0.7) with Hermes unaligned weights.',
     };
   }
 
