@@ -28,7 +28,8 @@ export type SatelliteCapability =
   | 'audio'
   | 'screenshot'
   | 'keystroke'
-  | 'speak';
+  | 'speak'
+  | 'reverse-engineer';
 
 export interface SatelliteSystemTelemetry {
   cpuUsagePct?: number;
@@ -68,7 +69,8 @@ export type SatelliteActionType =
   | 'SCREENSHOT'
   | 'TYPE_TEXT'
   | 'KEYSTROKE'
-  | 'SPEAK';
+  | 'SPEAK'
+  | 'REVERSE_ENGINEER';
 
 export interface SatelliteCommand {
   id: string;

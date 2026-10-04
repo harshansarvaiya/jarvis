@@ -268,6 +268,30 @@ $graphics.Dispose()
       return { success: true, output: `Spoke through host audio: "${text}"` };
     }
 
+    case 'REVERSE_ENGINEER': {
+      const targetPath = params.target || params.path || '';
+      const subAction = params.subAction || params.action || 'analyze';
+      const extraArgs = params.args || '';
+
+      if (!targetPath && subAction !== 'doctor') {
+        throw new Error('Missing target path parameter for reverse engineering analysis');
+      }
+
+      const targetArg = targetPath ? `"${targetPath}"` : '';
+      const cmd = `npx --yes rea-agents@latest ${subAction} ${targetArg} ${extraArgs} --json`;
+
+      const timeout = params.timeoutMs || 180000;
+      const { stdout, stderr } = await execAsync(cmd, {
+        timeout,
+        maxBuffer: 20 * 1024 * 1024,
+      });
+
+      return {
+        success: true,
+        output: stdout.trim() || stderr.trim() || 'REA reverse engineering analysis complete.',
+      };
+    }
+
     default:
       throw new Error(`Unsupported native action: ${action}`);
   }
@@ -294,6 +318,7 @@ async function heartbeatAndPoll() {
       'screenshot',
       'keystroke',
       'speak',
+      'reverse-engineer',
     ],
     telemetry: {
       ...sys,

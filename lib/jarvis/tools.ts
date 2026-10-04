@@ -2650,6 +2650,37 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['deviceId', 'action'],
     },
   },
+  {
+    name: 'reverse_engineer_target',
+    description: 'Reverse engineer any binary, native application (Mach-O, ELF, PE), or Electron/ASAR bundle via the REA framework. Delegates heavy decompilation (Hopper/Ghidra) to a connected workstation satellite node to protect cloud VM stability (Directive 06).',
+    parameters: {
+      type: 'object',
+      properties: {
+        targetPath: {
+          type: 'string',
+          description: 'The absolute file path to the binary, application, or .asar bundle to reverse engineer.',
+        },
+        action: {
+          type: 'string',
+          enum: ['analyze', 'decompile', 'doctor', 'instructions'],
+          description: 'REA analysis command to execute (default: analyze).',
+        },
+        deviceId: {
+          type: 'string',
+          description: 'Optional ID of the target workstation satellite node. If omitted, automatically picks the primary online workstation.',
+        },
+        featureObjective: {
+          type: 'string',
+          description: 'Description of the specific feature, protocol, or behavior you want to understand and extract.',
+        },
+        subArgs: {
+          type: 'string',
+          description: 'Additional REA CLI flags (e.g. "--provider ghidra" or "--snapshot").',
+        },
+      },
+      required: ['targetPath'],
+    },
+  },
 ];
 
 /**
@@ -4279,6 +4310,63 @@ export async function executeJarvisTool(
           success: res.success,
           result: res,
           error: res.error,
+        };
+      }
+
+      case 'reverse_engineer_target': {
+        const { targetPath, action, deviceId, featureObjective, subArgs } = args;
+        if (!targetPath && action !== 'doctor') {
+          return { success: false, result: null, error: 'targetPath is required' };
+        }
+
+        const { listRegisteredSatellites, dispatchSatelliteCommand } = await import('./satellite');
+        const satellites = await listRegisteredSatellites();
+
+        // Target designated device or find first online workstation with reverse-engineer capability
+        let targetSatellite = deviceId
+          ? satellites.find((s) => s.id === deviceId)
+          : satellites.find((s) => s.status === 'ONLINE' && (s.capabilities.includes('reverse-engineer') || s.capabilities.includes('shell')));
+
+        if (!targetSatellite) {
+          targetSatellite = satellites.find((s) => s.status === 'ONLINE');
+        }
+
+        if (targetSatellite) {
+          const res = await dispatchSatelliteCommand(
+            targetSatellite.id,
+            'ACTION',
+            {
+              action: 'REVERSE_ENGINEER' as any,
+              params: {
+                target: targetPath,
+                action: action || 'analyze',
+                args: subArgs || '',
+                featureObjective,
+              },
+            },
+            180000 // 3 min budget for deep static analysis
+          );
+
+          return {
+            success: res.success,
+            result: {
+              delegatedTo: targetSatellite.name,
+              deviceId: targetSatellite.id,
+              output: res.output,
+              durationMs: res.durationMs,
+            },
+            error: res.error,
+          };
+        }
+
+        // If no satellite is connected, enforce Directive 06 and provide clean instructions
+        return {
+          success: false,
+          result: null,
+          error:
+            'Directive 06 Safeguard: No active workstation satellite node is online. Heavy binary decompilation (Hopper / Ghidra JDK 21) is restricted on the GCP Cloud Runner VM to prevent memory thrashing. Please launch the satellite on your workstation (`npx tsx scripts/satellite-node.ts`) or run `npx --yes rea-agents@latest analyze "' +
+            (targetPath || '') +
+            '"` directly in your local terminal.',
         };
       }
 
