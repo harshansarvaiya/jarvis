@@ -16,6 +16,8 @@ import {
   detectActivePersonaAsync,
   ActivePersona,
   generateSweErrorRecoveryPlan,
+  autoTuneSamplingParameters,
+  AutoTuneSamplingConfig,
 } from './orchestrator';
 import { appendUniversalChatMessage, appendAgentChatMessage, getCrossChannelContext } from './storage';
 import { getPersonaConfig, buildPersonaPromptBlock } from './persona';
@@ -658,7 +660,14 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     ] : undefined;
 
     const contents: any[] = [];
-    const generationTemperature = archetype === 'DEEP_SYNTHESIS' ? 0.6 : 0.5;
+    const autoTuneConfig = autoTuneSamplingParameters(lastUserMessage.content, {
+      persona,
+      isMutatingCode: isGithubOrRepoQuery,
+    });
+    console.log(`[AutoTune] Context-calibrated sampling: ${autoTuneConfig.archetype} (temp: ${autoTuneConfig.temperature}, topP: ${autoTuneConfig.topP}) -> ${autoTuneConfig.rationale}`);
+    const generationTemperature = autoTuneConfig.temperature;
+    const generationTopP = autoTuneConfig.topP;
+    const generationThinkingBudget = autoTuneConfig.thinkingBudget ?? (persona === 'FRIDAY' || isGithubOrRepoQuery || archetype === 'DEEP_SYNTHESIS' ? 2048 : undefined);
 
     const repoTeardownAnchor = isGithubOrRepoQuery
       ? `\n\n[MANDATORY STAFF ARCHITECT & PRODUCT STRATEGIST STANDARD]: Sir has referenced a repository, architecture, or product for evaluation. You are strictly mandated to produce an authentic, Staff-level teardown covering: 1. Product Hook & User Delight (why users/devs love it, tactile feel, dopamine loops), 2. Technical Anatomy & Core Primitives (models, voice/vision streaming pipelines, state topology), 3. Ecosystem & Model Grounding (if Sir mentions companion personas or models like "Khushi", explain the underlying models in the ecosystem like Sarvam AI or ElevenLabs—NEVER stop at "not found"), 4. Operational Trade-offs & Security, 5. Concrete Extraction / Outperformance Vector for J.A.R.V.I.S. DO NOT truncate into a superficial summary or dry security compliance checklist.`
@@ -727,9 +736,10 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
             tools: geminiTools,
             generationConfig: {
               temperature: generationTemperature,
+              topP: generationTopP,
               maxOutputTokens: 4096,
-              ...(persona === 'FRIDAY' || isGithubOrRepoQuery || archetype === 'DEEP_SYNTHESIS'
-                ? { thinkingConfig: { thinkingBudget: 2048 } }
+              ...(generationThinkingBudget
+                ? { thinkingConfig: { thinkingBudget: generationThinkingBudget } }
                 : {}),
             },
             signal: AbortSignal.timeout(isExplicitPro || persona === 'FRIDAY' ? 45000 : 30000),
@@ -766,7 +776,11 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 
       const generationConfig = {
         temperature: generationTemperature,
+        topP: generationTopP,
         maxOutputTokens: 4096,
+        ...(generationThinkingBudget
+          ? { thinkingConfig: { thinkingBudget: generationThinkingBudget } }
+          : {}),
       };
 
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${candidateModel}:generateContent?key=${apiKey}`;
@@ -1590,6 +1604,8 @@ Do NOT repeat the exact same call without mutating parameters or testing one of 
         recalledEpisodesCount: recalledEpisodes.length,
         emotion: emotionAnalysis.primaryEmotion,
         unspokenSubtext: emotionAnalysis.unspokenSubtext,
+        samplingArchetype: autoTuneConfig.archetype,
+        samplingTemperature: autoTuneConfig.temperature,
       },
     };
   } catch (err: any) {

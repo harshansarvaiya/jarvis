@@ -24,6 +24,8 @@ export interface OrchestrationTelemetry {
   persona?: ActivePersona;
   emotion?: string;
   unspokenSubtext?: string;
+  samplingArchetype?: SamplingContextArchetype;
+  samplingTemperature?: number;
 }
 
 export interface PreThoughtReasoningPass {
@@ -524,6 +526,155 @@ export function generateSweErrorRecoveryPlan(
     ],
     recommendedAction: 'Analyze error trace, adjust parameters, and test an alternative execution vector rather than repeating verbatim.',
     promptMandate: '[SWE ERROR RECOVERY - EXECUTION ANOMALY]: Operation halted with error. Apply Devin/Claude Code protocol: formulate hypotheses and pivot.',
+  };
+}
+
+// ============================================================================
+// 10. AUTOTUNE DYNAMIC SAMPLING ENGINE (G0DM0D3-Derived Context Adaptation)
+// ============================================================================
+
+export type SamplingContextArchetype =
+  | 'DETERMINISTIC_CODE_DIFF'      // Surgical TS/JS mutations, compiler fixes, AST diffing
+  | 'FORENSIC_SECURITY_AUDIT'     // OWASP scans, secret audits, vulnerability forensics
+  | 'SYSTEM_INFRASTRUCTURE'       // VM status, bash execution, process inspection
+  | 'RADAR_TASK_MANAGEMENT'       // Task creation, briefing, memory lookup
+  | 'STRATEGIC_SPARRING'          // Red-teaming, architecture design, trade-offs
+  | 'CREATIVE_BRAINSTORM'         // Storytelling, ideation, naming, copy
+  | 'CONVERSATIONAL_REFLEX';      // Fast banter, daily status, quick greetings
+
+export interface AutoTuneSamplingConfig {
+  archetype: SamplingContextArchetype;
+  temperature: number;
+  topP: number;
+  topK?: number;
+  thinkingBudget?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  rationale: string;
+}
+
+/**
+ * AutoTune Adaptive Sampling Parameter Engine (G0DM0D3 Paradigm)
+ * Dynamically calibrates temperature, topP, and thinking token budget based on
+ * query intent and execution state rather than applying static globals.
+ */
+export function autoTuneSamplingParameters(
+  prompt: string,
+  options: {
+    persona?: ActivePersona;
+    isMutatingCode?: boolean;
+    hasToolFailure?: boolean;
+  } = {}
+): AutoTuneSamplingConfig {
+  const clean = prompt.toLowerCase().trim();
+
+  // If a tool failure recently occurred, force deterministic recovery
+  if (options.hasToolFailure) {
+    return {
+      archetype: 'DETERMINISTIC_CODE_DIFF',
+      temperature: 0.05,
+      topP: 0.8,
+      thinkingBudget: 2048,
+      rationale: 'Active tool failure recovery detected: Enforcing near-zero entropy (0.05) for deterministic self-correction.',
+    };
+  }
+
+  // 1. Deterministic Code & Compiler Diffing
+  const codeTriggers = [
+    'compiler', 'tsc', 'syntax', 'ts2', 'typeerror', 'import', 'export', 'interface',
+    'edit_workspace_file', 'refactor', 'diff', 'patch', 'bug', 'fix code', 'function',
+    'endpoint', 'component', 'script', 'compile'
+  ];
+  if (options.isMutatingCode || codeTriggers.some((t) => clean.includes(t))) {
+    return {
+      archetype: 'DETERMINISTIC_CODE_DIFF',
+      temperature: 0.1,
+      topP: 0.85,
+      thinkingBudget: 2048,
+      rationale: 'Code mutation / compilation detected: Enforcing low-entropy (0.1) for AST precision and type validity.',
+    };
+  }
+
+  // 2. Forensic Security & Secrets Audit
+  const secTriggers = [
+    'security', 'audit', 'cso', 'vulnerability', 'secret', 'leak', 'sast',
+    'stride', 'cve', 'injection', 'xss', 'owasp', 'penetration', 'mitm'
+  ];
+  if (secTriggers.some((t) => clean.includes(t))) {
+    return {
+      archetype: 'FORENSIC_SECURITY_AUDIT',
+      temperature: 0.15,
+      topP: 0.9,
+      thinkingBudget: 2048,
+      rationale: 'Security forensics detected: Enforcing rigid empirical bounds (0.15) for STRIDE audit integrity.',
+    };
+  }
+
+  // 3. Cloud Infrastructure & Shell Operations
+  const infraTriggers = [
+    'vm', 'gcp', 'runner', 'server', 'daemon', 'systemd', 'process', 'cpu',
+    'ram', 'disk', 'curl', 'ping', 'port', 'satellite', 'infrastructure', 'status'
+  ];
+  if (infraTriggers.some((t) => clean.includes(t))) {
+    return {
+      archetype: 'SYSTEM_INFRASTRUCTURE',
+      temperature: 0.2,
+      topP: 0.9,
+      thinkingBudget: 1024,
+      rationale: 'Infrastructure operations detected: Enforcing factual execution (0.2) for shell and daemon state.',
+    };
+  }
+
+  // 4. Mission Control Task & Radar Management
+  const taskTriggers = [
+    'task', 'todo', 'radar', 'briefing', 'schedule', 'reminder', 'habit', 'due date', 'matrix'
+  ];
+  if (taskTriggers.some((t) => clean.includes(t))) {
+    return {
+      archetype: 'RADAR_TASK_MANAGEMENT',
+      temperature: 0.3,
+      topP: 0.9,
+      thinkingBudget: 512,
+      rationale: 'Radar task operations detected: Enforcing structured synthesis (0.3) for tactical tracking.',
+    };
+  }
+
+  // 5. Strategic Sparring & Architecture Design
+  const sparringTriggers = [
+    'architect', 'design', 'sparring', 'adversarial', 'red-team', 'tradeoff',
+    'evaluate', 'compare', 'review', 'strategy', 'philosophical', 'paradigm', 'why does'
+  ];
+  if (options.persona === 'FRIDAY' || sparringTriggers.some((t) => clean.includes(t))) {
+    return {
+      archetype: 'STRATEGIC_SPARRING',
+      temperature: 0.65,
+      topP: 0.95,
+      thinkingBudget: 2048,
+      rationale: 'Staff sparring / architectural evaluation: Enabling expansive cognitive reasoning (0.65) with deep thinking.',
+    };
+  }
+
+  // 6. Creative Brainstorming & Vision
+  const creativeTriggers = [
+    'brainstorm', 'pitch', 'story', 'vision', 'naming', 'copy', 'narrative', 'creative'
+  ];
+  if (creativeTriggers.some((t) => clean.includes(t))) {
+    return {
+      archetype: 'CREATIVE_BRAINSTORM',
+      temperature: 0.8,
+      topP: 0.95,
+      thinkingBudget: 1024,
+      rationale: 'Creative ideation detected: Enabling high lateral entropy (0.8) for visionary synthesis.',
+    };
+  }
+
+  // 7. Default Conversational Reflex
+  return {
+    archetype: 'CONVERSATIONAL_REFLEX',
+    temperature: 0.45,
+    topP: 0.9,
+    thinkingBudget: 512,
+    rationale: 'Conversational reflex: Balanced intellectual elegance (0.45).',
   };
 }
 
