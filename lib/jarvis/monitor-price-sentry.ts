@@ -94,6 +94,14 @@ const DEFAULT_TARGETS: Record<string, MonitorTarget> = {
     targetPriceThreshold: 5500,
     minValidPrice: 4000,
   },
+  'wd-blue-sn580-1tb-amazon': {
+    id: 'wd-blue-sn580-1tb-amazon',
+    name: 'WD Blue SN580 1TB PCIe 4.0 NVMe M.2 SSD - Amazon',
+    url: 'https://www.amazon.in/dp/B0C8XMH264',
+    platform: 'amazon',
+    targetPriceThreshold: 5400,
+    minValidPrice: 3800,
+  },
   'cooler-master-mwe-650-bronze-amazon': {
     id: 'cooler-master-mwe-650-bronze-amazon',
     name: 'Cooler Master MWE 650 V3 Bronze (650W ATX 3.1) - Amazon',
