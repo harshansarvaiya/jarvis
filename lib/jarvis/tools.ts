@@ -2728,6 +2728,48 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['targetPath'],
     },
   },
+  {
+    name: 'orchestrate_mission',
+    description: 'Autonomous Sovereign Supervisor: Decomposes a complex directive into a Directed Acyclic Graph (DAG) of specialized subagents (Security Auditor, Compiler Fixer, Architecture Expert, etc.) with stigmergic mailboxes and closed-loop verification.',
+    parameters: {
+      type: 'object',
+      properties: {
+        directive: {
+          type: 'string',
+          description: 'The high-level mission or multi-step engineering objective to decompose and execute.',
+        },
+        initiator: {
+          type: 'string',
+          enum: ['sir', 'telegram', 'web-pwa', 'cloud-worker'],
+          description: 'The entity initiating this mission (default: sir).',
+        },
+      },
+      required: ['directive'],
+    },
+  },
+  {
+    name: 'manage_supervisor_task',
+    description: 'Inspects active supervisor DAGs, task queue status, pending HITL approvals, or resolves a blocked HITL gate.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['list_dags', 'pending_hitl', 'approve_hitl', 'reject_hitl', 'run_cycle'],
+          description: 'Action to perform on the supervisor engine.',
+        },
+        taskId: {
+          type: 'string',
+          description: 'Task ID to approve or reject (required for approve_hitl / reject_hitl).',
+        },
+        note: {
+          type: 'string',
+          description: 'Optional note or rationale for HITL approval/rejection.',
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 // ============================================================================
@@ -2744,6 +2786,8 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'inspect_infrastructure',
     'run_security_audit',
     'reverse_engineer_target',
+    'orchestrate_mission',
+    'manage_supervisor_task',
     'manage_task',
     'store_memory',
     'search_memories',
@@ -2769,6 +2813,8 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
   ],
   DAILY_OPERATIONS: [
     'manage_task',
+    'orchestrate_mission',
+    'manage_supervisor_task',
     'store_memory',
     'search_memories',
     'generate_briefing',
@@ -2973,6 +3019,51 @@ export async function executeJarvisTool(
           return { success: true, result: { tasks } };
         }
         return { success: false, result: null, error: `Unknown task action: ${action}` };
+      }
+
+      case 'orchestrate_mission': {
+        const { directive, initiator } = args;
+        if (!directive) return { success: false, result: null, error: 'Directive string required' };
+        const { decomposeDirectiveIntoDAG } = await import('./supervisor');
+        const dag = await decomposeDirectiveIntoDAG(directive, initiator || 'sir');
+        return {
+          success: true,
+          result: {
+            message: `🎯 Mission orchestrated into ${dag.tasks.length} subtasks under DAG ID: ${dag.dagId}`,
+            dagId: dag.dagId,
+            status: dag.status,
+            tasks: dag.tasks.map((t) => ({
+              id: t.id,
+              title: t.title,
+              specialist: t.specialistId,
+              status: t.status,
+              requiresHITL: t.requiresHITL,
+            })),
+          },
+        };
+      }
+
+      case 'manage_supervisor_task': {
+        const { action, taskId, note } = args;
+        const { getSupervisorDAGs, getPendingHITLTasks, resolveHITLApproval, runSupervisorCycle } = await import('./supervisor');
+        if (action === 'list_dags') {
+          const dags = await getSupervisorDAGs();
+          return { success: true, result: { total: dags.length, dags: dags.slice(0, 10) } };
+        }
+        if (action === 'pending_hitl') {
+          const pending = await getPendingHITLTasks();
+          return { success: true, result: { count: pending.length, tasks: pending } };
+        }
+        if (action === 'approve_hitl' || action === 'reject_hitl') {
+          if (!taskId) return { success: false, result: null, error: 'taskId required for HITL action' };
+          const res = await resolveHITLApproval(taskId, action === 'approve_hitl', note);
+          return { success: res.success, result: res };
+        }
+        if (action === 'run_cycle') {
+          const report = await runSupervisorCycle();
+          return { success: true, result: report };
+        }
+        return { success: false, result: null, error: `Unknown supervisor action: ${action}` };
       }
 
       case 'store_memory': {

@@ -1108,8 +1108,14 @@ async function startWorkerLoop(isTestMode: boolean = false) {
   setInterval(async () => {
     tickCount++;
     try {
-      // Every 30 seconds: Reminders & Autonomous Cron Tasks
+      // Every 30 seconds: Reminders, Autonomous Cron Tasks & Sovereign Task Supervisor Cycle
       await checkScheduledReminders();
+      try {
+        const { runSupervisorCycle } = await import('../lib/jarvis/supervisor');
+        await runSupervisorCycle(dispatchPush);
+      } catch (supErr: any) {
+        console.warn('[Cloud Worker:Supervisor] Cycle execution warning:', supErr.message);
+      }
 
       // Every 60 seconds (2 ticks): Sovereign Quant Trading Risk Sentry
       if (tickCount % 2 === 0) {

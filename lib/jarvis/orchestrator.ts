@@ -698,4 +698,27 @@ export function autoTuneSamplingParameters(
   };
 }
 
+// ==========================================
+// Autonomous Sovereign Task-State Supervisor Integration
+// ==========================================
+export {
+  decomposeDirectiveIntoDAG,
+  executeSupervisorTask,
+  runSupervisorCycle,
+  resolveHITLApproval,
+  getPendingHITLTasks,
+  getSupervisorDAGs,
+  saveSupervisorDAGs,
+  postToAgentMailbox,
+  drainAgentMailbox,
+} from './supervisor';
+export type {
+  SupervisorTask,
+  SupervisorDAG,
+  SupervisorTaskStatus,
+  SupervisorPriority,
+  AgentMailboxMessage,
+} from './supervisor';
+
+
 

@@ -50,5 +50,7 @@ next-env.d.ts
 /data/jarvis_satellites*.json
 /data/jarvis_satellite*.json
 /data/jarvis_state_events*.json
+/data/supervisor*.json
+/data/jarvis_supervisor*.json
 scripts/inspect-chats.ts
 
