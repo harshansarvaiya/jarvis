@@ -62,6 +62,14 @@ const DEFAULT_TARGETS: Record<string, MonitorTarget> = {
     targetPriceThreshold: 23000,
     minValidPrice: 18000,
   },
+  'lg-34g600a-amazon': {
+    id: 'lg-34g600a-amazon',
+    name: 'LG UltraGear 34G600A (34" UWQHD 160Hz Curved) - Amazon',
+    url: 'https://www.amazon.in/dp/B0FG8LKDT7',
+    platform: 'amazon',
+    targetPriceThreshold: 20000,
+    minValidPrice: 14000,
+  },
   'amd-ryzen-5-7600-amazon': {
     id: 'amd-ryzen-5-7600-amazon',
     name: 'AMD Ryzen 5 7600 (AM5 6C/12T Boxed w/ Cooler) - Amazon',
@@ -295,11 +303,13 @@ export async function runMonitorPriceSentrySweep(
           let discountDesc = `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Target: <= ₹${target.targetPriceThreshold.toLocaleString('en-IN')})\n• Card Checkout Net Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`;
           if (target.id.includes('ed340cur')) {
             discountDesc = `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Was ₹23,599!)\n• Card Checkout Net Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`;
+          } else if (target.id.includes('34g600a')) {
+            discountDesc = `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Historic Sale/Flash Deal! Was ₹31,999)\n• Card Checkout Net Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`;
           } else if (target.id.includes('xv272u')) {
             discountDesc = `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Was ₹19,000+!)\n• Card Checkout Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`;
           }
 
-          const isMonitor = target.id.includes('cur') || target.id.includes('xv272') || target.id.includes('pm161');
+          const isMonitor = target.id.includes('cur') || target.id.includes('34g600a') || target.id.includes('xv272') || target.id.includes('pm161');
           const itemType = isMonitor ? 'tracked display' : 'PC build component';
           const alertTitle = `🎯 TARGET HIT: ${target.name.split(' - ')[0]} @ ₹${price.toLocaleString('en-IN')}`;
           const alertBody = `Sir, your ${itemType} has hit your sniper trigger threshold!${discountDesc}\n\n🔗 Direct Link: ${target.url}\n\n⚡ Recommendation: Strike immediately before flash allocations deplete.`;
