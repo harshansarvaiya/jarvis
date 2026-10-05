@@ -54,6 +54,55 @@ export interface BreakingCatalyst {
 }
 
 // -------------------------------------------------------------
+// Pause State & Configuration
+// -------------------------------------------------------------
+const PAUSE_STATE_FILE = path.join(process.cwd(), 'data', 'market-catalyst-paused.json');
+const REDIS_PAUSE_KEY = 'jarvis:market_catalyst_alerts:paused';
+
+export async function isMarketCatalystAlertsPaused(): Promise<boolean> {
+  // 1. Check local state file
+  try {
+    if (fs.existsSync(PAUSE_STATE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(PAUSE_STATE_FILE, 'utf-8'));
+      if (data && data.paused === true) return true;
+    }
+  } catch {}
+
+  // 2. Check Redis
+  if (redis) {
+    try {
+      const val = await redis.get(REDIS_PAUSE_KEY);
+      if (val === true || val === 'true' || val === 1 || val === '1') {
+        return true;
+      }
+    } catch {}
+  }
+
+  return false;
+}
+
+export async function setMarketCatalystAlertsPaused(paused: boolean): Promise<void> {
+  try {
+    fs.mkdirSync(path.dirname(PAUSE_STATE_FILE), { recursive: true });
+    fs.writeFileSync(PAUSE_STATE_FILE, JSON.stringify({ paused, updatedAt: new Date().toISOString() }, null, 2));
+  } catch (err: any) {
+    console.warn('[Market Sentry] Failed to write pause state file:', err.message);
+  }
+
+  if (redis) {
+    try {
+      if (paused) {
+        await redis.set(REDIS_PAUSE_KEY, 'true');
+      } else {
+        await redis.del(REDIS_PAUSE_KEY);
+      }
+    } catch (err: any) {
+      console.warn('[Market Sentry] Failed to set pause state in Redis:', err.message);
+    }
+  }
+}
+
+// -------------------------------------------------------------
 // Deduplication & Semantic Filtering Utilities
 // -------------------------------------------------------------
 const DISPATCHED_ALERTS_FILE = path.join(process.cwd(), 'data', 'dispatched-alerts.json');
@@ -538,6 +587,11 @@ export async function dispatchBreakingCatalystAlert(
   catalyst: BreakingCatalyst,
   dispatchPushFn?: (title: string, body: string, url?: string, options?: any) => Promise<any>
 ): Promise<boolean> {
+  if (await isMarketCatalystAlertsPaused()) {
+    console.log(`[Market Sentry] ⏸️ Suppressed breaking catalyst alert: "${catalyst.headline.slice(0, 40)}..." (paused by Sir).`);
+    return false;
+  }
+
   const alreadyNotified = await isCatalystAlreadyDispatched(catalyst);
 
   if (alreadyNotified) {
@@ -633,6 +687,11 @@ export async function dispatchBreakingCatalystAlert(
 export async function runMarketCatalystSentrySweep(
   dispatchPushFn?: (title: string, body: string, url?: string, options?: any) => Promise<any>
 ): Promise<{ evaluated: number; dispatched: number }> {
+  if (await isMarketCatalystAlertsPaused()) {
+    console.log('[Market Sentry] ⏸️ 24/7 Breaking Market Catalyst Sentry is PAUSED by Sir.');
+    return { evaluated: 0, dispatched: 0 };
+  }
+
   console.log('[Market Sentry] 📡 Running 24/7 Breaking Market Catalyst Sentry sweep...');
   let dispatched = 0;
   let evaluated = 0;
