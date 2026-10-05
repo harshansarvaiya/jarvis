@@ -531,32 +531,91 @@ export async function executeNetworkMCP(
       throw new Error('Security Violation: Cloud metadata service access prohibited.');
     }
 
+    const defaultHeaders: Record<string, string> = {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124"',
+      'Sec-Ch-Ua-Mobile': '?0',
+      'Sec-Ch-Ua-Platform': '"Windows"',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      ...headers,
+    };
+
     const res = await fetch(url, {
       method,
-      headers,
+      headers: defaultHeaders,
       body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(10000),
+      redirect: 'follow',
     });
 
+    const finalUrl = res.url || url;
     const contentType = res.headers.get('content-type') || '';
     let responseData: any = null;
+    let isBotBlocked = false;
+    let extractedProductHint = '';
+
     if (contentType.includes('application/json')) {
       responseData = await res.json();
     } else {
       const text = await res.text();
-      responseData = text.slice(0, 2000);
+      const titleMatch = text.match(/<title[^>]*>([^<]*)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].trim() : '';
+
+      isBotBlocked =
+        res.status === 403 ||
+        res.status === 503 ||
+        title.includes('503') ||
+        title.includes('Service Unavailable') ||
+        text.includes('Click the button below to continue shopping') ||
+        text.includes('errors_pa') ||
+        text.includes('validateCaptcha');
+
+      const asinMatch = finalUrl.match(/(?:\/dp\/|\/gp\/product\/)([A-Z0-9]{10})/i);
+      if (asinMatch) {
+        extractedProductHint = `Amazon ASIN: ${asinMatch[1]}`;
+      }
+
+      const cleanSnippet = text
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 3000);
+
+      responseData = {
+        title,
+        finalUrl,
+        snippet: cleanSnippet,
+        isBotBlocked,
+        productHint: extractedProductHint || undefined,
+      };
     }
 
+    const success = res.ok && !isBotBlocked;
+
     return {
-      success: res.ok,
+      success,
       server: 'mcp:network',
       action: `${method} ${url}`,
       output: {
         status: res.status,
         statusText: res.statusText,
+        finalUrl,
+        isBotBlocked,
+        productHint: extractedProductHint || undefined,
         contentType,
         data: responseData,
+        guidance: isBotBlocked
+          ? `[ANTI-BOT CHALLENGE DETECTED]: The target website intercepted direct HTTP retrieval with a bot-shield challenge (Status: ${res.status}). ${extractedProductHint ? `Resolved target product: ${extractedProductHint}.` : ''} Do NOT claim operations were nominal. Use 'search_web' with the product ASIN or explain the anti-bot block directly to Sir.`
+          : undefined,
       },
+      error: isBotBlocked ? `Target site blocked automated scraping (HTTP ${res.status} / Bot Challenge). Target URL: ${finalUrl}` : undefined,
       latencyMs: Date.now() - startTime,
     };
   } catch (error: any) {

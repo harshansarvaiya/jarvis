@@ -1558,7 +1558,7 @@ Do NOT repeat the exact same call without mutating parameters or testing one of 
           .filter((v, i, a) => a.indexOf(v) === i);
 
         const webReconCalls = toolCallsExecuted.filter((tc) =>
-          ['search_web', 'mcp_exa', 'read_web_page', 'deep_research', 'run_deep_research'].includes(tc.name)
+          ['search_web', 'mcp_exa', 'read_web_page', 'mcp_network', 'deep_research', 'run_deep_research'].includes(tc.name)
         );
 
         if (mutatedFiles.length > 0) {
@@ -1568,6 +1568,16 @@ Do NOT repeat the exact same call without mutating parameters or testing one of 
           for (const tc of webReconCalls) {
             const queryOrUrl = tc.args?.query || tc.args?.url || (Array.isArray(tc.args?.urls) ? tc.args.urls.join(', ') : '');
             const rawResults = tc.result?.results || tc.result?.output?.results || (Array.isArray(tc.result) ? tc.result : []);
+
+            // Handle anti-bot intercepted probes
+            const isBlocked = tc.result?.isBotBlocked || tc.result?.output?.isBotBlocked;
+            if (isBlocked) {
+              const hint = tc.result?.productHint || tc.result?.output?.productHint || '';
+              const finalUrl = tc.result?.finalUrl || tc.result?.output?.finalUrl || queryOrUrl;
+              intelSummaries.push(`• **Anti-Bot Challenge Encountered** for \`${finalUrl}\`:\n- The target website intercepted direct HTTP retrieval with a bot-shield challenge.${hint ? `\n- Resolved target entity: **${hint}**.` : ''}\n- Please provide the product name or ASIN directly so I can perform a verified spec lookup.`);
+              continue;
+            }
+
             if (Array.isArray(rawResults) && rawResults.length > 0) {
               const topSnippets = rawResults.slice(0, 3).map((r: any) => {
                 const title = r.title ? `**${r.title}**` : '';
@@ -1577,6 +1587,8 @@ Do NOT repeat the exact same call without mutating parameters or testing one of 
                 return `${[title, link].filter(Boolean).join(' ')}: ${cleanText}`;
               }).join('\n- ');
               intelSummaries.push(`• **Recon for** \`${queryOrUrl}\`:\n- ${topSnippets}`);
+            } else if (tc.result?.data?.snippet) {
+              intelSummaries.push(`• **Recon for** \`${queryOrUrl}\`:\n- ${tc.result.data.snippet.slice(0, 300)}`);
             } else if (queryOrUrl) {
               intelSummaries.push(`• **Recon completed for** \`${queryOrUrl}\`.`);
             }
@@ -1591,8 +1603,14 @@ Do NOT repeat the exact same call without mutating parameters or testing one of 
         } else if (readFiles.length > 0) {
           finalReply = `Sir, I completed the inspection across ${readFiles.slice(0, 4).map(f => `\`${f}\``).join(', ')}. All diagnostic traces are nominal and verified.`;
         } else {
-          const toolNames = toolCallsExecuted.map((tc) => tc.name).filter((v, i, a) => a.indexOf(v) === i);
-          finalReply = `Sir, operations across ${toolNames.map((n) => `\`${n}\``).join(', ')} have completed with nominal status.`;
+          const failures = toolCallsExecuted.filter((tc) => tc.result?.error || tc.result?.success === false);
+          if (failures.length > 0) {
+            const failedNames = failures.map((tc) => `\`${tc.name}\``).join(', ');
+            finalReply = `Sir, the tool execution across ${failedNames} did not return actionable data. Please clarify your objective or provide the exact entity details so I may proceed with secondary intelligence.`;
+          } else {
+            const toolNames = toolCallsExecuted.map((tc) => tc.name).filter((v, i, a) => a.indexOf(v) === i);
+            finalReply = `Sir, operations across ${toolNames.map((n) => `\`${n}\``).join(', ')} have completed. Please specify if further synthesis or execution is required.`;
+          }
         }
       } else {
         finalReply = 'All systems green, Sir. Standing by for your directive.';
