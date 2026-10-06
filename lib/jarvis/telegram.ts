@@ -472,6 +472,37 @@ export class TelegramGateway {
   }
 
   /**
+   * Edits the text of an existing message on Telegram
+   */
+  public async editMessageText(
+    chatId: number | string,
+    messageId: number,
+    text: string,
+    options?: {
+      parseMode?: 'Markdown' | 'HTML';
+      replyMarkup?: TelegramInlineKeyboardMarkup;
+    }
+  ): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    try {
+      const res = await fetch(`${this.baseUrl}/editMessageText`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          message_id: messageId,
+          text,
+          parse_mode: options?.parseMode || 'Markdown',
+          reply_markup: options?.replyMarkup || { inline_keyboard: [] },
+        }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Edits inline keyboard on an existing message
    */
   public async editMessageReplyMarkup(

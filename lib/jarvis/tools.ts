@@ -2801,6 +2801,29 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'manage_mission_blackboard',
+    description: 'AgentTeams Swarm Blackboard: Access the shared Upstash scratchpad where subagents write intermediate findings, hypotheses, code diffs, security flags, and benchmarks during complex missions.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['post', 'read', 'synthesize'],
+          description: 'Blackboard action: "post" an entry, "read" raw entries, or "synthesize" an executive overview.',
+        },
+        dagId: {
+          type: 'string',
+          description: 'The mission DAG ID (e.g. "dag-1718000000").',
+        },
+        entry: {
+          type: 'object',
+          description: 'Entry data for "post": { agentId: string, entryType: "HYPOTHESIS"|"FINDING"|"CODE_DIFF"|"SECURITY_FLAG"|"BENCHMARK"|"EXECUTIVE_NOTE", title: string, content: string }',
+        },
+      },
+      required: ['action', 'dagId'],
+    },
+  },
+  {
     name: 'manage_open_loops',
     description: 'Inspect, register, update, or resurface Sir\'s unresolved ideas, hypotheses, and intellectual open loops (Dot + Muse continuity substrate).',
     parameters: {
@@ -2977,6 +3000,7 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'reverse_engineer_target',
     'orchestrate_mission',
     'manage_supervisor_task',
+    'manage_mission_blackboard',
     'trigger_ghost_builder',
     'run_alpha_radar_sweep',
     'manage_open_loops',
@@ -3025,6 +3049,7 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'deconstruct_multi_perspective',
     'orchestrate_mission',
     'manage_supervisor_task',
+    'manage_mission_blackboard',
     'store_memory',
     'search_memories',
     'generate_briefing',
@@ -3277,6 +3302,34 @@ export async function executeJarvisTool(
           return { success: true, result: report };
         }
         return { success: false, result: null, error: `Unknown supervisor action: ${action}` };
+      }
+
+      case 'manage_mission_blackboard': {
+        const { action, dagId, entry } = args;
+        if (!action || !dagId) {
+          return { success: false, result: null, error: 'action and dagId are required' };
+        }
+        const { AgentTeamsBlackboard } = await import('./supervisor');
+        if (action === 'post') {
+          if (!entry || !entry.title || !entry.content) {
+            return { success: false, result: null, error: 'entry with title and content is required for post' };
+          }
+          const saved = await AgentTeamsBlackboard.postEntry(String(dagId), {
+            agentId: entry.agentId || 'friday',
+            entryType: entry.entryType || 'FINDING',
+            title: entry.title,
+            content: entry.content,
+            metadata: entry.metadata,
+          });
+          return { success: true, result: saved };
+        } else if (action === 'read') {
+          const entries = await AgentTeamsBlackboard.getEntries(String(dagId));
+          return { success: true, result: { count: entries.length, entries } };
+        } else if (action === 'synthesize') {
+          const summary = await AgentTeamsBlackboard.synthesizeBlackboard(String(dagId));
+          return { success: true, result: { summary } };
+        }
+        return { success: false, result: null, error: `Unknown blackboard action: ${action}` };
       }
 
       case 'manage_open_loops': {

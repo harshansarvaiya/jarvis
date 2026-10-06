@@ -152,8 +152,24 @@ export async function callVertexAIGenerate(options: VertexGenerateOptions): Prom
     mergedGenConfig.thinkingConfig = options.generationConfig.thinkingConfig;
   }
 
+  // In-Flight Pre-Prompt Vault & PII Stripper (Octop-inspired Ingestion)
+  const { redactSecretsAndPii } = await import('./security/secret-sentry');
+  const sanitizedContents = (options.contents || []).map((content: any) => {
+    if (!content?.parts || !Array.isArray(content.parts)) return content;
+    return {
+      ...content,
+      parts: content.parts.map((p: any) => {
+        if (p && typeof p.text === 'string') {
+          const red = redactSecretsAndPii(p.text);
+          return red.redactedCount > 0 ? { ...p, text: red.sanitized } : p;
+        }
+        return p;
+      }),
+    };
+  });
+
   const bodyPayload: any = {
-    contents: options.contents,
+    contents: sanitizedContents,
     generationConfig: mergedGenConfig,
   };
 

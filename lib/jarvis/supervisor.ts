@@ -83,11 +83,87 @@ export interface AgentMailboxMessage {
   read: boolean;
 }
 
+export interface BlackboardEntry {
+  id: string;
+  dagId: string;
+  agentId: string; // e.g. 'security-auditor', 'architecture-expert', 'compiler-fixer'
+  entryType: 'HYPOTHESIS' | 'FINDING' | 'CODE_DIFF' | 'SECURITY_FLAG' | 'BENCHMARK' | 'EXECUTIVE_NOTE';
+  title: string;
+  content: string;
+  metadata?: Record<string, any>;
+  timestamp: string;
+}
+
 const SUPERVISOR_DAGS_KEY = 'jarvis:supervisor:dags';
 const SUPERVISOR_MAILBOX_PREFIX = 'jarvis:supervisor:mailbox:';
+const BLACKBOARD_PREFIX = 'jarvis:blackboard:';
 const LOCAL_DATA_DIR = path.join(process.cwd(), 'data');
 const LOCAL_DAGS_FILE = path.join(LOCAL_DATA_DIR, 'supervisor-dags.json');
 const LOCAL_MAILBOX_FILE = path.join(LOCAL_DATA_DIR, 'supervisor-mailboxes.json');
+
+/**
+ * AgentTeams Swarm Blackboard:
+ * Inspired by TencentCloud/Octop's AgentTeams coordinator-specialist decoupling.
+ * Subagents write intermediate findings, hypotheses, diffs, and benchmarks onto
+ * this shared Upstash blackboard without polluting the user's primary conversation.
+ */
+export class AgentTeamsBlackboard {
+  public static async postEntry(
+    dagId: string,
+    entry: Omit<BlackboardEntry, 'id' | 'timestamp' | 'dagId'>
+  ): Promise<BlackboardEntry> {
+    const id = `bb-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const fullEntry: BlackboardEntry = {
+      id,
+      dagId,
+      ...entry,
+      timestamp: new Date().toISOString(),
+    };
+
+    try {
+      const storage = getStorage();
+      await storage.execute('rpush', `${BLACKBOARD_PREFIX}${dagId}`, JSON.stringify(fullEntry));
+      await storage.execute('expire', `${BLACKBOARD_PREFIX}${dagId}`, 172800); // 48h TTL
+    } catch (err: any) {
+      console.warn(`[AgentTeams Blackboard] Post error: ${err.message}`);
+    }
+
+    return fullEntry;
+  }
+
+  public static async getEntries(dagId: string): Promise<BlackboardEntry[]> {
+    try {
+      const storage = getStorage();
+      const raw = await storage.execute('lrange', `${BLACKBOARD_PREFIX}${dagId}`, 0, -1);
+      if (!Array.isArray(raw)) return [];
+      return raw.map((item) => (typeof item === 'string' ? JSON.parse(item) : item));
+    } catch {
+      return [];
+    }
+  }
+
+  public static async synthesizeBlackboard(dagId: string): Promise<string> {
+    const entries = await this.getEntries(dagId);
+    if (entries.length === 0) return 'No entries recorded on mission blackboard.';
+
+    const grouped: Record<string, BlackboardEntry[]> = {};
+    for (const e of entries) {
+      if (!grouped[e.entryType]) grouped[e.entryType] = [];
+      grouped[e.entryType].push(e);
+    }
+
+    let summary = `📋 **[AGENTTEAMS MISSION BLACKBOARD — ${dagId}]**\n\n`;
+    for (const [type, items] of Object.entries(grouped)) {
+      summary += `### ${type} (${items.length})\n`;
+      for (const item of items) {
+        summary += `• **[${item.agentId}]** ${item.title}\n  _${item.content.slice(0, 300)}_\n`;
+      }
+      summary += '\n';
+    }
+
+    return summary.trim();
+  }
+}
 
 // ==========================================
 // 1. Dual-Persistence Storage Layer

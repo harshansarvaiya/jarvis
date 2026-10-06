@@ -176,3 +176,88 @@ export async function scanWorkspaceForSecrets(rootDir: string = process.cwd()): 
     scanDurationMs: Date.now() - startTime,
   };
 }
+
+export interface RedactionResult {
+  sanitized: string;
+  redactedCount: number;
+  redactedTypes: string[];
+}
+
+export const PII_PATTERNS: Array<{ type: string; pattern: RegExp; description: string }> = [
+  // Credit cards (Visa, MasterCard, Amex, Discover)
+  { type: 'CREDIT_CARD', pattern: /\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b/, description: 'Credit Card Number' },
+  // US SSN
+  { type: 'US_SSN', pattern: /\b\d{3}-\d{2}-\d{4}\b/, description: 'US Social Security Number' },
+  // International / Indian Phone numbers
+  { type: 'PHONE_NUMBER', pattern: /(?:\+91[\-\s]?)?[6789]\d{9}\b|\b\+1[\-\s]?\(?\d{3}\)?[\-\s]?\d{3}[\-\s]?\d{4}\b/, description: 'Phone Number' },
+  // Generic password fields in JSON/YAML/CLI
+  { type: 'PLAINTEXT_PASSWORD', pattern: /(?:password|passwd|secret|api_key|token)\s*[:=]\s*["']([^"'\s]{8,})["']/i, description: 'Plaintext Password Assignment' },
+];
+
+/**
+ * In-Flight Outbound Prompt & Context Sanitizer:
+ * Redacts high-entropy API secrets, private keys, database passwords, and PII
+ * before payloads are dispatched to foundation model APIs.
+ */
+export function redactSecretsAndPii(text: string): RedactionResult {
+  if (!text || typeof text !== 'string') {
+    return { sanitized: text, redactedCount: 0, redactedTypes: [] };
+  }
+
+  let sanitized = text;
+  let redactedCount = 0;
+  const redactedTypes = new Set<string>();
+
+  // 1. Scrub Known Secret Patterns
+  for (const { type, pattern } of SECRET_PATTERNS) {
+    if (pattern.test(sanitized)) {
+      sanitized = sanitized.replace(new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g'), () => {
+        redactedCount++;
+        redactedTypes.add(type);
+        return `[REDACTED_${type}]`;
+      });
+    }
+  }
+
+  // 2. Scrub PII Patterns
+  for (const { type, pattern } of PII_PATTERNS) {
+    if (pattern.test(sanitized)) {
+      sanitized = sanitized.replace(new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g'), () => {
+        redactedCount++;
+        redactedTypes.add(type);
+        return `[REDACTED_${type}]`;
+      });
+    }
+  }
+
+  // 3. Scrub Active Environment Secrets if present in text
+  const sensitiveEnvKeys = [
+    'UPSTASH_REDIS_REST_TOKEN',
+    'TELEGRAM_BOT_TOKEN',
+    'GROQ_API_KEY',
+    'NVIDIA_NIM_API_KEY',
+    'GEMINI_API_KEY',
+    'OPENAI_API_KEY',
+    'EXA_API_KEY',
+    'SERPER_API_KEY',
+    'GITHUB_TOKEN',
+    'GITHUB_MODELS_TOKEN',
+    'VAPID_PRIVATE_KEY',
+    'SATELLITE_SECRET',
+  ];
+
+  for (const envKey of sensitiveEnvKeys) {
+    const val = process.env[envKey];
+    if (val && val.length > 10 && sanitized.includes(val)) {
+      sanitized = sanitized.split(val).join(`[REDACTED_ENV_${envKey}]`);
+      redactedCount++;
+      redactedTypes.add(`ENV_${envKey}`);
+    }
+  }
+
+  return {
+    sanitized,
+    redactedCount,
+    redactedTypes: Array.from(redactedTypes),
+  };
+}

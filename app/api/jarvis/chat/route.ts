@@ -31,7 +31,16 @@ export async function POST(req: NextRequest) {
         ]
       : messages;
 
-    const result = await runJarvisAgent(effectiveMessages, {
+    const { redactSecretsAndPii } = await import('@/lib/jarvis/security/secret-sentry');
+    const sanitizedEffectiveMessages = effectiveMessages.map((m: any) => {
+      if (m && typeof m.content === 'string') {
+        const red = redactSecretsAndPii(m.content);
+        return red.redactedCount > 0 ? { ...m, content: red.sanitized } : m;
+      }
+      return m;
+    });
+
+    const result = await runJarvisAgent(sanitizedEffectiveMessages, {
       apiKey: apiKey || process.env.GEMINI_API_KEY,
       model: model || 'gemini-3.7-flash',
       groqApiKey: groqApiKey || process.env.GROQ_API_KEY,

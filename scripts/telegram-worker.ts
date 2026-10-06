@@ -1051,7 +1051,32 @@ async function handleIncomingMessage(update: TelegramUpdate) {
     console.log(`[Telegram Gateway] 🔘 Button Callback from Sir: "${cq.data}"`);
 
     let directiveText = '';
-    if (cq.data === 'cmd:evolve') {
+    if (cq.data.startsWith('guardian_approve:')) {
+      const actionId = cq.data.replace(/^guardian_approve:/, '');
+      const { executeGuardianApprovedAction } = await import('../lib/jarvis/security/guardian-barrier');
+      const res = await executeGuardianApprovedAction(actionId);
+      const icon = res.success ? '✅' : '⚠️';
+      if (cq.message?.message_id) {
+        await gateway.editMessageText(
+          chatId,
+          cq.message.message_id,
+          `${icon} **[GUARDIAN ACTION EXECUTED BY SIR]**\n\n\`\`\`\n${res.output.slice(0, 1500)}\n\`\`\`\n_Actuated with Sovereign Clearance at ${new Date().toLocaleTimeString('en-GB')}_`
+        );
+      }
+      return;
+    } else if (cq.data.startsWith('guardian_abort:')) {
+      const actionId = cq.data.replace(/^guardian_abort:/, '');
+      const { abortGuardianAction } = await import('../lib/jarvis/security/guardian-barrier');
+      await abortGuardianAction(actionId);
+      if (cq.message?.message_id) {
+        await gateway.editMessageText(
+          chatId,
+          cq.message.message_id,
+          `❌ **[GUARDIAN ACTION ABORTED BY SIR]**\n\n_Directive was safely revoked. System remains protected._`
+        );
+      }
+      return;
+    } else if (cq.data === 'cmd:evolve') {
       await processDirective(chatId, '/evolve', undefined, cq.message?.message_id);
       return;
     } else if (cq.data === 'cmd:nse' || cq.data === 'cmd:nse_scan') {
