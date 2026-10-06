@@ -33,14 +33,22 @@ export function compressSystemPrompt(prompt: string): string {
     .trim();
 }
 
+import { createSpillIfNeeded } from './spill';
+
 /**
- * Compresses tool outputs (stdout, JSON dumps) to isolate key needles and error signatures
+ * Compresses tool outputs (stdout, JSON dumps) to isolate key needles and error signatures.
+ * Automatically saves oversized output to persistent text spills with locator references.
  */
 export function compressToolOutput(output: string, maxChars = 2500): string {
   if (!output) return '';
   if (output.length <= maxChars) return output;
 
-  // Extract first 1,200 chars and trailing 1,200 chars (where error summaries and final outputs live)
+  const spillCheck = createSpillIfNeeded(output, maxChars, 80);
+  if (spillCheck.isSpilled) {
+    return spillCheck.content;
+  }
+
+  // Fallback head/tail truncation
   const headSize = Math.floor(maxChars * 0.5);
   const tailSize = Math.floor(maxChars * 0.45);
   const omittedChars = output.length - headSize - tailSize;

@@ -42,6 +42,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const execAsync = promisify(exec);
+import { globalLoopGuard } from './loop-guard';
+import { createSpillIfNeeded, readSpill } from './spill';
+import { presentDeliverables } from './deliverables';
+import { executePtcScript } from './ptc-runtime';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // /CAREFUL GUARDIAN — gstack-inspired destructive command safety layer
@@ -108,16 +112,21 @@ async function runDirectShellCommand(command: string): Promise<{ stdout: string;
       env: { ...process.env, PATH: process.env.PATH },
     });
 
+    const stdoutSpill = createSpillIfNeeded(stdout || '', 3500, 80, { sourceTool: 'shell', intent: command.slice(0, 50) });
+    const stderrSpill = createSpillIfNeeded(stderr || '', 1500, 40, { sourceTool: 'shell-stderr', intent: command.slice(0, 50) });
+
     return {
-      stdout: (stdout || '').slice(0, 3500),
-      stderr: (stderr || '').slice(0, 1500),
+      stdout: stdoutSpill.content,
+      stderr: stderrSpill.content,
       exitCode: 0,
       executionSubstrate: 'Direct VM Terminal (antigravity-cloud-runner)',
     };
   } catch (err: any) {
+    const errStdoutSpill = createSpillIfNeeded(err.stdout || '', 1500, 40, { sourceTool: 'shell-err' });
+    const errStderrSpill = createSpillIfNeeded(err.stderr || err.message || 'Execution error', 2000, 50, { sourceTool: 'shell-err-stderr' });
     return {
-      stdout: (err.stdout || '').slice(0, 1500),
-      stderr: (err.stderr || err.message || 'Execution error').slice(0, 2000),
+      stdout: errStdoutSpill.content,
+      stderr: errStderrSpill.content,
       exitCode: err.code || 1,
       executionSubstrate: 'Direct VM Terminal (antigravity-cloud-runner)',
     };
@@ -1127,6 +1136,95 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
         },
       },
       required: ['intent', 'code'],
+    },
+  },
+  {
+    name: 'read_spill',
+    description: 'Inspect full content, line ranges, or search patterns in spilled tool output logs stored on disk when output was too large for immediate context.',
+    parameters: {
+      type: 'object',
+      properties: {
+        spillId: {
+          type: 'string',
+          description: 'The unique spill identifier (e.g. "spill-1728238491-a1b2").',
+        },
+        startLine: {
+          type: 'number',
+          description: '1-indexed starting line to read.',
+        },
+        endLine: {
+          type: 'number',
+          description: '1-indexed ending line to read.',
+        },
+        searchPattern: {
+          type: 'string',
+          description: 'Regex or text pattern to search for within the spilled log with surrounding context.',
+        },
+        maxLines: {
+          type: 'number',
+          description: 'Maximum lines to return (capped at 200).',
+        },
+      },
+      required: ['spillId'],
+    },
+  },
+  {
+    name: 'present_deliverables',
+    description: 'Explicitly register and present completed mission deliverables (features, tools, docs, bug fixes) for Sir, with git working-tree diff line metrics and status tracking.',
+    parameters: {
+      type: 'object',
+      properties: {
+        deliverables: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              path: { type: 'string', description: 'Relative file path of the deliverable.' },
+              title: { type: 'string', description: 'Brief human-readable title.' },
+              description: { type: 'string', description: 'Concrete summary of changes or features.' },
+              category: {
+                type: 'string',
+                enum: ['FEATURE', 'FIX', 'TOOL', 'DOCS', 'INFRASTRUCTURE', 'SCRIPT'],
+                description: 'Category of deliverable.',
+              },
+            },
+            required: ['path', 'title', 'description', 'category'],
+          },
+          description: 'List of deliverables created or modified during this mission.',
+        },
+        turnId: {
+          type: 'string',
+          description: 'Optional turn or mission ID.',
+        },
+      },
+      required: ['deliverables'],
+    },
+  },
+  {
+    name: 'execute_ptc_script',
+    description: 'Program-aided Tool Calling (PTC): Execute a multi-step TypeScript/JavaScript script against host bindings in a single run, avoiding multiple chatty tool roundtrips.',
+    parameters: {
+      type: 'object',
+      properties: {
+        script: {
+          type: 'string',
+          description: 'The TypeScript or JavaScript code to execute. Can import fs, path, child_process.',
+        },
+        language: {
+          type: 'string',
+          enum: ['typescript', 'javascript'],
+          description: 'Script language.',
+        },
+        intent: {
+          type: 'string',
+          description: 'Intent of this programmatic operation.',
+        },
+        timeoutMs: {
+          type: 'number',
+          description: 'Execution budget in milliseconds (up to 45000ms).',
+        },
+      },
+      required: ['script'],
     },
   },
   {
@@ -3137,6 +3235,16 @@ export async function executeJarvisTool(
     };
   }
 
+  // 1B. Loop Hygiene Guard (DeepSeek Harness / gstack Investigate Iron Law)
+  const loopCheck = globalLoopGuard.inspectProposedCall(toolName, args);
+  if (loopCheck.actionToTake === 'INTERCEPT') {
+    return {
+      success: false,
+      result: null,
+      error: loopCheck.interceptionMessage,
+    };
+  }
+
   try {
     // Broadcast action to Dual-Citizen State Bus
     import('./state-bus').then(({ publishStateEvent }) => {
@@ -3657,6 +3765,53 @@ export async function executeJarvisTool(
             stderr: step.observation.stderr,
             executionMs: step.observation.executionMs,
           },
+        };
+      }
+
+      case 'read_spill': {
+        const { spillId, startLine, endLine, searchPattern, maxLines } = args;
+        const res = readSpill(spillId, {
+          startLine,
+          endLine,
+          searchPattern,
+          maxLines,
+        });
+        return {
+          success: res.success,
+          result: res.success ? { data: res.data, totalLines: res.totalLines } : null,
+          error: res.error,
+        };
+      }
+
+      case 'present_deliverables': {
+        const { deliverables, turnId } = args;
+        const res = await presentDeliverables(deliverables || [], turnId);
+        return {
+          success: res.success,
+          result: {
+            formattedCard: res.formattedCard,
+            record: res.record,
+          },
+        };
+      }
+
+      case 'execute_ptc_script': {
+        const { script, language, intent, timeoutMs } = args;
+        const res = await executePtcScript({
+          script,
+          language,
+          intent,
+          timeoutMs,
+        });
+        return {
+          success: res.success,
+          result: {
+            returnValue: res.returnValue,
+            stdout: res.stdout,
+            stderr: res.stderr,
+            executionDurationMs: res.executionDurationMs,
+          },
+          error: res.error,
         };
       }
 

@@ -55,5 +55,7 @@ next-env.d.ts
 /data/jarvis-chronicles.json
 /data/jarvis-open-loops.json
 /data/jarvis-temporal-anchor.json
+/data/deliverables-history.json
 scripts/inspect-chats.ts
+/scratch/
 

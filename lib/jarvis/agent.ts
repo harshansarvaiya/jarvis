@@ -24,6 +24,7 @@ import { getPersonaConfig, buildPersonaPromptBlock } from './persona';
 import { analyzeEmotionalSubtext, EmotionalSubtextResult } from './emotion-engine';
 import { compressSystemPrompt, compressToolOutput } from './compression';
 import { getDynamicCognitiveDnaBlock } from './dynamic-dna';
+import { globalLoopGuard } from './loop-guard';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -147,6 +148,7 @@ export async function runJarvisAgent(
   error?: string;
 }> {
   const startTime = Date.now();
+  globalLoopGuard.reset();
   const apiKey = options.apiKey || process.env.GEMINI_API_KEY || '';
   const groqKey = options.groqApiKey || process.env.GROQ_API_KEY || '';
   const githubKey = options.githubToken || process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_TOKEN || '';
