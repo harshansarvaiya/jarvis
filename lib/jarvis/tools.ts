@@ -2838,6 +2838,79 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['action'],
     },
   },
+  {
+    name: 'incubate_open_loop',
+    description: 'Matures an open loop in the Idea Incubation Sandbox, synthesizing architectural blueprints, empirical experiment designs, and trade-offs (Muse paradigm).',
+    parameters: {
+      type: 'object',
+      properties: {
+        loopId: {
+          type: 'string',
+          description: 'The ID of the open loop to incubate (e.g. "loop-muse-dot-grok-integration").',
+        },
+        customFocus: {
+          type: 'string',
+          description: 'Optional architectural angle or focus constraint.',
+        },
+      },
+      required: ['loopId'],
+    },
+  },
+  {
+    name: 'generate_idea_topology',
+    description: 'Generates an associative concept topology map and Mermaid graph connecting open loops, codebase AST symbols, and chronicle themes (Muse paradigm).',
+    parameters: {
+      type: 'object',
+      properties: {
+        maxNodes: {
+          type: 'number',
+          description: 'Maximum number of nodes to include in the topology (default 25).',
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'view_temporal_anchor',
+    description: 'Inspects Sir\'s longitudinal cognitive pacing, fatigue risk index, and session velocity across days (Dot paradigm).',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'fetch_developer_pulse',
+    description: 'Fetches the live real-time developer discourse and trending AI engineering debates via zero-auth Hacker News firehose (Grok paradigm).',
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: {
+          type: 'number',
+          description: 'Number of top discussions to fetch (default 8).',
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'deconstruct_multi_perspective',
+    description: 'Deconstructs any idea, architecture, or codebase pull request across 4 simultaneous cognitive prisms: Systems Architect, Product Strategist, Adversarial Red-Teamer (Grok Razor), and Empirical Pragmatist.',
+    parameters: {
+      type: 'object',
+      properties: {
+        targetSubject: {
+          type: 'string',
+          description: 'The idea, technology, architecture, or feature to deconstruct.',
+        },
+        contextNotes: {
+          type: 'string',
+          description: 'Additional architectural or business context.',
+        },
+      },
+      required: ['targetSubject'],
+    },
+  },
 ];
 
 // ============================================================================
@@ -2858,6 +2931,10 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'manage_supervisor_task',
     'manage_open_loops',
     'manage_chronicles',
+    'incubate_open_loop',
+    'generate_idea_topology',
+    'view_temporal_anchor',
+    'deconstruct_multi_perspective',
     'manage_task',
     'store_memory',
     'search_memories',
@@ -2868,6 +2945,7 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'cloud_execute_command',
     'read_workspace_file',
     'grep_workspace',
+    'deconstruct_multi_perspective',
     'store_memory',
     'search_memories',
   ],
@@ -2876,6 +2954,7 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'read_web_page',
     'deep_research_synthesis',
     'fetch_financial_intelligence',
+    'fetch_developer_pulse',
     'execute_mcp_operation',
     'store_memory',
     'search_memories',
@@ -2885,6 +2964,11 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'manage_task',
     'manage_open_loops',
     'manage_chronicles',
+    'incubate_open_loop',
+    'generate_idea_topology',
+    'view_temporal_anchor',
+    'fetch_developer_pulse',
+    'deconstruct_multi_perspective',
     'orchestrate_mission',
     'manage_supervisor_task',
     'store_memory',
@@ -3184,6 +3268,42 @@ export async function executeJarvisTool(
           return { success: true, result: chapter };
         }
         return { success: false, result: null, error: `Unknown action: ${action}` };
+      }
+
+      case 'incubate_open_loop': {
+        const { loopId, customFocus } = args;
+        if (!loopId) return { success: false, result: null, error: 'loopId required' };
+        const { incubateIdea } = await import('./idea-incubator');
+        const res = await incubateIdea(loopId, { customFocus });
+        return { success: res.success, result: res.loop || res.error };
+      }
+
+      case 'generate_idea_topology': {
+        const { maxNodes } = args;
+        const { generateIdeaTopology } = await import('./idea-topology');
+        const topology = await generateIdeaTopology({ maxNodes });
+        return { success: true, result: topology };
+      }
+
+      case 'view_temporal_anchor': {
+        const { getTemporalAnchorState } = await import('./temporal-anchor');
+        const anchor = await getTemporalAnchorState();
+        return { success: true, result: anchor };
+      }
+
+      case 'fetch_developer_pulse': {
+        const { limit } = args;
+        const { fetchDeveloperPulse } = await import('./developer-pulse');
+        const pulse = await fetchDeveloperPulse(limit || 8);
+        return { success: true, result: pulse };
+      }
+
+      case 'deconstruct_multi_perspective': {
+        const { targetSubject, contextNotes } = args;
+        if (!targetSubject) return { success: false, result: null, error: 'targetSubject required' };
+        const { deconstructMultiPerspective } = await import('./multi-perspective');
+        const analysis = await deconstructMultiPerspective(targetSubject, contextNotes);
+        return { success: true, result: analysis };
       }
 
       case 'store_memory': {

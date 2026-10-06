@@ -30,6 +30,14 @@ export interface OpenLoopItem {
   contextNotes: string;
   associations: string[]; // Concept tags for Muse-style associative linking
   resonanceScore: number; // 1 to 100 based on recurring themes
+  incubatedDossier?: {
+    architecturalAngle: string;
+    concreteHypothesis: string;
+    experimentDesign: string;
+    tradeoffsAndRisks: string[];
+    externalReferences?: string[];
+    incubatedAt: string;
+  };
   lastResurfacedAt?: string;
   createdAt: string;
   updatedAt: string;

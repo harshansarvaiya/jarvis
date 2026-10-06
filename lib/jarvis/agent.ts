@@ -391,6 +391,15 @@ ${repoIntel.fileContent ? `- Target File Ground Truth:\n\`\`\`\n${repoIntel.file
     console.warn('[Agent] Open loops load warning:', lErr);
   }
 
+  let temporalAnchorBlock = '';
+  try {
+    const { getTemporalAnchorState, formatTemporalAnchorPromptBlock } = await import('./temporal-anchor');
+    const anchor = await getTemporalAnchorState();
+    temporalAnchorBlock = formatTemporalAnchorPromptBlock(anchor);
+  } catch (aErr) {
+    console.warn('[Agent] Temporal anchor load warning:', aErr);
+  }
+
   const contextPrompt = `
 [CURRENT TEMPORAL CONTEXT]: ${new Date().toISOString()} (Local time: ${new Date().toLocaleString()})
 ${personaPromptBlock}
@@ -400,6 +409,7 @@ ${workspacePreflightBlock}
 ${externalRepoPreflightBlock}
 ${chroniclesBlock ? `\n${chroniclesBlock}\n` : ''}
 ${openLoopsBlock ? `\n${openLoopsBlock}\n` : ''}
+${temporalAnchorBlock ? `\n${temporalAnchorBlock}\n` : ''}
 
 [EMOTIONAL INTELLIGENCE & PSYCHOLOGICAL SUBTEXT PASS (EQ-SENTRY)]:
 - Primary Emotional Valence: ${emotionAnalysis.primaryEmotion} (Intensity: ${emotionAnalysis.intensity})
@@ -1702,6 +1712,18 @@ Do NOT repeat the exact same call without mutating parameters or testing one of 
     try {
       const { detectAndHarvestOpenLoops } = await import('./open-loops');
       detectAndHarvestOpenLoops(lastUserMessage.content, finalReply).catch(() => {});
+    } catch {
+      // Non-blocking
+    }
+
+    // Dot Feature: Asynchronously Record Temporal Interaction & Pace Telemetry
+    try {
+      const { recordTemporalInteraction } = await import('./temporal-anchor');
+      recordTemporalInteraction({
+        latencyMs,
+        domain: motivePass.targetEntities[0] || 'Core Architecture',
+        emotionValence: emotionAnalysis?.primaryEmotion,
+      }).catch(() => {});
     } catch {
       // Non-blocking
     }
