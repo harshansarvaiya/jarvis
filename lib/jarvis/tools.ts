@@ -2911,6 +2911,24 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['targetSubject'],
     },
   },
+  {
+    name: 'run_alpha_radar_sweep',
+    description: 'Executes an immediate Real-Time Alpha Radar sweep to detect developer discourse breakouts and dispatch multi-perspective intelligence.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'trigger_ghost_builder',
+    description: 'Triggers the Autonomous Overnight Ghost-Builder cycle to mature and implement high-resonance open loops under the Triple-Lock safety gate.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
 ];
 
 // ============================================================================
@@ -2929,6 +2947,8 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'reverse_engineer_target',
     'orchestrate_mission',
     'manage_supervisor_task',
+    'trigger_ghost_builder',
+    'run_alpha_radar_sweep',
     'manage_open_loops',
     'manage_chronicles',
     'incubate_open_loop',
@@ -3304,6 +3324,18 @@ export async function executeJarvisTool(
         const { deconstructMultiPerspective } = await import('./multi-perspective');
         const analysis = await deconstructMultiPerspective(targetSubject, contextNotes);
         return { success: true, result: analysis };
+      }
+
+      case 'run_alpha_radar_sweep': {
+        const { runAlphaRadarSweep } = await import('./alpha-radar');
+        const sweepRes = await runAlphaRadarSweep();
+        return { success: true, result: sweepRes };
+      }
+
+      case 'trigger_ghost_builder': {
+        const { runOvernightGhostBuildCycle } = await import('./ghost-builder');
+        const buildReport = await runOvernightGhostBuildCycle();
+        return { success: true, result: buildReport };
       }
 
       case 'store_memory': {

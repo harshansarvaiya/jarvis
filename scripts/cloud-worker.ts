@@ -549,6 +549,25 @@ async function checkScheduledBriefings() {
     }
 
     // -------------------------------------------------------------
+    // 4. AUTONOMOUS OVERNIGHT GHOST-BUILDER (Window: 02:00 AM - 04:30 AM IST)
+    // -------------------------------------------------------------
+    const isGhostBuildWindow = (istHour >= 2 && istHour < 5);
+    if (isGhostBuildWindow) {
+      const ghostKey = `jarvis:ghost_builder:cycle:${todayDateStr}`;
+      const alreadyRun = await isAlertDispatched(ghostKey);
+      if (!alreadyRun) {
+        await markAlertDispatched(ghostKey, 72000);
+        console.log(`[Cloud Worker] 🌙 Launching Autonomous Overnight Ghost-Builder...`);
+        try {
+          const { runOvernightGhostBuildCycle } = await import('../lib/jarvis/ghost-builder');
+          await runOvernightGhostBuildCycle();
+        } catch (ghostErr: any) {
+          console.error('[Cloud Worker] Overnight Ghost-Builder error:', ghostErr.message);
+        }
+      }
+    }
+
+    // -------------------------------------------------------------
     // EVENING TACTICAL DE-BRIEF (Window: 09:20 PM - 10:00 PM IST)
     // -------------------------------------------------------------
     if (istHour === 21 && istMin >= 20) {
@@ -1148,6 +1167,16 @@ async function startWorkerLoop(isTestMode: boolean = false) {
       // Every 15 minutes (30 ticks): Geopolitical & WW3 Escalation Radar sweep
       if (tickCount % 30 === 0) {
         await checkGeopoliticalEscalationRadar();
+      }
+
+      // Every 20 minutes (40 ticks): Real-Time Alpha Radar sweep (Developer Pulse Breakouts)
+      if (tickCount % 40 === 0) {
+        try {
+          const { runAlphaRadarSweep } = await import('../lib/jarvis/alpha-radar');
+          await runAlphaRadarSweep();
+        } catch (alphaErr: any) {
+          console.warn('[Cloud Worker:Alpha Radar] Sweep warning:', alphaErr.message);
+        }
       }
 
       // Every 30 minutes (60 ticks): System watchdog ping & AST Semantic Code Graph refresh
