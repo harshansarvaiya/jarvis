@@ -118,10 +118,19 @@ export function formatMarkdownForTelegramHtml(text: string): string {
     return placeholder;
   });
 
-  // 2. Escape HTML special characters in the rest of the text
+  // 2. Preserve valid Telegram HTML tags that may already be in the message
+  const preservedHtmlTags: string[] = [];
+  const telegramTagRegex = /<\/?(?:b|strong|i|em|u|ins|s|strike|del|span|tg-spoiler|tg-emoji|blockquote|code|pre|a(?:\s+href="[^"]*")?)>/gi;
+  processed = processed.replace(telegramTagRegex, (match) => {
+    const placeholder = `\u0000HT${preservedHtmlTags.length}\u0000`;
+    preservedHtmlTags.push(match);
+    return placeholder;
+  });
+
+  // 3. Escape HTML special characters in the rest of the text
   processed = escapeHtml(processed);
 
-  // 3. Convert Markdown syntax
+  // 4. Convert Markdown syntax
   // Bold: **text**
   processed = processed.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
 
@@ -134,7 +143,10 @@ export function formatMarkdownForTelegramHtml(text: string): string {
   // Markdown links: [label](url)
   processed = processed.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>');
 
-  // 4. Restore code blocks & inline code
+  // 5. Restore preserved valid HTML tags
+  processed = processed.replace(/\u0000HT(\d+)\u0000/g, (_, idx) => preservedHtmlTags[Number(idx)] || '');
+
+  // 6. Restore code blocks & inline code
   processed = processed.replace(/\u0000CB(\d+)\u0000/g, (_, idx) => codeBlocks[Number(idx)] || '');
   processed = processed.replace(/\u0000IC(\d+)\u0000/g, (_, idx) => inlineCodes[Number(idx)] || '');
 
@@ -153,6 +165,23 @@ export class TelegramGateway {
   private baseUrl: string;
 
   constructor(token?: string) {
+    if (!token && !process.env.TELEGRAM_BOT_TOKEN) {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const envPath = path.resolve(process.cwd(), '.env.local');
+        if (fs.existsSync(envPath)) {
+          const content = fs.readFileSync(envPath, 'utf8');
+          for (const line of content.split('\n')) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('TELEGRAM_BOT_TOKEN=')) {
+              process.env.TELEGRAM_BOT_TOKEN = trimmed.slice('TELEGRAM_BOT_TOKEN='.length).trim();
+              break;
+            }
+          }
+        }
+      } catch {}
+    }
     this.token = token || process.env.TELEGRAM_BOT_TOKEN || '';
     this.baseUrl = `https://api.telegram.org/bot${this.token}`;
   }
