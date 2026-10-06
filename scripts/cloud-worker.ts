@@ -820,11 +820,15 @@ async function checkInfrastructureAndTokenHealth() {
 
       if (ghRes.status === 401 || ghRes.status === 403) {
         console.warn('[Cloud Worker] 🚨 GitHub PAT has expired or is unauthorized!');
-        await dispatchPush(
-          '🚨 [SECURITY SENTRY] GitHub Token Expired',
-          'Primary GitHub PAT is unauthorized (HTTP 401/403). Direct repository sync may be throttled. Please refresh GITHUB_TOKEN in .env.local, Sir.',
-          '/'
-        );
+        const alertKey = `jarvis:alert:github_token_expired:${new Date().toISOString().slice(0, 10)}`;
+        if (!(await isAlertDispatched(alertKey))) {
+          await markAlertDispatched(alertKey, 86400);
+          await dispatchPush(
+            '🚨 [SECURITY SENTRY] GitHub Token Expired',
+            'Primary GitHub PAT is unauthorized (HTTP 401/403). Direct repository sync may be throttled. Please refresh GITHUB_TOKEN in .env.local, Sir.',
+            '/'
+          );
+        }
       } else if (ghRes.ok) {
         console.log('[Cloud Worker] 🛡️ GitHub API Token: VALID (HTTP 200)');
       }
