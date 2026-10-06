@@ -372,6 +372,25 @@ ${repoIntel.fileContent ? `- Target File Ground Truth:\n\`\`\`\n${repoIntel.file
     }
   }
 
+  // 3.12. Dot & Muse Living Chronicles and Open-Loops Context
+  let chroniclesBlock = '';
+  let openLoopsBlock = '';
+  try {
+    const { getChronicles, formatChroniclesPromptBlock } = await import('./chronicles');
+    const chapters = await getChronicles();
+    chroniclesBlock = formatChroniclesPromptBlock(chapters);
+  } catch (cErr) {
+    console.warn('[Agent] Chronicles load warning:', cErr);
+  }
+
+  try {
+    const { getOpenLoops, formatOpenLoopsPromptBlock } = await import('./open-loops');
+    const loops = await getOpenLoops();
+    openLoopsBlock = formatOpenLoopsPromptBlock(loops);
+  } catch (lErr) {
+    console.warn('[Agent] Open loops load warning:', lErr);
+  }
+
   const contextPrompt = `
 [CURRENT TEMPORAL CONTEXT]: ${new Date().toISOString()} (Local time: ${new Date().toLocaleString()})
 ${personaPromptBlock}
@@ -379,6 +398,8 @@ ${specializedAgentBlock}
 ${dynamicDnaBlock}
 ${workspacePreflightBlock}
 ${externalRepoPreflightBlock}
+${chroniclesBlock ? `\n${chroniclesBlock}\n` : ''}
+${openLoopsBlock ? `\n${openLoopsBlock}\n` : ''}
 
 [EMOTIONAL INTELLIGENCE & PSYCHOLOGICAL SUBTEXT PASS (EQ-SENTRY)]:
 - Primary Emotional Valence: ${emotionAnalysis.primaryEmotion} (Intensity: ${emotionAnalysis.intensity})
@@ -1675,6 +1696,14 @@ Do NOT repeat the exact same call without mutating parameters or testing one of 
       });
     } catch (trajErr) {
       console.warn('[Agent] Trajectory recording warning:', trajErr);
+    }
+
+    // Dot + Muse Feature: Asynchronously Detect and Harvest Open Loops
+    try {
+      const { detectAndHarvestOpenLoops } = await import('./open-loops');
+      detectAndHarvestOpenLoops(lastUserMessage.content, finalReply).catch(() => {});
+    } catch {
+      // Non-blocking
     }
 
     return {

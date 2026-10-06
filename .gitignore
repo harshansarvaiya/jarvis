@@ -52,5 +52,7 @@ next-env.d.ts
 /data/jarvis_state_events*.json
 /data/supervisor*.json
 /data/jarvis_supervisor*.json
+/data/jarvis-chronicles.json
+/data/jarvis-open-loops.json
 scripts/inspect-chats.ts
 

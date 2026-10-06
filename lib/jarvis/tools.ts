@@ -2770,6 +2770,74 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: ['action'],
     },
   },
+  {
+    name: 'manage_open_loops',
+    description: 'Inspect, register, update, or resurface Sir\'s unresolved ideas, hypotheses, and intellectual open loops (Dot + Muse continuity substrate).',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['list', 'register', 'update_status', 'resurface'],
+          description: 'Action to perform on the open-loop registry.',
+        },
+        title: {
+          type: 'string',
+          description: 'Title or thesis of the idea/hypothesis (required for register).',
+        },
+        category: {
+          type: 'string',
+          enum: ['ARCHITECTURAL_HYPOTHESIS', 'PRODUCT_VENTURE', 'SYSTEM_EXPERIMENT', 'CONTRARIAN_THOUGHT', 'PERSONAL_MILESTONE'],
+          description: 'Category of the open loop.',
+        },
+        status: {
+          type: 'string',
+          enum: ['OPEN', 'RESONATING', 'EXPLORING', 'RESOLVED', 'ARCHIVED'],
+          description: 'Status of the loop.',
+        },
+        contextNotes: {
+          type: 'string',
+          description: 'Context notes, technical angles, or discussion background.',
+        },
+        loopId: {
+          type: 'string',
+          description: 'The ID of the loop to update (required for update_status).',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'manage_chronicles',
+    description: 'View or record milestones into Sir\'s living biographical chronicles (Dot-inspired narrative timeline).',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['view', 'record_milestone'],
+          description: 'Action to perform on living chronicles.',
+        },
+        milestone: {
+          type: 'string',
+          description: 'The concrete engineering or strategic milestone to record (required for record_milestone).',
+        },
+        theme: {
+          type: 'string',
+          description: 'Associated project theme or architectural domain.',
+        },
+        stateOfMind: {
+          type: 'string',
+          description: 'Sir\'s observed intellectual posture or focus.',
+        },
+        dilemma: {
+          type: 'string',
+          description: 'Unresolved technical dilemma being tackled.',
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 // ============================================================================
@@ -2788,6 +2856,8 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'reverse_engineer_target',
     'orchestrate_mission',
     'manage_supervisor_task',
+    'manage_open_loops',
+    'manage_chronicles',
     'manage_task',
     'store_memory',
     'search_memories',
@@ -2813,6 +2883,8 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
   ],
   DAILY_OPERATIONS: [
     'manage_task',
+    'manage_open_loops',
+    'manage_chronicles',
     'orchestrate_mission',
     'manage_supervisor_task',
     'store_memory',
@@ -3064,6 +3136,54 @@ export async function executeJarvisTool(
           return { success: true, result: report };
         }
         return { success: false, result: null, error: `Unknown supervisor action: ${action}` };
+      }
+
+      case 'manage_open_loops': {
+        const { action, title, category, status, contextNotes, loopId } = args;
+        const { getOpenLoops, registerOpenLoop, updateOpenLoop } = await import('./open-loops');
+        if (action === 'list') {
+          const loops = await getOpenLoops();
+          return { success: true, result: { total: loops.length, openLoops: loops } };
+        }
+        if (action === 'register') {
+          if (!title) return { success: false, result: null, error: 'Title required for register' };
+          const created = await registerOpenLoop({
+            title,
+            originPrompt: 'Manually registered via tool execution',
+            category: category || 'ARCHITECTURAL_HYPOTHESIS',
+            status: status || 'OPEN',
+            contextNotes: contextNotes || '',
+            associations: [],
+            resonanceScore: 75,
+          });
+          return { success: true, result: created };
+        }
+        if (action === 'update_status') {
+          if (!loopId || !status) return { success: false, result: null, error: 'loopId and status required' };
+          const updated = await updateOpenLoop(loopId, { status, contextNotes });
+          return { success: !!updated, result: updated };
+        }
+        if (action === 'resurface') {
+          const loops = await getOpenLoops();
+          const active = loops.filter((l) => l.status === 'OPEN' || l.status === 'RESONATING');
+          return { success: true, result: { activeCount: active.length, activeLoops: active.slice(0, 5) } };
+        }
+        return { success: false, result: null, error: `Unknown action: ${action}` };
+      }
+
+      case 'manage_chronicles': {
+        const { action, milestone, theme, stateOfMind, dilemma } = args;
+        const { getChronicles, recordChronicleMilestone } = await import('./chronicles');
+        if (action === 'view') {
+          const chapters = await getChronicles();
+          return { success: true, result: { totalChapters: chapters.length, chapters } };
+        }
+        if (action === 'record_milestone') {
+          if (!milestone) return { success: false, result: null, error: 'milestone required' };
+          const chapter = await recordChronicleMilestone(milestone, { theme, stateOfMind, dilemma });
+          return { success: true, result: chapter };
+        }
+        return { success: false, result: null, error: `Unknown action: ${action}` };
       }
 
       case 'store_memory': {
