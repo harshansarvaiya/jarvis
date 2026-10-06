@@ -292,13 +292,242 @@ $graphics.Dispose()
       };
     }
 
+    case 'GHOST_DOCKER': {
+      const subCommand = params.subCommand || params.command || 'ps';
+      const composeFile = params.composeFile ? `-f "${params.composeFile}"` : '';
+      const cwd = params.cwd || process.cwd();
+      const cmd = `docker compose ${composeFile} ${subCommand}`.trim();
+      const { stdout, stderr } = await execAsync(cmd, { cwd, timeout: 60000 });
+      return { success: true, output: stdout.trim() || stderr.trim() || `Docker compose ${subCommand} completed.` };
+    }
+
+    case 'GHOST_IDE_LAUNCH': {
+      const targetPath = params.path || params.cwd || '.';
+      const editor = params.editor || 'code';
+      let cmd = '';
+      if (editor === 'cursor') {
+        cmd = `cursor "${targetPath}"`;
+      } else if (editor === 'idea') {
+        cmd = `idea "${targetPath}"`;
+      } else {
+        cmd = `code "${targetPath}"`;
+      }
+      await execAsync(cmd);
+      return { success: true, output: `Launched ${editor} at target path: ${targetPath}` };
+    }
+
+    case 'GHOST_GIT_SYNC': {
+      const repoPath = params.repoPath || params.cwd || process.cwd();
+      const gitCmd = params.gitCommand || params.command || 'status';
+      const cmd = `git ${gitCmd}`;
+      const { stdout, stderr } = await execAsync(cmd, { cwd: repoPath, timeout: 30000 });
+      return { success: true, output: stdout.trim() || stderr.trim() || `Git ${gitCmd} executed.` };
+    }
+
+    case 'GHOST_RUN_COMMAND': {
+      const cmd = params.command;
+      if (!cmd) throw new Error('Missing command parameter for GHOST_RUN_COMMAND');
+      const cwd = params.cwd || process.cwd();
+      const timeout = params.timeoutMs || 45000;
+      const { stdout, stderr } = await execAsync(cmd, { cwd, timeout, maxBuffer: 10 * 1024 * 1024 });
+      return { success: true, output: stdout.trim() || stderr.trim() || 'Executed with zero output.' };
+    }
+
+    case 'HARDWARE_HEALTH_PROBE': {
+      const totalMemMb = Math.round(os.totalmem() / (1024 * 1024));
+      const freeMemMb = Math.round(os.freemem() / (1024 * 1024));
+      const usedMemMb = totalMemMb - freeMemMb;
+      const usedPct = Math.round((usedMemMb / totalMemMb) * 100);
+      const topProcs = await getTopProcesses(10);
+      const cpus = os.cpus();
+      const loadAvg = os.loadavg();
+
+      const output = JSON.stringify({
+        memory: {
+          totalMb: totalMemMb,
+          freeMb: freeMemMb,
+          usedMb: usedMemMb,
+          usedPct: `${usedPct}%`,
+        },
+        cpu: {
+          cores: cpus.length,
+          model: cpus[0]?.model || 'Unknown',
+          loadAvg,
+        },
+        uptimeSeconds: Math.round(os.uptime()),
+        topProcesses: topProcs,
+      }, null, 2);
+
+      return { success: true, output };
+    }
+
+    case 'KILL_ZOMBIE_PROCESS': {
+      const pid = Number(params.pid);
+      if (!pid || isNaN(pid)) throw new Error('Valid pid parameter is required');
+      const res = await terminateHostProcess(pid);
+      return { success: res.success, output: res.message };
+    }
+
+    case 'SUBMIT_CRASH_REPORT': {
+      const res = await postTelepathyEvent({
+        type: 'TERMINAL_CRASH',
+        payload: {
+          command: params.command || 'unknown',
+          error: params.error || 'Execution crash',
+          exitCode: params.exitCode,
+          cwd: params.cwd || process.cwd(),
+        },
+      });
+      return { success: true, output: res?.message || 'Crash report ingested into Context Telepathy mesh.' };
+    }
+
     default:
       throw new Error(`Unsupported native action: ${action}`);
   }
 }
 
+// --- Telepathy & Hardware Sentinel Helpers ---
+
+async function postTelepathyEvent(event: {
+  type: 'TERMINAL_CRASH' | 'HARDWARE_ALERT' | 'DESKTOP_CAPTURE';
+  payload: any;
+}): Promise<any> {
+  try {
+    const res = await fetch(`${serverUrl}/api/jarvis/satellite/poll`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        telepathyEvent: {
+          deviceId,
+          type: event.type,
+          payload: event.payload,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err: any) {
+    console.warn(`[Satellite Node] Telepathy event error: ${err.message}`);
+  }
+  return null;
+}
+
+const PROTECTED_PROCESS_NAMES = new Set([
+  'systemd',
+  'init',
+  'kthreadd',
+  'sshd',
+  'login',
+  'launchd',
+  'kernel_task',
+  'WindowServer',
+  'explorer.exe',
+  'svchost.exe',
+  'csrss.exe',
+  'satellite-node',
+  'node',
+]);
+
+async function getTopProcesses(limit: number = 10): Promise<Array<{ pid: number; memPct: number; cpuPct: number; comm: string }>> {
+  try {
+    if (platform === 'win32') {
+      const psCmd = `powershell -NoProfile -Command "Get-Process | Sort-Object -Property WorkingSet64 -Descending | Select-Object -First ${limit} Id, ProcessName, @{Name='MemMB';Expression={[math]::Round($_.WorkingSet64/1MB)}}, CPU | ConvertTo-Json"`;
+      const { stdout } = await execAsync(psCmd);
+      const parsed = JSON.parse(stdout);
+      const items = Array.isArray(parsed) ? parsed : [parsed];
+      return items.map((p: any) => ({
+        pid: p.Id,
+        memPct: 0,
+        cpuPct: p.CPU || 0,
+        comm: p.ProcessName,
+      }));
+    } else {
+      const sortFlag = platform === 'darwin' ? '-r' : '--sort=-%mem';
+      const cmd = `ps -eo pid,%mem,%cpu,comm ${sortFlag} | head -n ${limit + 1}`;
+      const { stdout } = await execAsync(cmd);
+      const lines = stdout.trim().split('\n').slice(1);
+      return lines.map((l) => {
+        const parts = l.trim().split(/\s+/);
+        return {
+          pid: parseInt(parts[0], 10),
+          memPct: parseFloat(parts[1]) || 0,
+          cpuPct: parseFloat(parts[2]) || 0,
+          comm: parts.slice(3).join(' '),
+        };
+      }).filter((p) => !isNaN(p.pid));
+    }
+  } catch {
+    return [];
+  }
+}
+
+async function terminateHostProcess(pid: number): Promise<{ success: boolean; message: string }> {
+  if (pid <= 1 || pid === process.pid) {
+    return { success: false, message: `Safety guard: Cannot terminate system or self PID ${pid}` };
+  }
+  try {
+    if (platform === 'win32') {
+      await execAsync(`taskkill /F /PID ${pid}`);
+    } else {
+      await execAsync(`kill -9 ${pid}`);
+    }
+    return { success: true, message: `Terminated process PID ${pid}` };
+  } catch (err: any) {
+    return { success: false, message: `Failed to terminate PID ${pid}: ${err.message}` };
+  }
+}
+
+let lastSentinelSweep = 0;
+async function runHardwareSentinelSweep(): Promise<void> {
+  const now = Date.now();
+  if (now - lastSentinelSweep < 60000) return; // Run once per 60s
+  lastSentinelSweep = now;
+
+  try {
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedPct = ((totalMem - freeMem) / totalMem) * 100;
+
+    // Scan top processes
+    const top = await getTopProcesses(10);
+    for (const proc of top) {
+      if (proc.pid <= 1 || proc.pid === process.pid) continue;
+      const baseName = path.basename(proc.comm).toLowerCase();
+      if (PROTECTED_PROCESS_NAMES.has(baseName)) continue;
+
+      // Capability 4: Trigger immune reaction if rogue process consumes >85% RAM
+      if (proc.memPct > 85 || (usedPct > 92 && proc.memPct > 65)) {
+        console.warn(`[Hardware Sentinel] 🚨 Rogue zombie process detected: ${proc.comm} (PID: ${proc.pid}, RAM: ${proc.memPct}%)`);
+        const killRes = await terminateHostProcess(proc.pid);
+        const approxMb = Math.round((proc.memPct / 100) * (totalMem / (1024 * 1024)));
+
+        await postTelepathyEvent({
+          type: 'HARDWARE_ALERT',
+          payload: {
+            processName: proc.comm,
+            pid: proc.pid,
+            memoryMb: approxMb,
+            cpuUsagePct: proc.cpuPct,
+            actionTaken: killRes.success ? 'Terminated rogue zombie process to prevent host freeze' : killRes.message,
+          },
+        });
+        break;
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[Hardware Sentinel] Sweep error: ${err.message}`);
+  }
+}
+
 // 4. Remote Gateway Communication Loop
 async function heartbeatAndPoll() {
+  await runHardwareSentinelSweep();
   const battery = await getBatteryStatus();
   const sys = getSystemTelemetry();
 
@@ -319,6 +548,9 @@ async function heartbeatAndPoll() {
       'keystroke',
       'speak',
       'reverse-engineer',
+      'context-telepathy',
+      'ghost-hands',
+      'hardware-sentinel',
     ],
     telemetry: {
       ...sys,
@@ -390,6 +622,19 @@ async function heartbeatAndPoll() {
         };
       }
 
+      // Capability 1 Context Telepathy: Intercept fatal failures and dispatch SWE recovery telemetry
+      if (!executionResult.success) {
+        postTelepathyEvent({
+          type: 'TERMINAL_CRASH',
+          payload: {
+            command: command.type === 'SHELL' ? command.command : `ACTION:${command.action}`,
+            error: executionResult.error || executionResult.output,
+            exitCode: executionResult.exitCode,
+            cwd: process.cwd(),
+          },
+        }).catch(() => {});
+      }
+
       const durationMs = Date.now() - start;
 
       // Post execution result back
@@ -423,20 +668,40 @@ async function heartbeatAndPoll() {
 
 // 5. Node Banner & Startup
 console.log('╔═══════════════════════════════════════════════════════════════╗');
-console.log('║  J.A.R.V.I.S. & F.R.I.D.A.Y. SOVEREIGN SATELLITE NODE        ║');
+console.log('║  J.A.R.V.I.S. & F.R.I.D.A.Y. HARDWARE SYMBIOTE NODE          ║');
 console.log('║  Status: Autonomous Edge Actuator Mesh Active                 ║');
 console.log('╚═══════════════════════════════════════════════════════════════╝');
 console.log(`• Device ID:    ${deviceId}`);
 console.log(`• Device Name:  ${deviceName}`);
 console.log(`• Hostname:     ${hostname} (${platform}-${arch})`);
 console.log(`• Central Mesh: ${serverUrl}`);
-console.log(`• Actuators:    Shell, Notifications, URLs, Clipboard, Apps, Screen Lock\n`);
+console.log(`• Capabilities: Shell, Notifications, Clipboard, Ghost Hands, Telepathy, Sentinel\n`);
 
-async function runLoop() {
-  while (true) {
-    await heartbeatAndPoll();
-    await new Promise((res) => setTimeout(res, 2500)); // Poll every 2.5 seconds
-  }
+// Immediate CLI action hooks
+if (args.includes('--report-crash')) {
+  const crashCmd = getArg('cmd', 'pnpm build');
+  const crashErr = getArg('error', 'Error: Type error detected during compilation');
+  console.log(`[Context Telepathy] Reporting manual terminal crash for: "${crashCmd}"...`);
+  postTelepathyEvent({
+    type: 'TERMINAL_CRASH',
+    payload: { command: crashCmd, error: crashErr, exitCode: 1, cwd: process.cwd() },
+  }).then((r) => {
+    console.log('[Context Telepathy] Response:', r);
+    process.exit(0);
+  });
+} else if (args.includes('--sentinel-probe')) {
+  console.log('[Hardware Sentinel] Probing host hardware health...');
+  executeNativeAction('HARDWARE_HEALTH_PROBE').then((r) => {
+    console.log(r.output);
+    process.exit(0);
+  });
+} else {
+  const runLoop = async () => {
+    while (true) {
+      await heartbeatAndPoll();
+      await new Promise((res) => setTimeout(res, 2500)); // Poll every 2.5 seconds
+    }
+  };
+
+  runLoop().catch(console.error);
 }
-
-runLoop().catch(console.error);

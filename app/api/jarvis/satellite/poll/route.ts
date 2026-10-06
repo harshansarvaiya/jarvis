@@ -25,6 +25,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, recorded: true });
     }
 
+    // 1.1 Context Telepathy & Hardware Sentinel event ingestion
+    if (body.telepathyEvent) {
+      const { processTelepathyEvent } = await import('@/lib/jarvis/satellite');
+      const eventRes = await processTelepathyEvent(body.telepathyEvent);
+      return NextResponse.json({ success: eventRes.success, eventProcessed: true, message: eventRes.message });
+    }
+
     // 2. Heartbeat & inbox poll
     if (body.device && body.device.id) {
       const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';

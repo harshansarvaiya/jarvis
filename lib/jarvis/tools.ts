@@ -2698,6 +2698,36 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'actuate_symbiote_host',
+    description: 'Project Ghost Hands & Hardware Sentinel Actuator: Remotely commands Sir\'s local workstation symbiote node. Execute local Docker compose workflows (ps/up/down/restart), launch/focus IDEs (VS Code, Cursor, IntelliJ), sync local Git branches, run host terminal commands, probe host hardware health (RAM/CPU/top processes), or terminate runaway rogue/zombie processes.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: [
+            'GHOST_DOCKER',
+            'GHOST_IDE_LAUNCH',
+            'GHOST_GIT_SYNC',
+            'GHOST_RUN_COMMAND',
+            'HARDWARE_HEALTH_PROBE',
+            'KILL_ZOMBIE_PROCESS',
+          ],
+          description: 'The Ghost Hands or Hardware Sentinel action to trigger on the workstation.',
+        },
+        deviceId: {
+          type: 'string',
+          description: 'Optional ID of the target symbiote node. Defaults to primary online workstation.',
+        },
+        params: {
+          type: 'object',
+          description: 'Action parameters: e.g. { subCommand: "ps"|"up"|"down"|"restart", composeFile?: string } for GHOST_DOCKER, { path?: string, editor?: "code"|"cursor"|"idea" } for GHOST_IDE_LAUNCH, { repoPath?: string, gitCommand?: "status"|"pull"|"fetch" } for GHOST_GIT_SYNC, { command: string, cwd?: string } for GHOST_RUN_COMMAND, { pid: number } for KILL_ZOMBIE_PROCESS.',
+        },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'reverse_engineer_target',
     description: 'Reverse engineer any binary, native application (Mach-O, ELF, PE), or Electron/ASAR bundle via the REA framework. Delegates heavy decompilation (Hopper/Ghidra) to a connected workstation satellite node to protect cloud VM stability (Directive 06).',
     parameters: {
@@ -2958,6 +2988,10 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'manage_task',
     'store_memory',
     'search_memories',
+    'actuate_symbiote_host',
+    'execute_satellite_command',
+    'satellite_action',
+    'list_satellites',
   ],
   SECURITY_AUDITING: [
     'run_security_audit',
@@ -2997,7 +3031,10 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'inspect_infrastructure',
     'notify_user',
     'cloud_execute_command',
-    'run_satellite_workstation_command',
+    'actuate_symbiote_host',
+    'execute_satellite_command',
+    'satellite_action',
+    'list_satellites',
   ],
   KNOWLEDGE_RAG: [
     'query_knowledge_base',
@@ -4813,6 +4850,25 @@ export async function executeJarvisTool(
           'ACTION',
           { action: action as any, params: params || {} },
           25000
+        );
+        return {
+          success: res.success,
+          result: res,
+          error: res.error,
+        };
+      }
+
+      case 'actuate_symbiote_host': {
+        const { action, deviceId, params } = args;
+        if (!action) {
+          return { success: false, result: null, error: 'action parameter is required' };
+        }
+        const { dispatchGhostHandsCommand } = await import('./satellite');
+        const res = await dispatchGhostHandsCommand(
+          String(deviceId || ''),
+          String(action),
+          params || {},
+          45000
         );
         return {
           success: res.success,

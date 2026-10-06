@@ -29,7 +29,10 @@ export type SatelliteCapability =
   | 'screenshot'
   | 'keystroke'
   | 'speak'
-  | 'reverse-engineer';
+  | 'reverse-engineer'
+  | 'context-telepathy'
+  | 'ghost-hands'
+  | 'hardware-sentinel';
 
 export interface SatelliteSystemTelemetry {
   cpuUsagePct?: number;
@@ -70,7 +73,14 @@ export type SatelliteActionType =
   | 'TYPE_TEXT'
   | 'KEYSTROKE'
   | 'SPEAK'
-  | 'REVERSE_ENGINEER';
+  | 'REVERSE_ENGINEER'
+  | 'GHOST_DOCKER'
+  | 'GHOST_IDE_LAUNCH'
+  | 'GHOST_GIT_SYNC'
+  | 'GHOST_RUN_COMMAND'
+  | 'HARDWARE_HEALTH_PROBE'
+  | 'KILL_ZOMBIE_PROCESS'
+  | 'SUBMIT_CRASH_REPORT';
 
 export interface SatelliteCommand {
   id: string;
@@ -302,4 +312,103 @@ export async function unregisterSatellite(deviceId: string): Promise<boolean> {
     return true;
   }
   return false;
+}
+
+/**
+ * Capability 1 & 4: Ingests and processes telepathy crash events and hardware sentinel alerts
+ */
+export async function processTelepathyEvent(event: {
+  deviceId: string;
+  type: 'TERMINAL_CRASH' | 'HARDWARE_ALERT' | 'DESKTOP_CAPTURE';
+  payload: any;
+  timestamp: string;
+}): Promise<{ success: boolean; handled: boolean; message?: string }> {
+  const authChatId = process.env.TELEGRAM_AUTHORIZED_CHAT_ID || '864360540';
+  const { telegramGateway } = await import('./telegram');
+
+  if (event.type === 'TERMINAL_CRASH') {
+    const { error, command, exitCode, cwd } = event.payload;
+    const { generateSweErrorRecoveryPlan } = await import('./orchestrator');
+    const recoveryPlan = generateSweErrorRecoveryPlan('terminal_command', { cwd, command }, error || 'Non-zero exit code', exitCode);
+
+    const telegramMsg = `⚡ **[CONTEXT TELEPATHY — TERMINAL CRASH INTERCEPTED]**
+Host Device: \`${event.deviceId}\`
+Command: \`${command || 'unknown'}\` (Exit Code: \`${exitCode ?? 'N/A'}\`)
+
+🚨 **Error Category:** \`${recoveryPlan.errorCategory}\`
+🔍 **Forensic Hypotheses:**
+${recoveryPlan.hypotheses.map((h, i) => `${i + 1}. ${h}`).join('\n')}
+
+🛠️ **Recommended Surgical Action:**
+${recoveryPlan.recommendedAction}
+
+_Intercepted live by your Workstation Symbiote Node._`;
+
+    try {
+      await telegramGateway.sendMessage(authChatId, telegramMsg, { parseMode: 'Markdown' });
+      return { success: true, handled: true, message: 'Crash recovery plan dispatched to Telegram' };
+    } catch (err: any) {
+      return { success: false, handled: false, message: err.message };
+    }
+  }
+
+  if (event.type === 'HARDWARE_ALERT') {
+    const { processName, pid, memoryMb, actionTaken, cpuUsagePct } = event.payload;
+    const telegramMsg = `🛡️ **[HARDWARE SENTINEL — HOST IMMUNE ALERT]**
+Host Device: \`${event.deviceId}\`
+
+⚠️ **Rogue Process Detected:** \`${processName}\` (PID: \`${pid}\`)
+📊 **Resource Spiked:** Memory: \`${memoryMb} MB\` | CPU: \`${cpuUsagePct ?? 'N/A'}%\`
+⚡ **Action Taken:** \`${actionTaken || 'Quarantined / Terminated'}\`
+
+_Host responsiveness preserved by your Workstation Symbiote._`;
+
+    try {
+      await telegramGateway.sendMessage(authChatId, telegramMsg, { parseMode: 'Markdown' });
+      return { success: true, handled: true, message: 'Hardware sentinel alert dispatched to Telegram' };
+    } catch (err: any) {
+      return { success: false, handled: false, message: err.message };
+    }
+  }
+
+  return { success: true, handled: true };
+}
+
+/**
+ * Capability 3: Dispatches a high-privilege Ghost Hands native action to a workstation satellite
+ */
+export async function dispatchGhostHandsCommand(
+  deviceId: string,
+  action: string,
+  payload: Record<string, any> = {},
+  timeoutMs = 45000
+): Promise<SatelliteExecutionResult> {
+  let targetId = deviceId;
+  if (!targetId) {
+    const satellites = await listRegisteredSatellites();
+    const online = satellites.find((s) => s.status === 'ONLINE' && (s.capabilities.includes('ghost-hands') || s.capabilities.includes('shell')));
+    if (online) targetId = online.id;
+    else targetId = satellites.find((s) => s.status === 'ONLINE')?.id || '';
+  }
+
+  if (!targetId) {
+    return {
+      commandId: `cmd-err-${Date.now()}`,
+      deviceId: 'none',
+      success: false,
+      output: '',
+      error: 'No active workstation symbiote satellite node is currently online. Launch satellite-node on the host first (`npx tsx scripts/satellite-node.ts`).',
+      exitCode: 1,
+      durationMs: 0,
+      executedAt: new Date().toISOString(),
+    };
+  }
+
+  return await dispatchSatelliteCommand(
+    targetId,
+    'ACTION',
+    { action: action as any, params: payload },
+    timeoutMs,
+    'Friday/GhostHands'
+  );
 }
