@@ -433,8 +433,8 @@ export async function dispatchIndianMarketAlertToTelegram(card: MacroCatalystCar
 
     msg += `_Execute orders manually on Zerodha Kite / Groww / AngelOne._`;
 
-    await telegramGateway.sendMessage(authChatId, msg, { parseMode: 'Markdown' });
-    console.log(`[NSE Radar] 📱 Tactical market card dispatched to Telegram chat ${authChatId}.`);
+    await telegramGateway.dispatchCronAlert('MARKETS', msg, { parseMode: 'Markdown' });
+    console.log(`[NSE Radar] 📱 Tactical market card dispatched to Telegram.`);
     return true;
   } catch (err) {
     console.warn(`[NSE Radar] Telegram alert dispatch failed:`, err);

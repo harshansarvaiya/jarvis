@@ -363,16 +363,15 @@ Synthesize a high-impact, professional pre-market trading executive summary for 
 
               console.log(`[Cloud Worker] 🤖 Synthesized intelligence briefing (${result.telemetry?.latencyMs}ms).`);
 
-              // Dispatch full briefing to Telegram
-              if (authChatId) {
-                const header = `🌅 *[AUTONOMOUS 09:00 AM IST BRIEFING]*\n*${task.title}*\n\n`;
-                await telegramGateway.sendMessage(
-                  authChatId,
-                  `${header}${result.reply}`,
-                  { parseMode: 'Markdown' }
-                );
-                console.log(`[Cloud Worker] 📱 Intelligence briefing delivered to Telegram chat: ${authChatId}`);
-              }
+              // Dispatch full briefing to Telegram via Topics or direct chat
+              const category = /ai|tech|model|frontier/i.test(task.title) ? 'AINEWS' : 'BRIEFINGS';
+              const header = `🌅 *[AUTONOMOUS BRIEFING]*\n*${task.title}*\n\n`;
+              await telegramGateway.dispatchCronAlert(
+                category,
+                `${header}${result.reply}`,
+                { parseMode: 'Markdown' }
+              );
+              console.log(`[Cloud Worker] 📱 Intelligence briefing delivered to Telegram [${category}].`);
 
               // Dispatch lockscreen push alert (suppress Telegram to prevent duplicate alert)
               await dispatchPush(

@@ -282,6 +282,8 @@ export class TelegramGateway {
       parseMode?: 'Markdown' | 'HTML';
       replyToMessageId?: number;
       replyMarkup?: TelegramInlineKeyboardMarkup;
+      messageThreadId?: number;
+      message_thread_id?: number;
     }
   ): Promise<boolean> {
     if (!this.isConfigured()) return false;
@@ -327,6 +329,9 @@ export class TelegramGateway {
       if (options?.replyToMessageId && i === 0) {
         payload.reply_to_message_id = options.replyToMessageId;
       }
+      if (options?.messageThreadId || options?.message_thread_id) {
+        payload.message_thread_id = options.messageThreadId || options.message_thread_id;
+      }
       // Attach inline keyboard to the last message chunk only
       if (isLastChunk && options?.replyMarkup) {
         payload.reply_markup = options.replyMarkup;
@@ -357,6 +362,40 @@ export class TelegramGateway {
     }
 
     return success;
+  }
+
+  /**
+   * Creates a topic/room in a Telegram supergroup with topics enabled
+   */
+  public async createForumTopic(
+    chatId: number | string,
+    name: string,
+    iconColor?: number
+  ): Promise<{ message_thread_id: number; name: string } | null> {
+    if (!this.isConfigured()) return null;
+    try {
+      const res = await fetch(`${this.baseUrl}/createForumTopic`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          name,
+          icon_color: iconColor,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok && data.result) {
+        return {
+          message_thread_id: data.result.message_thread_id,
+          name: data.result.name,
+        };
+      }
+      console.warn(`[Telegram] createForumTopic failed:`, data.description);
+      return null;
+    } catch (err: any) {
+      console.warn(`[Telegram] createForumTopic error:`, err?.message);
+      return null;
+    }
   }
 
   /**
@@ -596,6 +635,53 @@ export class TelegramGateway {
       return false;
     }
   }
+
+  /**
+   * Dispatches an autonomous cron alert directly to its dedicated topic room,
+   * falling back to Sir's private 1-on-1 chat if topics are not yet configured.
+   */
+  public async dispatchCronAlert(
+    category: 'BRIEFINGS' | 'MARKETS' | 'AINEWS' | 'MONETIZATION' | 'DEFENSE' | 'GENERAL',
+    text: string,
+    options?: {
+      parseMode?: 'Markdown' | 'HTML';
+      replyMarkup?: TelegramInlineKeyboardMarkup;
+    }
+  ): Promise<boolean> {
+    const topicConfig = getTelegramTopicConfig();
+    if (topicConfig && topicConfig.supergroupId && topicConfig.topics?.[category]) {
+      const threadId = topicConfig.topics[category];
+      const sent = await this.sendMessage(topicConfig.supergroupId, text, {
+        ...options,
+        messageThreadId: threadId,
+      });
+      if (sent) return true;
+    }
+
+    // Fallback to Sir's private authorized DM chat
+    const authChatId = (await this.getAuthorizedChatId()) || '864360540';
+    return this.sendMessage(authChatId, text, options);
+  }
+}
+
+export type CronCategory = 'BRIEFINGS' | 'MARKETS' | 'AINEWS' | 'MONETIZATION' | 'DEFENSE' | 'GENERAL';
+
+export interface TelegramTopicConfig {
+  supergroupId: number | string;
+  topics: Record<string, number>;
+  configuredAt: string;
+}
+
+export function getTelegramTopicConfig(): TelegramTopicConfig | null {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const topicsFilePath = path.join(process.cwd(), 'data', 'telegram-topics.json');
+    if (fs.existsSync(topicsFilePath)) {
+      return JSON.parse(fs.readFileSync(topicsFilePath, 'utf-8'));
+    }
+  } catch {}
+  return null;
 }
 
 export const telegramGateway = new TelegramGateway();

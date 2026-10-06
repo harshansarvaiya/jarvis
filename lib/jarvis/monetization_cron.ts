@@ -219,7 +219,7 @@ export async function dispatchMonetizationReportToTelegram(report: TriVectorReve
       ],
     };
 
-    await telegramGateway.sendMessage(authChatId, msg, { parseMode: 'Markdown', replyMarkup: kb });
+    await telegramGateway.dispatchCronAlert('MONETIZATION', msg, { parseMode: 'Markdown', replyMarkup: kb });
     console.log(`[Revenue Engine] 📱 Tri-Vector Monetization report dispatched to Telegram.`);
     return true;
   } catch (err: any) {

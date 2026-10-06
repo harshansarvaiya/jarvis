@@ -1307,8 +1307,8 @@ async function handleIncomingMessage(update: TelegramUpdate) {
     return;
   }
 
-  if (msg.chat.type !== 'private') {
-    console.warn(`[GUARDIAN SENTRY] 🚨 Rejected non-private chat type: ${msg.chat.type}`);
+  if (msg.chat.type !== 'private' && msg.chat.type !== 'supergroup' && msg.chat.type !== 'group') {
+    console.warn(`[GUARDIAN SENTRY] 🚨 Rejected non-allowed chat type: ${msg.chat.type}`);
     return;
   }
 
@@ -1320,6 +1320,72 @@ async function handleIncomingMessage(update: TelegramUpdate) {
 
   let userText = (msg.text || msg.caption || '').trim();
   let isVoiceInput = false;
+
+  // Handle Supergroup & Forum Topic Initialization
+  if (msg.chat.type === 'supergroup' || msg.chat.type === 'group') {
+    console.log(`[Telegram Gateway] 🏛️ Group/Supergroup event received from Sir (Chat ID: ${chatId}): "${userText}"`);
+
+    // Create topics if requested or on any first group interaction
+    const isTopicCommand = /\b(setup|init|topic|topics|room|rooms|create|matrix|start|hi|hello|jarvis|friday)\b/i.test(userText) || userText.startsWith('/');
+    if (isTopicCommand || !userText) {
+      await gateway.sendMessage(
+        chatId,
+        `🏛️ <b>Initializing J.A.R.V.I.S. Command Matrix Topics...</b>\nCreating dedicated operational rooms for Sir...`
+      );
+
+      const topicsToCreate = [
+        { name: '🌅 Daily Briefings', color: 16766590, key: 'BRIEFINGS' },
+        { name: '📊 Market & NSE Radars', color: 9367192, key: 'MARKETS' },
+        { name: '📰 AI Tech Intelligence', color: 7322096, key: 'AINEWS' },
+        { name: '💰 Monetization Radar', color: 13338331, key: 'MONETIZATION' },
+        { name: '🛡️ Defense & Geopolitics', color: 16478047, key: 'DEFENSE' },
+      ];
+
+      const createdTopics: Record<string, number> = {};
+      for (const t of topicsToCreate) {
+        const created = await gateway.createForumTopic(chatId, t.name, t.color);
+        if (created) {
+          createdTopics[t.key] = created.message_thread_id;
+          console.log(`[Telegram Topics] Created topic "${t.name}" with thread_id: ${created.message_thread_id}`);
+        }
+      }
+
+      // Persist configuration to data/telegram-topics.json and Upstash
+      const topicConfig = {
+        supergroupId: chatId,
+        topics: createdTopics,
+        configuredAt: new Date().toISOString(),
+      };
+
+      try {
+        const topicsFilePath = path.join(process.cwd(), 'data', 'telegram-topics.json');
+        fs.mkdirSync(path.dirname(topicsFilePath), { recursive: true });
+        fs.writeFileSync(topicsFilePath, JSON.stringify(topicConfig, null, 2), 'utf-8');
+      } catch (err: any) {
+        console.warn('[Telegram Topics] Failed to save local topics config:', err.message);
+      }
+
+      try {
+        const { getUniversalStorage } = await import('../lib/jarvis/storage');
+        const storage = getUniversalStorage();
+        await storage.execute('set', 'jarvis:telegram:supergroup_topics', JSON.stringify(topicConfig));
+      } catch {}
+
+      const count = Object.keys(createdTopics).length;
+      await gateway.sendMessage(
+        chatId,
+        `✅ <b>J.A.R.V.I.S. Command Matrix Operational!</b>\n\n` +
+        `Successfully initialized <b>${count} dedicated topic rooms</b>:\n` +
+        `• 🌅 <b>Daily Briefings</b>\n` +
+        `• 📊 <b>Market & NSE Radars</b>\n` +
+        `• 📰 <b>AI Tech Intelligence</b>\n` +
+        `• 💰 <b>Monetization Radar</b>\n` +
+        `• 🛡️ <b>Defense & Geopolitics</b>\n\n` +
+        `All autonomous cron streams will now deliver directly to their respective rooms. Your private 1-on-1 chat with Friday is now reserved exclusively for direct sparring.`
+      );
+      return;
+    }
+  }
 
   // Handle Voice Memos & Audio Files
   if (hasVoice || hasAudio) {
