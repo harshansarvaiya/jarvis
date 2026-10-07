@@ -47,12 +47,12 @@ Keep it composed, high-signal, zero fluff. Use clean markdown with bullet points
       ],
     };
 
-    await telegramGateway.sendMessage(authChatId, fullMsg, {
+    await telegramGateway.dispatchCronAlert('AINEWS', fullMsg, {
       parseMode: 'Markdown',
       replyMarkup: keyboard,
     });
 
-    console.log('[AI Tech Briefing] 📱 09:00 AM IST Briefing dispatched to Telegram.');
+    console.log('[AI Tech Briefing] 📱 09:00 AM IST Briefing dispatched to Telegram [AINEWS].');
     return { success: true, summary: result.vocalSummary || 'Delivered' };
   } catch (err: any) {
     console.error('[AI Tech Briefing] Failed to synthesize briefing:', err.message);

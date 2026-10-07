@@ -295,11 +295,11 @@ export async function runAutonomousEvolutionCycle(options: {
     };
 
     try {
-      await telegramGateway.sendMessage(authChatId, msg, {
+      await telegramGateway.dispatchCronAlert('DEFENSE', msg, {
         parseMode: 'Markdown',
         replyMarkup: keyboard,
       });
-      console.log(`[Evolution Sentry] 📱 Autonomous Evolution Card dispatched to Telegram chat: ${authChatId}`);
+      console.log(`[Evolution Sentry] 📱 Autonomous Evolution Card dispatched to Telegram [DEFENSE]`);
     } catch (tgErr: any) {
       console.warn('[Evolution Sentry] Telegram dispatch failed:', tgErr.message);
     }

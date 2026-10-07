@@ -587,7 +587,9 @@ async function checkScheduledBriefings() {
           `All defensive sentries and background daemons remain on active watch.`;
 
         console.log(`[Cloud Worker] 🌙 Dispatching Evening De-Brief to Sir (IST 21:30)...`);
-        await dispatchPush('🌙 J.A.R.V.I.S. Evening De-Brief', message, '/');
+        const { telegramGateway } = await import('../lib/jarvis/telegram');
+        await telegramGateway.dispatchCronAlert('BRIEFINGS', `🌙 *[J.A.R.V.I.S. EVENING DE-BRIEF]*\n\n${message}`, { parseMode: 'Markdown' });
+        await dispatchPush('🌙 J.A.R.V.I.S. Evening De-Brief', message, '/', { skipTelegram: true });
       }
     }
 

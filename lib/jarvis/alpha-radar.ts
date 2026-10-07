@@ -140,13 +140,13 @@ _Synthesized autonomously by F.R.I.D.A.Y. via live developer firehose._`;
     };
 
     try {
-      await telegramGateway.sendMessage(authChatId, message, {
+      await telegramGateway.dispatchCronAlert('AINEWS', message, {
         parseMode: 'Markdown',
         replyMarkup: keyboard,
       });
       await markItemSeen(item.id);
       dispatched.push(report);
-      console.log(`[Alpha Radar] 📱 Dispatched breakout alert to Telegram: ${item.title}`);
+      console.log(`[Alpha Radar] 📱 Dispatched breakout alert to Telegram [AINEWS]: ${item.title}`);
     } catch (telErr: any) {
       console.warn('[Alpha Radar] Telegram dispatch warning:', telErr.message);
     }

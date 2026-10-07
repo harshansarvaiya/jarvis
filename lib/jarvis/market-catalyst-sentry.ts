@@ -655,11 +655,11 @@ export async function dispatchBreakingCatalystAlert(
   };
 
   try {
-    await telegramGateway.sendMessage(authChatId, msg, {
+    await telegramGateway.dispatchCronAlert('MARKETS', msg, {
       parseMode: 'Markdown',
       replyMarkup: keyboard,
     });
-    console.log(`[Market Sentry] 🚨 Breaking catalyst alert sent to Telegram: "${catalyst.headline.slice(0, 50)}..."`);
+    console.log(`[Market Sentry] 🚨 Breaking catalyst alert sent to Telegram [MARKETS]: "${catalyst.headline.slice(0, 50)}..."`);
   } catch (tgErr: any) {
     console.warn('[Market Sentry] Telegram alert dispatch failed:', tgErr.message);
   }
