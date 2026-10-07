@@ -394,6 +394,23 @@ export class TelegramGateway {
   }
 
   /**
+   * Deletes a message from Telegram (used in Incognito / Burn message actions)
+   */
+  public async deleteMessage(chatId: number | string, messageId: number): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    try {
+      const res = await fetch(`${this.baseUrl}/deleteMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, message_id: messageId }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Creates a topic/room in a Telegram supergroup with topics enabled
    */
   public async createForumTopic(

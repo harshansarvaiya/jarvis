@@ -12,7 +12,8 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json();
-    const { messages, apiKey, model, groqApiKey, githubToken, provider, orchestrationMode } = body;
+    const { messages, apiKey, model, groqApiKey, githubToken, provider, orchestrationMode, incognito } = body;
+    const isIncognito = Boolean(incognito);
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -47,9 +48,10 @@ export async function POST(req: NextRequest) {
       githubToken: githubToken || process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_TOKEN,
       provider: provider || 'auto',
       orchestrationMode: orchestrationMode || 'auto',
+      incognito: isIncognito,
     });
 
-    // Synchronously persist user message and assistant reply to universal shared history
+    // Synchronously persist user message and assistant reply to universal shared history (skipped in Incognito mode)
     const lastUser = [...messages].reverse().find((m: any) => m.role === 'user');
     const nowStr = new Date().toISOString(); // ISO UTC — client parses to local timezone
     const recordsToSave: ChatMessageRecord[] = [];
@@ -63,21 +65,23 @@ export async function POST(req: NextRequest) {
         timestamp: lastUser.timestamp || nowStr,
       });
 
-      // Directive 03: Autonomous Evolutionary Memory Assimilation
-      const lower = lastUser.content.toLowerCase();
-      const isExplicitPref =
-        lower.includes('i prefer ') ||
-        lower.includes('always ') ||
-        lower.includes('never ') ||
-        lower.includes('remember that ') ||
-        lower.includes("don't use ");
+      // Directive 03: Autonomous Evolutionary Memory Assimilation (Bypassed if Incognito)
+      if (!isIncognito) {
+        const lower = lastUser.content.toLowerCase();
+        const isExplicitPref =
+          lower.includes('i prefer ') ||
+          lower.includes('always ') ||
+          lower.includes('never ') ||
+          lower.includes('remember that ') ||
+          lower.includes("don't use ");
 
-      if (isExplicitPref && lastUser.content.length < 180) {
-        try {
-          const { addMemory } = await import('@/lib/jarvis/memory');
-          addMemory('PREFERENCE', lastUser.content.trim(), 'Autonomous Directive 03 Assimilation', 0.9);
-        } catch (memErr) {
-          console.warn('[Chat] Preference assimilation warning:', memErr);
+        if (isExplicitPref && lastUser.content.length < 180) {
+          try {
+            const { addMemory } = await import('@/lib/jarvis/memory');
+            addMemory('PREFERENCE', lastUser.content.trim(), 'Autonomous Directive 03 Assimilation', 0.9);
+          } catch (memErr) {
+            console.warn('[Chat] Preference assimilation warning:', memErr);
+          }
         }
       }
     }
@@ -94,12 +98,15 @@ export async function POST(req: NextRequest) {
         tacticalActions: result.tacticalActions,
         motiveAnalysis: result.motiveAnalysis,
         internalThoughts: result.internalThoughts,
-        telemetry: result.telemetry,
+        telemetry: {
+          ...result.telemetry,
+          incognito: isIncognito,
+        },
       };
       recordsToSave.push(assistantRecord);
     }
 
-    if (recordsToSave.length > 0 && auth.role !== 'guest') {
+    if (recordsToSave.length > 0 && auth.role !== 'guest' && !isIncognito) {
       try {
         await appendUniversalChatMessages(recordsToSave);
       } catch (historyErr) {
@@ -110,6 +117,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ...result,
       messageRecord: assistantRecord,
+      incognito: isIncognito,
     });
   } catch (error: any) {
     console.error('API /api/jarvis/chat error:', error);

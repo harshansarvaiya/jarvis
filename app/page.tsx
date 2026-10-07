@@ -30,6 +30,8 @@ import {
   Coins,
   Radio,
   PhoneCall,
+  EyeOff,
+  Ghost,
 } from 'lucide-react';
 import { ArcReactorOrb } from '@/components/ArcReactorOrb';
 import { DirectiveBadge } from '@/components/DirectiveBadge';
@@ -94,6 +96,7 @@ interface Message {
   motiveAnalysis?: string;
   internalThoughts?: string;
   telemetry?: any;
+  isIncognito?: boolean;
 }
 
 function getDynamicWelcomeMessage(): Message {
@@ -175,6 +178,7 @@ export default function JarvisDashboard() {
   const [isMounted, setIsMounted] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isGuestMode, setIsGuestMode] = useState(false);
+  const [isIncognito, setIsIncognito] = useState(false);
 
   // Tab State: Separate mobile tabs from desktop view
   const [mobileTab, setMobileTab] = useState<'COMMS' | 'VAULT' | 'RADAR' | 'SYSTEM'>('COMMS');
@@ -463,9 +467,9 @@ export default function JarvisDashboard() {
     desktopChatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Persist chat transmissions across page refreshes
+  // Persist chat transmissions across page refreshes (Bypassed if Incognito)
   useEffect(() => {
-    if (!isHistoryHydrated.current) return;
+    if (!isHistoryHydrated.current || isIncognito) return;
     try {
       const sanitized = messages.slice(-100).map((m) => ({
         ...m,
@@ -476,7 +480,7 @@ export default function JarvisDashboard() {
     } catch (err) {
       console.warn('Could not save chat history to localStorage', err);
     }
-  }, [messages]);
+  }, [messages, isIncognito]);
 
   // Smooth scroll to latest transmission ONLY if user is already at the bottom
   useEffect(() => {
@@ -722,6 +726,7 @@ export default function JarvisDashboard() {
       image: selectedImage || (attachedDoc && !attachedDoc.isText ? attachedDoc.content : undefined),
       document: docMeta,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isIncognito,
     };
 
     setMessages((prev) => [...prev, userMsg]);
@@ -753,6 +758,7 @@ export default function JarvisDashboard() {
         groqApiKey: groqApiKey || undefined,
         githubToken: githubToken || undefined,
         orchestrationMode,
+        incognito: isIncognito,
       };
 
       // Fix 5: fetchWithRetry handles Mobile Safari TCP socket drops silently
@@ -792,6 +798,7 @@ export default function JarvisDashboard() {
         motiveAnalysis: data.motiveAnalysis,
         internalThoughts: data.internalThoughts,
         telemetry,
+        isIncognito,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -1073,6 +1080,19 @@ export default function JarvisDashboard() {
             <span className="hidden sm:inline">LIVE CALL</span>
           </a>
 
+          <button
+            onClick={() => setIsIncognito(!isIncognito)}
+            title={isIncognito ? 'Incognito Mode Active (Zero Trace)' : 'Enable Incognito Stealth Mode'}
+            className={`px-2.5 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all flex items-center space-x-1.5 ${
+              isIncognito
+                ? 'bg-purple-950/90 border-purple-500/80 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.4)] animate-pulse'
+                : 'bg-slate-900/80 border-slate-700/60 text-slate-400 hover:text-purple-300 hover:border-purple-500/40'
+            }`}
+          >
+            <EyeOff className="w-3.5 h-3.5 text-purple-400" />
+            <span className="hidden sm:inline">{isIncognito ? 'STEALTH ON' : 'INCOGNITO'}</span>
+          </button>
+
           {isGuestMode && (
             <button
               onClick={() => {
@@ -1133,6 +1153,19 @@ export default function JarvisDashboard() {
                     <Zap className="w-2.5 h-2.5 text-cyan-400" />
                     <span>{isReactorExpanded ? 'HIDE CORE' : 'CORE HUD'}</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsIncognito(!isIncognito)}
+                    title={isIncognito ? 'Deactivate Incognito Mode' : 'Activate Incognito Stealth Mode'}
+                    className={`text-[10px] flex items-center space-x-1 px-1.5 py-0.5 rounded font-mono transition-colors ${
+                      isIncognito
+                        ? 'bg-purple-950/80 text-purple-300 border border-purple-500/60 shadow-[0_0_8px_rgba(168,85,247,0.3)] animate-pulse'
+                        : 'text-slate-400 hover:text-purple-300 bg-slate-900/60 border border-slate-800 hover:border-purple-500/40'
+                    }`}
+                  >
+                    <EyeOff className="w-2.5 h-2.5 text-purple-400" />
+                    <span>{isIncognito ? 'STEALTH' : 'INCOGNITO'}</span>
+                  </button>
                   <span className="text-[10px] text-slate-400">{messages.length} LOGS</span>
                   {messages.length > 1 && (
                     <button
@@ -1148,9 +1181,26 @@ export default function JarvisDashboard() {
                 </div>
               </div>
 
+              {/* Incognito Stealth Warning Banner */}
+              {isIncognito && (
+                <div className="mb-2 px-2.5 py-1.5 rounded-lg bg-purple-950/70 border border-purple-500/40 text-purple-300 text-[10px] font-mono flex items-center justify-between shadow-[0_0_12px_rgba(168,85,247,0.2)] shrink-0 animate-fadeIn">
+                  <div className="flex items-center space-x-1.5">
+                    <EyeOff className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+                    <span className="font-bold">INCOGNITO ACTIVE</span>
+                    <span className="text-[9px] text-purple-400/80 hidden xs:inline">— Zero trace stored</span>
+                  </div>
+                  <button
+                    onClick={() => setIsIncognito(false)}
+                    className="text-[9px] text-purple-400 hover:text-white underline font-bold"
+                  >
+                    EXIT
+                  </button>
+                </div>
+              )}
+
               {/* Optional Collapsible Arc Reactor Drawer */}
               {isReactorExpanded && (
-                <div className="mb-2 p-3 rounded-xl bg-slate-950/80 border border-cyan-500/30 shadow-inner flex flex-col items-center justify-center shrink-0">
+                <div className="mb-2 p-2 rounded-xl bg-slate-950/80 border border-cyan-500/30 shadow-inner flex flex-col items-center justify-center shrink-0">
                   <ArcReactorOrb
                     status={orbStatus}
                     onToggleListen={toggleListening}
@@ -1197,6 +1247,7 @@ export default function JarvisDashboard() {
                           <div className="leading-relaxed whitespace-pre-wrap">{msg.content}</div>
 
                           <div className="flex items-center justify-end gap-1 text-[9px] font-mono text-cyan-400/70 pt-0.5 select-none">
+                            {msg.isIncognito && <span title="Incognito Transmission">🕶️</span>}
                             <span>{formatLocalTimestamp(msg.timestamp)}</span>
                             <span className="text-cyan-300 font-bold">✓✓</span>
                           </div>
@@ -1210,6 +1261,12 @@ export default function JarvisDashboard() {
                           <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pb-1.5 border-b border-slate-800/80">
                             <div className="flex items-center gap-1.5">
                               <span className="text-cyan-400 font-bold tracking-wider">J.A.R.V.I.S.</span>
+                              {(msg.isIncognito || msg.telemetry?.incognito) && (
+                                <span className="px-1.5 py-0.5 rounded bg-purple-950/80 border border-purple-500/40 text-[9px] text-purple-300 font-bold flex items-center gap-1 shadow-[0_0_8px_rgba(168,85,247,0.3)]">
+                                  <span>🕶️</span>
+                                  <span>STEALTH</span>
+                                </span>
+                              )}
                               {msg.telemetry && (
                                 <span className="px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/30 text-[9px] text-cyan-300 font-medium flex items-center gap-1">
                                   <span>{formatModelBadge(msg.telemetry).icon}</span>
@@ -1579,6 +1636,19 @@ export default function JarvisDashboard() {
                   <Zap className="w-3 h-3 text-cyan-400" />
                   <span>{isReactorExpanded ? 'COLLAPSE CORE' : 'EXPAND CORE HUD'}</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setIsIncognito(!isIncognito)}
+                  title={isIncognito ? 'Deactivate Incognito Mode' : 'Activate Incognito Stealth Mode'}
+                  className={`text-[10px] flex items-center space-x-1 px-2 py-0.5 rounded font-mono transition-colors ${
+                    isIncognito
+                      ? 'bg-purple-950/80 text-purple-300 border border-purple-500/60 shadow-[0_0_8px_rgba(168,85,247,0.3)] animate-pulse'
+                      : 'text-slate-400 hover:text-purple-300 bg-slate-900/60 border border-slate-800 hover:border-purple-500/40'
+                  }`}
+                >
+                  <EyeOff className="w-3 h-3 text-purple-400" />
+                  <span>{isIncognito ? 'STEALTH ACTIVE' : 'INCOGNITO'}</span>
+                </button>
                 <span className="text-[10px] text-slate-400">
                   {messages.length} TRANSMISSIONS
                 </span>
@@ -1595,6 +1665,23 @@ export default function JarvisDashboard() {
                 )}
               </div>
             </div>
+
+            {/* Incognito Stealth Warning Banner */}
+            {isIncognito && (
+              <div className="mb-2.5 px-3 py-1.5 rounded-xl bg-purple-950/70 border border-purple-500/50 text-purple-300 text-xs font-mono flex items-center justify-between shadow-[0_0_15px_rgba(168,85,247,0.25)] shrink-0 animate-fadeIn">
+                <div className="flex items-center space-x-2">
+                  <EyeOff className="w-4 h-4 text-purple-400 animate-pulse" />
+                  <span className="font-bold">INCOGNITO STEALTH MODE ENGAGED</span>
+                  <span className="text-[11px] text-purple-400/80">— Ephemeral execution. Zero history recorded to database, zero memories formed.</span>
+                </div>
+                <button
+                  onClick={() => setIsIncognito(false)}
+                  className="text-xs text-purple-400 hover:text-white underline font-bold"
+                >
+                  EXIT STEALTH
+                </button>
+              </div>
+            )}
 
             {/* Optional Collapsible Arc Reactor Drawer on Left */}
             {isReactorExpanded && (
@@ -1642,6 +1729,7 @@ export default function JarvisDashboard() {
                         <div className="leading-relaxed whitespace-pre-wrap">{msg.content}</div>
 
                         <div className="flex items-center justify-end gap-1.5 text-[9px] font-mono text-cyan-400/70 pt-0.5 select-none">
+                          {msg.isIncognito && <span title="Incognito Transmission">🕶️</span>}
                           <span>{formatLocalTimestamp(msg.timestamp)}</span>
                           <span className="text-cyan-300 font-bold">✓✓</span>
                         </div>
@@ -1655,6 +1743,12 @@ export default function JarvisDashboard() {
                         <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pb-2 border-b border-slate-800/80">
                           <div className="flex items-center gap-2">
                             <span className="text-cyan-400 font-bold tracking-wider">J.A.R.V.I.S.</span>
+                            {(msg.isIncognito || msg.telemetry?.incognito) && (
+                              <span className="px-2 py-0.5 rounded bg-purple-950/80 border border-purple-500/40 text-[9px] text-purple-300 font-bold flex items-center gap-1 shadow-[0_0_8px_rgba(168,85,247,0.3)]">
+                                <span>🕶️</span>
+                                <span>STEALTH</span>
+                              </span>
+                            )}
                             {msg.telemetry && (
                               <span className="px-2 py-0.5 rounded bg-cyan-950/80 border border-cyan-500/30 text-[9px] text-cyan-300 font-medium flex items-center gap-1">
                                 <span>{formatModelBadge(msg.telemetry).icon}</span>

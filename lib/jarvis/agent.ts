@@ -65,6 +65,7 @@ export interface JarvisAgentOptions {
   specializedAgentId?: string;
   persona?: 'JARVIS' | 'FRIDAY';
   onProgress?: (step: string) => Promise<void> | void;
+  incognito?: boolean;
 }
 
 export function normalizeModel(m?: string): string {
@@ -1651,23 +1652,27 @@ Do NOT repeat the exact same call without mutating parameters or testing one of 
     }
 
     // Pillar 5: Autonomous Epistemic Heuristic & Preference Assimilation (TypeSafe Jev + Directive 03)
-    try {
-      const userText = lastUserMessage.content.toLowerCase();
-      if (/prefer|always|never|my rule|i want|remember that|from now on|i need you to/i.test(userText)) {
-        addMemory('PREFERENCE', `Sir's Explicit Preference: "${lastUserMessage.content.slice(0, 300)}"`, 'Directive 03 Evolutionary Adaptation');
-      } else if (process.env.TYPESAFE_API_KEY && lastUserMessage.content.length > 20) {
-        // Asynchronous non-blocking epistemic sieve (Store ONLY Sir's directives/preferences, never unverified assistant prose)
-        jevAutonomousMemorySieve(lastUserMessage.content, finalReply)
-          .then((sieve) => {
-            if (sieve.shouldMemorize && sieve.category) {
-              console.log(`[Jev Epistemic Sieve] 🧠 Auto-assimilated permanent ${sieve.category}: "${lastUserMessage.content.slice(0, 80)}"`);
-              addMemory(sieve.category as any, `Sir's Mandate: "${lastUserMessage.content.slice(0, 300)}"`, 'Directive 03 Jev Epistemic Sieve');
-            }
-          })
-          .catch((sErr) => console.warn('[Jev Memory Sieve] Non-blocking warning:', sErr));
+    if (!options.incognito) {
+      try {
+        const userText = lastUserMessage.content.toLowerCase();
+        if (/prefer|always|never|my rule|i want|remember that|from now on|i need you to/i.test(userText)) {
+          addMemory('PREFERENCE', `Sir's Explicit Preference: "${lastUserMessage.content.slice(0, 300)}"`, 'Directive 03 Evolutionary Adaptation');
+        } else if (process.env.TYPESAFE_API_KEY && lastUserMessage.content.length > 20) {
+          // Asynchronous non-blocking epistemic sieve (Store ONLY Sir's directives/preferences, never unverified assistant prose)
+          jevAutonomousMemorySieve(lastUserMessage.content, finalReply)
+            .then((sieve) => {
+              if (sieve.shouldMemorize && sieve.category) {
+                console.log(`[Jev Epistemic Sieve] 🧠 Auto-assimilated permanent ${sieve.category}: "${lastUserMessage.content.slice(0, 80)}"`);
+                addMemory(sieve.category as any, `Sir's Mandate: "${lastUserMessage.content.slice(0, 300)}"`, 'Directive 03 Jev Epistemic Sieve');
+              }
+            })
+            .catch((sErr) => console.warn('[Jev Memory Sieve] Non-blocking warning:', sErr));
+        }
+      } catch (prefErr) {
+        console.warn('[Agent] Preference assimilation warning:', prefErr);
       }
-    } catch (prefErr) {
-      console.warn('[Agent] Preference assimilation warning:', prefErr);
+    } else {
+      console.log('[Agent] 🕶️ Incognito mode active: Bypassing preference assimilation and epistemic memory storage.');
     }
     // Pre-Dispatch Empirical Grounding Critic (Async non-blocking background telemetry)
     if (process.env.TYPESAFE_API_KEY) {
@@ -1765,6 +1770,7 @@ Do NOT repeat the exact same call without mutating parameters or testing one of 
         unspokenSubtext: emotionAnalysis.unspokenSubtext,
         samplingArchetype: autoTuneConfig.archetype,
         samplingTemperature: autoTuneConfig.temperature,
+        incognito: Boolean(options.incognito),
       },
     };
   } catch (err: any) {
@@ -1782,6 +1788,7 @@ Do NOT repeat the exact same call without mutating parameters or testing one of 
         archetype,
         persona,
         failoverOccurred: true,
+        incognito: Boolean(options.incognito),
       },
       error: err.message,
     };

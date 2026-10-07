@@ -100,6 +100,44 @@ acquireSingleInstanceLock();
 const ALLOWED_USER_ID = process.env.TELEGRAM_ALLOWED_USER_ID || '864360540';
 const gateway = new TelegramGateway();
 
+// -------------------------------------------------------------
+// INCOGNITO STEALTH MODE STATE (Zero History, Zero Memories)
+// -------------------------------------------------------------
+const incognitoChats = new Set<string>();
+
+async function isIncognitoActive(chatId: string | number): Promise<boolean> {
+  const idStr = String(chatId);
+  if (incognitoChats.has(idStr)) return true;
+  try {
+    const { getStorage } = await import('../lib/jarvis/storage');
+    const storage = getStorage();
+    const val = await storage.execute('get', `jarvis:incognito:${idStr}`);
+    if (val === '1' || val === 'true') {
+      incognitoChats.add(idStr);
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+async function setIncognitoActive(chatId: string | number, active: boolean): Promise<void> {
+  const idStr = String(chatId);
+  if (active) {
+    incognitoChats.add(idStr);
+  } else {
+    incognitoChats.delete(idStr);
+  }
+  try {
+    const { getStorage } = await import('../lib/jarvis/storage');
+    const storage = getStorage();
+    if (active) {
+      await storage.execute('setex', `jarvis:incognito:${idStr}`, 7200, '1');
+    } else {
+      await storage.execute('del', `jarvis:incognito:${idStr}`);
+    }
+  } catch {}
+}
+
 /**
  * Builds the interactive specialized subagents matrix keyboard
  */
@@ -139,10 +177,18 @@ function buildSubagentsKeyboard(): TelegramInlineKeyboardMarkup {
 /**
  * Builds quick tactical action keyboard for Telegram replies
  */
-function buildActionKeyboard(tacticalActions?: string[]): TelegramInlineKeyboardMarkup {
+function buildActionKeyboard(tacticalActions?: string[], isIncognito?: boolean): TelegramInlineKeyboardMarkup {
   const keyboard: TelegramInlineKeyboardMarkup = {
     inline_keyboard: [],
   };
+
+  // Stealth action row if incognito is active
+  if (isIncognito) {
+    keyboard.inline_keyboard.push([
+      { text: '🔓 Exit Incognito', callback_data: 'cmd:incognito_exit' },
+      { text: '🗑️ Burn Message', callback_data: 'cmd:burn_msg' },
+    ]);
+  }
 
   // If specific tactical actions were extracted from the agent run, map them
   if (tacticalActions && tacticalActions.length > 0) {
@@ -155,10 +201,10 @@ function buildActionKeyboard(tacticalActions?: string[]): TelegramInlineKeyboard
 
   // Tactical utility shortcut row
   keyboard.inline_keyboard.push([
+    { text: isIncognito ? '🕶️ Incognito (ON)' : '🕶️ Incognito', callback_data: 'cmd:incognito_toggle' },
     { text: '🇮🇳 NSE Radar', callback_data: 'cmd:nse' },
-    { text: '🧬 Evolve', callback_data: 'cmd:evolve' },
-    { text: '📈 Quant', callback_data: 'cmd:quant' },
     { text: '📊 Briefing', callback_data: 'cmd:briefing' },
+    { text: '📈 Quant', callback_data: 'cmd:quant' },
   ]);
 
   // Fast engine switch row
@@ -899,11 +945,63 @@ async function processDirective(
 
       await gateway.sendMessage(chatId, msg, { replyToMessageId, replyMarkup: keyboard });
       return;
+    } else if (
+      cleanUserText === '/incognito' ||
+      cleanUserText === '/stealth' ||
+      cleanUserText === '/ghost' ||
+      cleanUserText === '/private' ||
+      cleanUserText.toLowerCase() === 'incognito' ||
+      cleanUserText.toLowerCase() === 'stealth mode' ||
+      cleanUserText.toLowerCase() === 'incognito mode'
+    ) {
+      const active = await isIncognitoActive(chatId);
+      const newActive = !active;
+      await setIncognitoActive(chatId, newActive);
+
+      if (newActive) {
+        const kb: TelegramInlineKeyboardMarkup = {
+          inline_keyboard: [
+            [
+              { text: '🔓 Exit Incognito Mode', callback_data: 'cmd:incognito_exit' },
+            ],
+          ],
+        };
+        await gateway.sendMessage(
+          chatId,
+          `🕶️ **Incognito Stealth Mode Activated**\n\n• **Zero History**: Inbound and outbound messages are NOT saved to Redis or disk.\n• **Zero Memory**: Epistemic Sieve & Supermemory learning completely paused.\n• **Zero Telemetry Leaks**: Prompts and thoughts remain ephemeral.\n• **Full Model Power**: All reasoning and tool capabilities remain available.\n\n_Send directives normally. Send \`/incognito\` again or tap below to return to persistent mode._`,
+          { replyToMessageId, replyMarkup: kb }
+        );
+      } else {
+        await gateway.sendMessage(
+          chatId,
+          `🔓 **Incognito Mode Deactivated**\n\nStandard memory assimilation, continuous learning, and universal history logging are now active. All systems green.`,
+          { replyToMessageId }
+        );
+      }
+      return;
     }
 
     if (!cleanUserText && rawText) {
       cleanUserText = rawText;
     }
+
+    // Check Single-Shot Incognito Prefix (/i <directive>, /incognito <directive>, incognito: <directive>)
+    const isSingleShotIncognito =
+      cleanUserText.startsWith('/i ') ||
+      cleanUserText.startsWith('/incognito ') ||
+      /^incognito:\s*/i.test(cleanUserText) ||
+      /^\[incognito\]\s*/i.test(cleanUserText);
+
+    if (isSingleShotIncognito) {
+      cleanUserText = cleanUserText
+        .replace(/^\/i\s+/, '')
+        .replace(/^\/incognito\s+/, '')
+        .replace(/^incognito:\s*/i, '')
+        .replace(/^\[incognito\]\s*/i, '')
+        .trim();
+    }
+
+    const isIncognito = isSingleShotIncognito || (await isIncognitoActive(chatId));
 
     // Append Current Message
     const userMsgRecord: ChatMessageRecord = {
@@ -929,13 +1027,14 @@ async function processDirective(
       orchestrationMode: requestedMode,
       specializedAgentId: delegatedAgentId,
       persona: isFridayDirective ? 'FRIDAY' : undefined,
+      incognito: isIncognito,
       onProgress: async (stepText: string) => {
         gateway.sendTypingAction(chatId).catch(() => {});
         console.log(`[Telegram Worker] ${stepText}`);
       },
     });
 
-    // 3. Save Both Records to Universal Storage (Syncs to Web PWA in Real-Time)
+    // 3. Save Both Records to Universal Storage (Bypassed if Incognito)
     const assistantMsgRecord: ChatMessageRecord = {
       id: `msg-${Date.now()}-a`,
       role: 'assistant',
@@ -944,19 +1043,30 @@ async function processDirective(
       tacticalActions: result.tacticalActions,
       toolCalls: result.toolCallsExecuted,
       internalThoughts: result.internalThoughts,
-      telemetry: result.telemetry,
+      telemetry: {
+        ...result.telemetry,
+        incognito: isIncognito,
+      },
       timestamp: new Date().toISOString(),
       source: 'jarvis',
       channel: 'telegram',
     };
 
-    await appendUniversalChatMessages([
-      { ...userMsgRecord, source: 'jarvis', channel: 'telegram' },
-      { ...assistantMsgRecord, source: 'jarvis', channel: 'telegram' },
-    ]);
+    if (!isIncognito) {
+      await appendUniversalChatMessages([
+        { ...userMsgRecord, source: 'jarvis', channel: 'telegram' },
+        { ...assistantMsgRecord, source: 'jarvis', channel: 'telegram' },
+      ]);
+    } else {
+      console.log(`[Telegram Worker] 🕶️ Incognito Mode: Bypassed universal chat history storage for Chat ${chatId}.`);
+    }
 
     // 4. Format Output for Telegram (Automatic Persona Assignment Header)
     let responseText = '';
+
+    if (isIncognito) {
+      responseText += `🕶️ *[INCOGNITO MODE // ZERO FOOTPRINT]*\n\n`;
+    }
 
     if (isVoiceInput) {
       responseText += `🎙️ *[Transcribed]*: _"${cleanUserText}"_\n\n`;
@@ -987,7 +1097,7 @@ async function processDirective(
       responseText += `\n\n${badgePrefix} ${engineName} // ${result.telemetry.latencyMs}ms\``;
     }
 
-    const actionMarkup = buildActionKeyboard(result.tacticalActions);
+    const actionMarkup = buildActionKeyboard(result.tacticalActions, isIncognito);
 
     await gateway.sendMessage(chatId, responseText, {
       parseMode: 'Markdown',
@@ -1074,6 +1184,28 @@ async function handleIncomingMessage(update: TelegramUpdate) {
           cq.message.message_id,
           `❌ **[GUARDIAN ACTION ABORTED BY SIR]**\n\n_Directive was safely revoked. System remains protected._`
         );
+      }
+      return;
+    } else if (cq.data === 'cmd:incognito_exit') {
+      await setIncognitoActive(chatId, false);
+      await gateway.sendMessage(
+        chatId,
+        `🔓 **Incognito Mode Deactivated**\n\nStandard shared history logging and continuous memory learning are now restored.`,
+        { replyToMessageId: cq.message?.message_id }
+      );
+      return;
+    } else if (cq.data === 'cmd:incognito_toggle') {
+      const active = await isIncognitoActive(chatId);
+      const newActive = !active;
+      await setIncognitoActive(chatId, newActive);
+      const statusText = newActive
+        ? `🕶️ **Incognito Stealth Mode Activated**\n\n• Zero history saved to database\n• Zero memories assimilated\n• Ephemeral execution only.\n\n_Send /incognito again or use the buttons to exit._`
+        : `🔓 **Incognito Mode Deactivated**\n\nStandard logging and learning restored.`;
+      await gateway.sendMessage(chatId, statusText, { replyToMessageId: cq.message?.message_id });
+      return;
+    } else if (cq.data === 'cmd:burn_msg') {
+      if (cq.message?.message_id) {
+        await gateway.deleteMessage(chatId, cq.message.message_id);
       }
       return;
     } else if (cq.data === 'cmd:evolve') {
@@ -1529,6 +1661,8 @@ async function startTelegramGateway() {
     { command: 'radar', description: '📡 Tactical radar sweep' },
     { command: 'voice', description: '🎙️ Movie Neural Speech (Kerry Condon & Paul Bettany)' },
     { command: 'persona', description: '🎭 Tune tone and sparring intensity' },
+    { command: 'incognito', description: '🕶️ Toggle Stealth Mode (Zero trace, zero memories)' },
+    { command: 'i', description: '🕶️ Single-shot stealth query (/i <prompt>)' },
     { command: 'status', description: '🩺 Cloud runner VM & infrastructure health' },
   ]).catch(() => {});
 

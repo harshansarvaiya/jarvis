@@ -26,6 +26,7 @@ export interface OrchestrationTelemetry {
   unspokenSubtext?: string;
   samplingArchetype?: SamplingContextArchetype;
   samplingTemperature?: number;
+  incognito?: boolean;
 }
 
 export interface PreThoughtReasoningPass {
