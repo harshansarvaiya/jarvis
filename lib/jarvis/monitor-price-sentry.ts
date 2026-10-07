@@ -65,7 +65,7 @@ const DEFAULT_TARGETS: Record<string, MonitorTarget> = {
   'lg-34g600a-amazon': {
     id: 'lg-34g600a-amazon',
     name: 'LG UltraGear 34G600A (34" UWQHD 160Hz Curved) - Amazon',
-    url: 'https://www.amazon.in/dp/B0FG8LKDT7',
+    url: 'https://www.amazon.in/dp/B0FXMKFX4S',
     platform: 'amazon',
     targetPriceThreshold: 20000,
     minValidPrice: 14000,
