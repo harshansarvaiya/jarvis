@@ -703,19 +703,7 @@
 
 ### Turn 95 [2026-09-15T19:35:36]
 **Sir's Directive**: 
-> {
->   "type": "service_account",
->   "project_id": "antigravity-cloud-runner",
->   "private_key_id": "cd64d69ba45923b698c73d250bbe532d7a8f1dcf",
->   "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDPkr4EyJgArt6V\nLQWiwCJmRTGGGz7OTK7eT8wyqLvDNPJfjzcahBXkSYy3Vfzd/tHs0p2bDLWwF7FZ\n21U0MQV+7x1JKB3uny2z23C1FtI9W/5klGdwrETcXHilAeSGUWBXUE5m3wsne4fP\nyB6T8otVuX4lznvVpMJGO0xSfCvkL2nU2dUUlhU/pqZ+SbkAVdmPrvyS/CB4WedE\nz6qVqjC7esk+HkJWGsijhN81DZqqo7oiPQa5zdln8yFHvdNhDM8GSt3JDzSM6eE+\naF5fZV/Omc9qaUN7tIby4btgNVr3PIkzFnvgvSbWmeAh8Wt5N8x+xuFt7IpVH+Bh\nBTV5TVnbAgMBAAECggEAN5MPygMU41XuZR1FPYJYk24iKMghpCVWylGuF8AiaUzD\nOb+D3tcPb2wbvzhH9/3SIahwJwObn3ZwduDo6ozXbllBy4TwoqM+nsF5ZxqhlmkL\nbs1m9n1BAIjHilI755RhCW+IVjWQbHU/8use+Lh/AqgjtKaYdCZlF12n/QueyrxF\nLGVGVmfXA06PBZK4Vcs2+xH9wY+PDBrLpShzavASN+F3DKM5nAg4cDWmq5L+t9Bl\nGny0Mal0XW+e7Fqgd953zD458255YhiFx+x6cv56G/Pi5PKyh3wDdtcdbVVtAtXx\nYlGYj952KK8USbAnk31NlwfzVW48t18cRQ9cPrGnSQKBgQD6QX9cbCX+iFoz9B5F\nmtwh9GYn9IsbwzxDCrho2XV2bMFRamPTklVBGAKhcV3+Ugwc0LyosAfSxMBFSVCD\nKBd52mFAuWmqJ7YaXbBYinU951TU0zrQY1fjKfz90ngEsSXMytScRJf1VIV699gh\np0/nQSPG2kFkf5qlXejxtK5qqQKBgQDUVnEVBYSpWyI/uLUqTv3pUxC8OzYtFvUS\nJ4u54GVpYshk+5sArHHqban8U2o/HNpGy5WdX92lfE9MA8YABbwFghRfl4tiQB3I\n10aEFca0A5acbizrAZCO8CORSfjbvqq7UuQOM/dpAXAZjIPgq0uyJHRcLKCEWGEA\ngSoXZlBW4wKBgQDU3lW5hfyjj9Q6kRIW3u0UrNEgd3DEgsOFu161QRQbUdL2r+qO\nEtEV95h1PvtW0u+eqyduzZ05+UYbKYukpLujWNCUv6JTrEfIEZ1pEw07RMTx62MB\n0x71Ccg7F4YjZ5PhqT5EVkxz0BtiR+O+bJUY/l2yTgCFvc0LkOAOiUQ7UQKBgALb\njvYLdveYhGN7JuUE3yHuvkDqQxZkQrQV2CmOPY8nhy7ku/dMWtQe2bTNopZq2v0s\n7DyL972saJzLSDTj3t3sHD4VGgked8gmLYrFiEEP80zzpqMbCEkELlZcOn8ql72h\npfQS+vdsz4dofrXdWE1zdCVxbE+bqOKK2ngqJlalAoGACS2PlM3UEaiTZYD9DJ22\n2xGk0yZKkE1tulfVJOkMeYrqS/gyfMXYmZ/JyNpMGZTJU+D1SfGf47HIOSWkUi/Y\nl9T1sy5oNSEpxoKEOm2AJOc0KnYAs3sHOsJQrv5G7Xn72jHyc8JBSv3cdY+Z3lbJ\nUFPTQIQhIGt+BC2Klb3uAAQ=\n-----END PRIVATE KEY-----\n",
->   "client_email": "jarvis-vertex@antigravity-cloud-runner.iam.gserviceaccount.com",
->   "client_id": "113102021077067322534",
->   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
->   "token_uri": "https://oauth2.googleapis.com/token",
->   "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
->   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/jarvis-vertex%40antigravity-cloud-runner.iam.gserviceaccount.com",
->   "universe_domain": "googleapis.com"
-> }
+> [REDACTED: GCP Service Account Credentials for jarvis-vertex@antigravity-cloud-runner.iam.gserviceaccount.com]
 
 ### Turn 96 [2026-09-15T19:44:19]
 **Sir's Directive**: 
