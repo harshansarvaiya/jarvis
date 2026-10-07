@@ -90,10 +90,21 @@ async function main() {
   chronicleContent += `**Total Exchanges**: ${userTurns.length} User Directive Turns\n\n`;
   chronicleContent += `## Chronological Directive Log\n\n`;
 
+  function sanitizeContent(text: string): string {
+    return text
+      .replace(/-----BEGIN PRIVATE KEY-----[\s\S]*?-----END PRIVATE KEY-----/g, '[REDACTED_PRIVATE_KEY]')
+      .replace(/"private_key":\s*"[^"]+"/g, '"private_key": "[REDACTED_PRIVATE_KEY]"')
+      .replace(/"private_key_id":\s*"[^"]+"/g, '"private_key_id": "[REDACTED_KEY_ID]"')
+      .replace(/ghp_[A-Za-z0-9_]{30,}/g, '[REDACTED_GH_TOKEN]')
+      .replace(/AIza[0-9A-Za-z-_]{35}/g, '[REDACTED_GOOGLE_API_KEY]')
+      .replace(/sk-[A-Za-z0-9-_]{30,}/g, '[REDACTED_API_KEY]');
+  }
+
   for (let i = 0; i < userTurns.length; i++) {
     const u = userTurns[i];
+    const safeContent = sanitizeContent(u.content);
     chronicleContent += `### Turn ${i + 1} [${u.timestamp.substring(0, 19)}]\n`;
-    chronicleContent += `**Sir's Directive**: \n> ${u.content.replace(/\n/g, '\n> ')}\n\n`;
+    chronicleContent += `**Sir's Directive**: \n> ${safeContent.replace(/\n/g, '\n> ')}\n\n`;
   }
 
   const chroniclePath = path.join(knowledgeDir, 'antigravity-chronicles.md');
