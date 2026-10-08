@@ -58,4 +58,6 @@ next-env.d.ts
 /data/deliverables-history.json
 scripts/inspect-chats.ts
 /scratch/
+/public/generated-images/*
+!/public/generated-images/.gitkeep
 

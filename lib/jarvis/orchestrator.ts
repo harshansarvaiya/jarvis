@@ -56,7 +56,9 @@ export function detectActivePersona(prompt: string): { persona: ActivePersona; e
     'code', 'bug', 'fix', 'debug', 'refactor', 'compile', 'tsc', 'test',
     'function', 'file', 'architecture', 'system design', 'script', 'daemon',
     'endpoint', 'api', 'git', 'commit', 'pr', 'deep', 'antigravity', 'infra',
-    'error', 'exception', 'stack trace', 'inspect', 'grep', 'search_workspace'
+    'error', 'exception', 'stack trace', 'inspect', 'grep', 'search_workspace',
+    'image', 'generate image', 'draw', 'render', 'diagram', 'blueprint', 'mockup',
+    'visualize', 'schematic', 'illustration', 'wallpaper', 'photo'
   ];
   if (fridayTriggers.some((t) => clean.includes(t))) {
     return { persona: 'FRIDAY', explicit: false };

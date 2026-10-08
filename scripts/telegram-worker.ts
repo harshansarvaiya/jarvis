@@ -317,6 +317,19 @@ async function processDirective(
       cleanUserText = `Friday, ${cleanUserText}`;
       requestedModel = 'gemini-3.7-flash';
       requestedMode = 'auto';
+    } else if (cleanUserText.startsWith('/image') || cleanUserText.startsWith('/draw') || cleanUserText.startsWith('/render')) {
+      const promptText = cleanUserText.replace(/^\/(image|draw|render)\s*/i, '').trim();
+      if (!promptText) {
+        await gateway.sendMessage(
+          chatId,
+          `🎨 **F.R.I.D.A.Y. Visual Frame**, Sir.\n\nPlease supply a prompt: \`/image <description>\`\n\n_Examples:_\n• \`/image futuristic cybernetic arc reactor HUD\`\n• \`/image technical blueprint of agent swarm architecture\`\n• \`/image 16:9 panoramic neon cyberpunk city\``,
+          { replyToMessageId }
+        );
+        return;
+      }
+      cleanUserText = `Friday, synthesize an image using the generate_image tool with prompt: "${promptText}". Display the visual artifact for Sir.`;
+      requestedModel = 'gemini-3.7-flash';
+      requestedMode = 'auto';
     } else if (cleanUserText.startsWith('/jarvis')) {
       cleanUserText = cleanUserText.replace(/^\/jarvis\s*/i, '').trim();
       cleanUserText = `Jarvis, ${cleanUserText}`;
@@ -1105,6 +1118,50 @@ async function processDirective(
       replyMarkup: actionMarkup,
     });
 
+    // 4B. Dispatch Native Photo Asset if Image Synthesis was executed
+    try {
+      const imgToolCalls = (result.toolCallsExecuted || []).filter(
+        (tc) => tc.name === 'generate_image' && tc.result && tc.result.success !== false
+      );
+
+      for (const call of imgToolCalls) {
+        const payload = call.result?.result || call.result;
+        let photoBuffer: Buffer | null = null;
+        if (payload?.filePath && fs.existsSync(payload.filePath)) {
+          photoBuffer = fs.readFileSync(payload.filePath);
+        } else if (payload?.base64Data) {
+          const raw = payload.base64Data.replace(/^data:image\/[a-z]+;base64,/, '');
+          photoBuffer = Buffer.from(raw, 'base64');
+        }
+
+        if (photoBuffer && photoBuffer.length > 0) {
+          const caption = `🛡️ **F.R.I.D.A.Y. Visual Frame**\n_${payload.prompt || 'Synthesized Asset'}_\n\n\`${payload.engineUsed || 'Cloud Diffusion'} // ${payload.aspectRatio || '1:1'}\``;
+          await gateway.sendPhoto(chatId, photoBuffer, {
+            caption,
+            replyToMessageId,
+          });
+        }
+      }
+
+      // Also detect if markdown image link in result.reply was written to /generated-images/
+      if (imgToolCalls.length === 0 && result.reply.includes('/generated-images/')) {
+        const match = result.reply.match(/!\[([^\]]*)\]\((\/generated-images\/[^)]+)\)/);
+        if (match) {
+          const [, alt, relUrl] = match;
+          const fullPath = path.join(process.cwd(), 'public', relUrl.replace(/^\//, ''));
+          if (fs.existsSync(fullPath)) {
+            const buf = fs.readFileSync(fullPath);
+            await gateway.sendPhoto(chatId, buf, {
+              caption: `🛡️ **F.R.I.D.A.Y. Visual Frame**\n_${alt || 'Synthesized Asset'}_`,
+              replyToMessageId,
+            });
+          }
+        }
+      }
+    } catch (photoErr: any) {
+      console.warn('[Telegram Worker] Photo dispatch warning:', photoErr?.message);
+    }
+
     // 5. Send Movie-Fidelity Neural Voice Note if triggered via Voice Input or explicit request
     const wantsVoiceResponse =
       isVoiceInput ||
@@ -1651,6 +1708,7 @@ async function startTelegramGateway() {
     { command: 'call', description: '📞 Launch Full-Duplex Voice Sheet (AirPods / TMA)' },
     { command: 'bus', description: '⚡ Real-time Dual-Citizen State Bus stream' },
     { command: 'friday', description: '🛡️ Apex Tactical Mind directive' },
+    { command: 'image', description: '🎨 Visual Frame: Synthesize diagrams, mockups & blueprints' },
     { command: 'jarvis', description: '⚡ Tactical Chief of Staff & Butler' },
     { command: 'monetization', description: '💰 08:00 AM Revenue, Bounties & B2B Leads' },
     { command: 'nse', description: '🇮🇳 08:15 AM Indian Market (NSE/BSE) macro catalysts & setups' },

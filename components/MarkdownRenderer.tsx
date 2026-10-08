@@ -9,12 +9,50 @@ interface MarkdownRendererProps {
  * Format inline tokens like **bold**, *italic*, `code`, and links.
  */
 function renderInlineText(text: string): React.ReactNode[] {
-  // Regex to match inline tokens: bold (**...**), italic (*...* or _..._), code (`...`), links ([...](...))
-  const tokenRegex = /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\[[^\]]+\]\([^)]+\)|\*[^*]+\*|_[^_]+_)/g;
+  // Regex to match inline tokens: images (![...](...)), bold (**...**), italic (*...* or _..._), code (`...`), links ([...](...))
+  const tokenRegex = /(!\[[^\]]*\]\([^)]+\)|\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\[[^\]]+\]\([^)]+\)|\*[^*]+\*|_[^_]+_)/g;
   const parts = text.split(tokenRegex);
 
   return parts.map((part, index) => {
     if (!part) return null;
+
+    // Markdown Images: ![alt](url)
+    const imgMatch = part.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (imgMatch) {
+      const [, altText, url] = imgMatch;
+      return (
+        <span key={index} className="block my-3 rounded-xl border border-cyan-500/40 bg-slate-950/90 p-2.5 shadow-[0_0_20px_rgba(0,229,255,0.15)] group relative overflow-hidden">
+          <span className="flex items-center justify-between px-2 py-1 text-[10px] font-mono text-cyan-400 border-b border-cyan-500/20 mb-2">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              <span>🛡️ F.R.I.D.A.Y. VISUAL FRAME</span>
+            </span>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              download
+              className="text-cyan-400 hover:text-cyan-200 transition-colors uppercase tracking-wider text-[9px] flex items-center gap-1"
+            >
+              <span>Download High-Res ↗</span>
+            </a>
+          </span>
+          <span className="relative rounded-lg overflow-hidden flex items-center justify-center bg-black/60 min-h-[160px]">
+            <img
+              src={url}
+              alt={altText || 'Generated Visual Asset'}
+              className="w-full max-h-[520px] object-contain rounded-lg transition-transform duration-300 group-hover:scale-[1.01]"
+              loading="lazy"
+            />
+          </span>
+          {altText && (
+            <span className="block mt-2 px-1 text-[11px] font-mono text-slate-400 italic">
+              ↳ {altText}
+            </span>
+          )}
+        </span>
+      );
+    }
 
     // Bold: **text** or __text__
     if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('__') && part.endsWith('__'))) {
@@ -282,6 +320,45 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
     // 8. Empty lines
     if (trimmed === '') {
       elements.push(<div key={`empty-${i}`} className="h-1.5" />);
+      continue;
+    }
+
+    // 8B. Standalone Markdown Image Block
+    const standaloneImgMatch = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (standaloneImgMatch) {
+      const [, altText, url] = standaloneImgMatch;
+      elements.push(
+        <div key={`img-block-${i}`} className="my-3 rounded-xl border border-cyan-500/40 bg-slate-950/90 p-2.5 shadow-[0_0_20px_rgba(0,229,255,0.15)] group relative overflow-hidden">
+          <div className="flex items-center justify-between px-2 py-1 text-[10px] font-mono text-cyan-400 border-b border-cyan-500/20 mb-2">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              <span>🛡️ F.R.I.D.A.Y. VISUAL FRAME</span>
+            </span>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              download
+              className="text-cyan-400 hover:text-cyan-200 transition-colors uppercase tracking-wider text-[9px] flex items-center gap-1"
+            >
+              <span>Download High-Res ↗</span>
+            </a>
+          </div>
+          <div className="relative rounded-lg overflow-hidden flex items-center justify-center bg-black/60 min-h-[160px]">
+            <img
+              src={url}
+              alt={altText || 'Generated Visual Asset'}
+              className="w-full max-h-[520px] object-contain rounded-lg transition-transform duration-300 group-hover:scale-[1.01]"
+              loading="lazy"
+            />
+          </div>
+          {altText && (
+            <div className="mt-2 px-1 text-[11px] font-mono text-slate-400 italic">
+              ↳ {altText}
+            </div>
+          )}
+        </div>
+      );
       continue;
     }
 

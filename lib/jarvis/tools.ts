@@ -3080,6 +3080,30 @@ export const JARVIS_TOOLS: ToolDefinition[] = [
       required: [],
     },
   },
+  {
+    name: 'generate_image',
+    description: 'Synthesizes high-fidelity visual assets, system architecture diagrams, UI blueprints, concept art, and technical schematics via cloud-native frontier diffusion and multimodal image generation (Google Cloud Vertex AI). Complies with Directive 01 and Directive 06.',
+    parameters: {
+      type: 'object',
+      properties: {
+        prompt: {
+          type: 'string',
+          description: 'Detailed description of the visual scene, subject, lighting, perspective, and composition.',
+        },
+        aspectRatio: {
+          type: 'string',
+          enum: ['1:1', '16:9', '9:16', '4:3', '3:4'],
+          description: 'Aspect ratio of the generated asset. Default: 1:1. Use 16:9 for widescreen wallpaper/diagrams, 9:16 for mobile vertical.',
+        },
+        style: {
+          type: 'string',
+          enum: ['cinematic', 'blueprint', 'cyberpunk', 'photorealistic', 'minimalist', 'concept_art', 'diagram', 'raw'],
+          description: 'Visual aesthetic conditioning. Use "blueprint" for technical schematics, "diagram" for software architecture, "cyberpunk" for neon HUD, "cinematic" for photorealism.',
+        },
+      },
+      required: ['prompt'],
+    },
+  },
 ];
 
 // ============================================================================
@@ -3114,6 +3138,7 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'execute_satellite_command',
     'satellite_action',
     'list_satellites',
+    'generate_image',
   ],
   SECURITY_AUDITING: [
     'run_security_audit',
@@ -3158,6 +3183,7 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'execute_satellite_command',
     'satellite_action',
     'list_satellites',
+    'generate_image',
   ],
   KNOWLEDGE_RAG: [
     'query_knowledge_base',
@@ -3166,6 +3192,13 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'store_memory',
     'read_workspace_file',
     'search_web',
+  ],
+  VISUAL_SYNTHESIS: [
+    'generate_image',
+    'read_workspace_file',
+    'inspect_infrastructure',
+    'store_memory',
+    'search_memories',
   ],
 };
 
@@ -5139,6 +5172,37 @@ export async function executeJarvisTool(
             'Directive 06 Safeguard: No active workstation satellite node is online. Heavy binary decompilation (Hopper / Ghidra JDK 21) is restricted on the GCP Cloud Runner VM to prevent memory thrashing. Please launch the satellite on your workstation (`npx tsx scripts/satellite-node.ts`) or run `npx --yes rea-agents@latest analyze "' +
             (targetPath || '') +
             '"` directly in your local terminal.',
+        };
+      }
+
+      case 'generate_image': {
+        const { prompt, aspectRatio, style } = args;
+        if (!prompt) {
+          return { success: false, result: null, error: 'Prompt is required for image generation.' };
+        }
+        const { generateImageWithCloudEngine } = await import('./image-generator');
+        const imgResult = await generateImageWithCloudEngine({
+          prompt,
+          aspectRatio,
+          style,
+          persona: 'FRIDAY',
+        });
+        if (!imgResult.success) {
+          return { success: false, result: null, error: imgResult.error || 'Visual synthesis failed.' };
+        }
+        return {
+          success: true,
+          result: {
+            message: `Visual asset synthesized successfully via ${imgResult.engineUsed}.`,
+            imageUrl: imgResult.imageUrl,
+            filePath: imgResult.filePath,
+            markdown: imgResult.markdown,
+            engineUsed: imgResult.engineUsed,
+            latencyMs: imgResult.latencyMs,
+            aspectRatio: imgResult.aspectRatio,
+            prompt: imgResult.prompt,
+            base64Data: imgResult.base64Data,
+          },
         };
       }
 
