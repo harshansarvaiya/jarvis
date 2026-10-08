@@ -3160,6 +3160,7 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'store_memory',
     'search_memories',
     'read_workspace_file',
+    'generate_image',
   ],
   DAILY_OPERATIONS: [
     'manage_task',
@@ -3192,6 +3193,7 @@ const CATEGORY_TOOL_MAP: Record<string, string[]> = {
     'store_memory',
     'read_workspace_file',
     'search_web',
+    'generate_image',
   ],
   VISUAL_SYNTHESIS: [
     'generate_image',
