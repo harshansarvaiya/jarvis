@@ -30,6 +30,7 @@ export interface TelegramUpdate {
   update_id: number;
   message?: {
     message_id: number;
+    message_thread_id?: number;
     from: {
       id: number;
       is_bot: boolean;
@@ -86,6 +87,7 @@ export interface TelegramUpdate {
     };
     message?: {
       message_id: number;
+      message_thread_id?: number;
       chat: {
         id: number;
         type: string;
@@ -226,16 +228,20 @@ export class TelegramGateway {
   /**
    * Sends typing status to indicate J.A.R.V.I.S. is processing/reasoning
    */
-  public async sendTypingAction(chatId: number | string): Promise<void> {
+  public async sendTypingAction(chatId: number | string, messageThreadId?: number): Promise<void> {
     if (!this.isConfigured()) return;
     try {
+      const body: any = {
+        chat_id: chatId,
+        action: 'typing',
+      };
+      if (messageThreadId) {
+        body.message_thread_id = messageThreadId;
+      }
       await fetch(`${this.baseUrl}/sendChatAction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          action: 'typing',
-        }),
+        body: JSON.stringify(body),
       });
     } catch {}
   }
@@ -454,6 +460,8 @@ export class TelegramGateway {
       caption?: string;
       replyToMessageId?: number;
       duration?: number;
+      messageThreadId?: number;
+      message_thread_id?: number;
     }
   ): Promise<boolean> {
     if (!this.isConfigured()) return false;
@@ -466,6 +474,10 @@ export class TelegramGateway {
       }
       if (options?.replyToMessageId) {
         formData.append('reply_to_message_id', String(options.replyToMessageId));
+      }
+      const threadId = options?.messageThreadId || options?.message_thread_id;
+      if (threadId) {
+        formData.append('message_thread_id', String(threadId));
       }
       if (options?.duration) {
         formData.append('duration', String(options.duration));
@@ -498,6 +510,8 @@ export class TelegramGateway {
       caption?: string;
       parseMode?: 'Markdown' | 'HTML';
       replyToMessageId?: number;
+      messageThreadId?: number;
+      message_thread_id?: number;
     }
   ): Promise<boolean> {
     if (!this.isConfigured()) return false;
@@ -511,6 +525,10 @@ export class TelegramGateway {
       }
       if (options?.replyToMessageId) {
         formData.append('reply_to_message_id', String(options.replyToMessageId));
+      }
+      const threadId = options?.messageThreadId || options?.message_thread_id;
+      if (threadId) {
+        formData.append('message_thread_id', String(threadId));
       }
 
       const res = await fetch(`${this.baseUrl}/sendPhoto`, {

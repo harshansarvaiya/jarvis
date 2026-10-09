@@ -226,12 +226,13 @@ async function processDirective(
   base64Image?: string,
   replyToMessageId?: number,
   isVoiceInput = false,
-  explicitDelegatedAgentId?: string
+  explicitDelegatedAgentId?: string,
+  messageThreadId?: number
 ) {
   const typingPulse = setInterval(() => {
-    gateway.sendTypingAction(chatId).catch(() => {});
+    gateway.sendTypingAction(chatId, messageThreadId).catch(() => {});
   }, 4000);
-  await gateway.sendTypingAction(chatId);
+  await gateway.sendTypingAction(chatId, messageThreadId);
 
   try {
     // 1. Retrieve Recent Universal Chat History for Cross-Device Continuity
@@ -1116,6 +1117,7 @@ async function processDirective(
       parseMode: 'Markdown',
       replyToMessageId,
       replyMarkup: actionMarkup,
+      messageThreadId,
     });
 
     // 4B. Dispatch Native Photo Asset if Image Synthesis was executed
@@ -1139,6 +1141,7 @@ async function processDirective(
           await gateway.sendPhoto(chatId, photoBuffer, {
             caption,
             replyToMessageId,
+            messageThreadId,
           });
         }
       }
@@ -1154,6 +1157,7 @@ async function processDirective(
             await gateway.sendPhoto(chatId, buf, {
               caption: `🛡️ **F.R.I.D.A.Y. Visual Frame**\n_${alt || 'Synthesized Asset'}_`,
               replyToMessageId,
+              messageThreadId,
             });
           }
         }
@@ -1179,6 +1183,7 @@ async function processDirective(
           await gateway.sendVoice(chatId, voiceBuffer, {
             replyToMessageId,
             caption: `${personaLabel} Vocal Dispatch`,
+            messageThreadId,
           });
         }
       } catch (voiceErr: any) {
@@ -1190,7 +1195,7 @@ async function processDirective(
     await gateway.sendMessage(
       chatId,
       `Sir, a temporary cognitive latency occurred while processing your directive: ${err.message}. State and safeguards remain nominal.`,
-      { replyToMessageId }
+      { replyToMessageId, messageThreadId }
     );
   } finally {
     clearInterval(typingPulse);
@@ -1424,7 +1429,15 @@ async function handleIncomingMessage(update: TelegramUpdate) {
         'codeact-executor': 'Verify CodeAct step execution pipeline and tool execution harness status.',
       };
       const taskText = defaultTasks[agentId] || `Execute specialized operation as ${agentId}`;
-      await processDirective(chatId, taskText, undefined, cq.message?.message_id, false, agentId);
+      await processDirective(
+        chatId,
+        taskText,
+        undefined,
+        cq.message?.message_id,
+        false,
+        agentId,
+        cq.message?.message_thread_id
+      );
       return;
     } else if (cq.data === 'cmd:groq') {
       directiveText = '/groq Report status and confirm Groq LPU 120B reflex tier active.';
@@ -1475,7 +1488,15 @@ async function handleIncomingMessage(update: TelegramUpdate) {
       directiveText = cq.data;
     }
 
-    await processDirective(chatId, directiveText, undefined, cq.message?.message_id);
+    await processDirective(
+      chatId,
+      directiveText,
+      undefined,
+      cq.message?.message_id,
+      false,
+      undefined,
+      cq.message?.message_thread_id
+    );
     return;
   }
 
@@ -1512,14 +1533,15 @@ async function handleIncomingMessage(update: TelegramUpdate) {
 
   // Handle Supergroup & Forum Topic Initialization
   if (msg.chat.type === 'supergroup' || msg.chat.type === 'group') {
-    console.log(`[Telegram Gateway] 🏛️ Group/Supergroup event received from Sir (Chat ID: ${chatId}): "${userText}"`);
+    console.log(`[Telegram Gateway] 🏛️ Group/Supergroup event received from Sir (Chat ID: ${chatId}, Thread: ${msg.message_thread_id || 'general'}): "${userText}"`);
 
-    // Create topics if requested or on any first group interaction
-    const isTopicCommand = /\b(setup|init|topic|topics|room|rooms|create|matrix|start|hi|hello|jarvis|friday)\b/i.test(userText) || userText.startsWith('/');
-    if (isTopicCommand || !userText) {
+    // Only create/recreate topics on EXPLICIT command (e.g. /init_topics or /setup_topics)
+    const isExplicitTopicSetup = /^\/(?:setup_topics|init_topics|create_topics)\b/i.test(userText);
+    if (isExplicitTopicSetup) {
       await gateway.sendMessage(
         chatId,
-        `🏛️ <b>Initializing J.A.R.V.I.S. Command Matrix Topics...</b>\nCreating dedicated operational rooms for Sir...`
+        `🏛️ <b>Initializing J.A.R.V.I.S. Command Matrix Topics...</b>\nCreating dedicated operational rooms for Sir...`,
+        { messageThreadId: msg.message_thread_id }
       );
 
       const topicsToCreate = [
@@ -1570,7 +1592,8 @@ async function handleIncomingMessage(update: TelegramUpdate) {
         `• 📰 <b>AI Tech Intelligence</b>\n` +
         `• 💰 <b>Monetization Radar</b>\n` +
         `• 🛡️ <b>Defense & Geopolitics</b>\n\n` +
-        `All autonomous cron streams will now deliver directly to their respective rooms. Your private 1-on-1 chat with Friday is now reserved exclusively for direct sparring.`
+        `All autonomous cron streams will now deliver directly to their respective rooms. Your private 1-on-1 chat with Friday is now reserved exclusively for direct sparring.`,
+        { messageThreadId: msg.message_thread_id }
       );
       return;
     }
@@ -1679,7 +1702,15 @@ async function handleIncomingMessage(update: TelegramUpdate) {
     if (b64) base64Image = b64;
   }
 
-  await processDirective(chatId, userText, base64Image, msg.message_id, isVoiceInput);
+  await processDirective(
+    chatId,
+    userText,
+    base64Image,
+    msg.message_id,
+    isVoiceInput,
+    undefined,
+    msg.message_thread_id
+  );
 }
 
 async function startTelegramGateway() {

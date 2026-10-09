@@ -1,11 +1,11 @@
 {
   "supergroupId": -1004479491064,
   "topics": {
-    "BRIEFINGS": 5,
-    "MARKETS": 6,
-    "AINEWS": 7,
-    "MONETIZATION": 8,
-    "DEFENSE": 9
+    "BRIEFINGS": 36,
+    "MARKETS": 37,
+    "AINEWS": 38,
+    "MONETIZATION": 39,
+    "DEFENSE": 40
   },
-  "configuredAt": "2026-10-06T19:18:33.028Z"
+  "configuredAt": "2026-10-09T13:05:25.234Z"
 }
