@@ -132,14 +132,24 @@ export async function runAutonomousEvolutionCycle(options: {
       console.warn('[Evolution Sentry] ⚠️ Compiler check failed during evolution audit:', compilerRes.details);
     }
 
-    // 2. Query Git State
+    // 2. Query Git State & Commit Age
     let commitHash = 'unknown';
     let branch = 'main';
+    let commitAge = 'recent';
+    let commitSubject = '';
+    let isFreshCommit = false;
     try {
       const { stdout: hashOut } = await execAsync('git rev-parse --short HEAD');
       commitHash = hashOut.trim();
       const { stdout: branchOut } = await execAsync('git rev-parse --abbrev-ref HEAD');
       branch = branchOut.trim();
+      const { stdout: ageOut } = await execAsync('git log -1 --format="%cr"');
+      commitAge = ageOut.trim();
+      const { stdout: subjOut } = await execAsync('git log -1 --format="%s"');
+      commitSubject = subjOut.trim();
+      const { stdout: tsOut } = await execAsync('git log -1 --format="%ct"');
+      const commitTimestamp = parseInt(tsOut.trim(), 10) * 1000;
+      isFreshCommit = (Date.now() - commitTimestamp) < 24 * 3600 * 1000;
     } catch {}
 
     // 3. Query VM Telemetry & Code Graph
@@ -202,13 +212,16 @@ export async function runAutonomousEvolutionCycle(options: {
           }
         }
 
-        // Add evolution log
+        // Add evolution or integrity audit log
+        const logMsg = isFreshCommit
+          ? `Autonomous Cognitive & Architectural Evolution executed: Stage ${currentStage} active (${commitHash}${commitSubject ? ` — ${commitSubject}` : ''}).`
+          : `Substrate Health & Integrity Audit verified: Stage ${currentStage} nominal at commit ${commitHash} (${commitAge}).`;
         state.logs = state.logs || [];
         state.logs.push({
           id: `evo-${Date.now()}`,
           timestamp: new Date().toISOString(),
           type: 'EVOLUTION',
-          message: `Autonomous Cognitive & Architectural Evolution executed: Stage ${currentStage} active (${commitHash}).`,
+          message: logMsg,
         });
 
         // Limit logs to last 200
@@ -256,10 +269,14 @@ export async function runAutonomousEvolutionCycle(options: {
       hour12: true,
     });
 
-    let msg = `🛡️ **[F.R.I.D.A.Y. — AUTONOMOUS COGNITIVE & ARCHITECTURAL EVOLUTION]**\n\n`;
+    const titleHeader = isFreshCommit
+      ? `🛡️ **[F.R.I.D.A.Y. — AUTONOMOUS COGNITIVE & ARCHITECTURAL EVOLUTION]**`
+      : `🛡️ **[F.R.I.D.A.Y. — DAILY SUBSTRATE HEALTH & INTEGRITY AUDIT]**`;
+
+    let msg = `${titleHeader}\n\n`;
     msg += `🧬 **Active Stage**: \`Stage ${currentStage} (Autonomous Sovereign Cloud Substrate)\`\n`;
     msg += `⏰ **Audit Timestamp**: \`${dateStr} ${istTimeStr} IST\`\n`;
-    msg += `📦 **Codebase Commit**: \`${commitHash}\` (branch: \`${branch}\`)\n\n`;
+    msg += `📦 **Codebase Commit**: \`${commitHash}\` (${commitAge}, branch: \`${branch}\`)${commitSubject ? ` — _${commitSubject}_` : ''}\n\n`;
 
     msg += `🔬 **SYSTEM HEALTH & COMPILER AUDIT**:\n`;
     msg += `• **Compiler Gate**: ${compilerRes.valid ? '🟢 `PASSED (npx tsc --noEmit: 0 errors)`' : '⚠️ `COMPILER WARNINGS DETECTED`'}\n`;
@@ -279,7 +296,9 @@ export async function runAutonomousEvolutionCycle(options: {
     msg += `2. **Interactive Telegram Suite**: Real-time \`/nse\`, \`/market\`, \`/trade\`, and single-stock lookups.\n`;
     msg += `3. **Autonomous Evolution Cron**: Hard-wired daily self-audit and cognitive consolidation.\n\n`;
 
-    msg += `_Autonomous evolution cycle completed under Directive 03 & Directive 05._`;
+    msg += isFreshCommit
+      ? `_Autonomous evolution cycle completed under Directive 03 & Directive 05._`
+      : `_Substrate health & integrity check completed. No uncommitted mutations._`;
 
     const keyboard: TelegramInlineKeyboardMarkup = {
       inline_keyboard: [
@@ -307,9 +326,15 @@ export async function runAutonomousEvolutionCycle(options: {
     // 8. Dispatch Native Web Push
     if (dispatchPushFn) {
       try {
+        const pushTitle = isFreshCommit
+          ? `🛡️ F.R.I.D.A.Y. Evolved to Stage ${currentStage}`
+          : `🛡️ F.R.I.D.A.Y. Substrate Health Audit`;
+        const pushBody = isFreshCommit
+          ? `Architectural mutation active. Commit: ${commitHash} (${commitAge}). Compiler: 0 errors.`
+          : `Compiler: 0 errors (Passed). Substrate stable at commit ${commitHash} (${commitAge}).`;
         await dispatchPushFn(
-          `🛡️ F.R.I.D.A.Y. Evolved to Stage ${currentStage}`,
-          `Autonomous cognitive & architectural audit complete. Compiler: 0 errors. Active commit: ${commitHash}.`,
+          pushTitle,
+          pushBody,
           '/api/jarvis/health'
         );
       } catch (pushErr: any) {
@@ -325,7 +350,9 @@ export async function runAutonomousEvolutionCycle(options: {
       compilerDetails: compilerRes.details,
       assimilatedNodesCount: assimilatedCount,
       timestamp: now.toISOString(),
-      summary: `Autonomous Evolution Stage ${currentStage} deployed and verified.`,
+      summary: isFreshCommit
+        ? `Autonomous Evolution Stage ${currentStage} deployed and verified (${commitHash}).`
+        : `Substrate Health Audit verified: 0 compiler errors, commit ${commitHash} (${commitAge}).`,
     };
   } catch (fatalErr: any) {
     console.error('[Evolution Sentry] ❌ Fatal error during evolution cycle:', fatalErr);

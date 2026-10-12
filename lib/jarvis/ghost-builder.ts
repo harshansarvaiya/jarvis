@@ -126,25 +126,47 @@ export async function runOvernightGhostBuildCycle(): Promise<GhostBuildReport> {
     };
   }
 
-  // 3. Cognitive Evolution & Implementation Maturation
+  // 3. Cognitive Evolution & Chronicle Recording
   const filesModified: string[] = [];
   try {
     // Evolve chronicle milestone
-    await recordChronicleMilestone(`Autonomously assimilated and verified: ${candidate.title}`, {
+    await recordChronicleMilestone(`Autonomous evaluation of candidate: ${candidate.title}`, {
       theme: candidate.category,
       stateOfMind: 'Autonomous Sovereign Execution (Night Shift)',
-    });
-
-    // Mark loop as resolved in registry
-    await updateOpenLoop(candidate.id, {
-      status: 'RESOLVED',
-      contextNotes: `${candidate.contextNotes} | Shipped autonomously by Ghost-Builder.`,
     });
   } catch (evolveErr: any) {
     console.warn('[Ghost-Builder] Cognitive evolution record warning:', evolveErr.message);
   }
 
-  // 4. Closed-Loop Compiler Lock
+  // 4. Inspect Source Code Modifications (Excluding runtime caches)
+  let statusOut = '';
+  try {
+    const res = await execAsync('git status -s', { cwd: process.cwd() });
+    statusOut = res.stdout.trim();
+  } catch {}
+
+  const sourceFilesModified = statusOut
+    ? statusOut
+        .split('\n')
+        .map((l) => l.slice(3).trim())
+        .filter((f) => !f.startsWith('data/') && !f.startsWith('logs/') && !f.endsWith('.log') && !f.endsWith('.pdf'))
+    : [];
+
+  if (sourceFilesModified.length === 0) {
+    console.log(`[Ghost-Builder] ℹ️ No source code mutations staged for target: "${candidate.title}". Loop remains OPEN.`);
+    return {
+      id: `ghost-${Date.now()}`,
+      loopId: candidate.id,
+      title: candidate.title,
+      tier,
+      status: 'NO_CANDIDATE',
+      filesModified: [],
+      compilerStatus: 'CLEAN_NO_MUTATIONS',
+      completedAt: new Date().toISOString(),
+    };
+  }
+
+  // 5. Closed-Loop Compiler Lock
   const postCompiler = await verifyCompiler();
   if (!postCompiler.clean) {
     console.warn('[Ghost-Builder] ❌ Compiler failed post-mutation:', postCompiler.errors);
@@ -154,13 +176,13 @@ export async function runOvernightGhostBuildCycle(): Promise<GhostBuildReport> {
       title: candidate.title,
       tier,
       status: 'FAILED_COMPILER',
-      filesModified,
+      filesModified: sourceFilesModified,
       compilerStatus: postCompiler.errors?.slice(0, 300) || 'Compiler error',
       completedAt: new Date().toISOString(),
     };
   }
 
-  // 5. Build Verification Lock
+  // 6. Build Verification Lock
   const buildCheck = await verifyBuild();
   if (!buildCheck.clean) {
     console.warn('[Ghost-Builder] ❌ Production build failed post-mutation:', buildCheck.errors);
@@ -170,31 +192,46 @@ export async function runOvernightGhostBuildCycle(): Promise<GhostBuildReport> {
       title: candidate.title,
       tier,
       status: 'FAILED_COMPILER',
-      filesModified,
+      filesModified: sourceFilesModified,
       compilerStatus: buildCheck.errors?.slice(0, 300) || 'Build error',
       completedAt: new Date().toISOString(),
     };
   }
 
-  // 6. Fast-Track Auto-Merge & Push to Origin Main (Directive 05)
+  // 7. Fast-Track Auto-Merge & Push to Origin Main (Directive 05)
   let commitHash = 'clean-state';
   if (tier === 'FAST_TRACK') {
     try {
-      const { stdout: statusOut } = await execAsync('git status -s', { cwd: process.cwd() });
-      if (statusOut.trim().length > 0) {
-        await execAsync('git add .', { cwd: process.cwd() });
-        const commitMsg = `feat(ghost-builder): autonomous sovereign upgrade — ${candidate.title.toLowerCase()}`;
-        await execAsync(`git commit -m "${commitMsg}"`, { cwd: process.cwd() });
-        const { stdout: revOut } = await execAsync('git rev-parse --short HEAD', { cwd: process.cwd() });
-        commitHash = revOut.trim();
-        await execAsync('git push origin main', { cwd: process.cwd() });
-        console.log(`[Ghost-Builder] 🚀 Tier 1 Fast-Track pushed to origin/main (${commitHash})!`);
+      for (const file of sourceFilesModified) {
+        await execAsync(`git add "${file}"`, { cwd: process.cwd() });
       }
+      const commitMsg = `feat(ghost-builder): autonomous sovereign upgrade — ${candidate.title.toLowerCase()}`;
+      await execAsync(`git commit -m "${commitMsg}"`, { cwd: process.cwd() });
+      const { stdout: revOut } = await execAsync('git rev-parse --short HEAD', { cwd: process.cwd() });
+      commitHash = revOut.trim();
+      await execAsync('git push origin main', { cwd: process.cwd() });
+      console.log(`[Ghost-Builder] 🚀 Tier 1 Fast-Track pushed to origin/main (${commitHash})!`);
+
+      // Mark loop as resolved ONLY after successful commit & push
+      await updateOpenLoop(candidate.id, {
+        status: 'RESOLVED',
+        contextNotes: `${candidate.contextNotes} | Shipped autonomously by Ghost-Builder (${commitHash}).`,
+      });
     } catch (gitErr: any) {
       console.warn('[Ghost-Builder] Git commit/push warning:', gitErr.message);
+      return {
+        id: `ghost-${Date.now()}`,
+        loopId: candidate.id,
+        title: candidate.title,
+        tier,
+        status: 'FAILED_COMPILER',
+        filesModified: sourceFilesModified,
+        compilerStatus: `Git push failed: ${gitErr.message}`,
+        completedAt: new Date().toISOString(),
+      };
     }
 
-    // 7. Morning Delivery Notification to Telegram
+    // 8. Morning Delivery Notification to Telegram (Only sent when verified commit pushed)
     const telegramMsg = `🌙 **[AUTONOMOUS OVERNIGHT GHOST-BUILDER — SHIPPED]**
 
 🚀 **Objective:** ${candidate.title}
@@ -202,7 +239,7 @@ export async function runOvernightGhostBuildCycle(): Promise<GhostBuildReport> {
 🛡️ **Tier:** \`TIER 1 — FAST-TRACK (AUTO-DEPLOYED)\`
 
 ✅ **Triple-Lock Verification Gates:**
-• Clean Non-Destructive Diff: Verified
+• Clean Non-Destructive Diff: Verified (${sourceFilesModified.length} files)
 • Compiler AST Lock (\`tsc --noEmit\`): Passed (0 Errors)
 • Production Next.js Build (\`next build\`): 100% Passed
 • Git Origin: Merged directly to \`main\` (${commitHash})
@@ -225,7 +262,7 @@ _Your exoskeleton evolved while you slept, Sir. Production deployment is live._`
       tier: 'FAST_TRACK',
       status: 'SHIPPED_TO_MAIN',
       commitHash,
-      filesModified,
+      filesModified: sourceFilesModified,
       compilerStatus: 'VERIFIED_0_ERRORS',
       completedAt: new Date().toISOString(),
     };

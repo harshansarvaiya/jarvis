@@ -381,8 +381,10 @@ Synthesize a high-impact, professional pre-market trading executive summary for 
                 { skipTelegram: true }
               );
 
-              // If this is the Autonomous Evolutionary Sentry, trigger autonomous self-mutation & evolution verification
-              const isEvolutionaryCron = task.title.toLowerCase().includes('evolutionary') || task.title.toLowerCase().includes('sentry') || task.title.toLowerCase().includes('synthesis');
+              // If this is specifically the Autonomous Evolutionary Sentry task, trigger evolution verification
+              const isEvolutionaryCron =
+                task.title.toLowerCase().includes('autonomous evolutionary sentry') ||
+                task.title.toLowerCase().includes('autonomous self-evolution');
               if (isEvolutionaryCron) {
                 try {
                   const { runAutonomousEvolutionCycle } = await import('../lib/jarvis/evolution-sentry');
