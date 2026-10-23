@@ -12,6 +12,14 @@ export function isVertexAIAvailable(): boolean {
 }
 
 function getCredentialsConfig(): any {
+  if (fs.existsSync('/home/harshans279/.gcp/jarvis-vertex.json')) {
+    return { keyFilename: '/home/harshans279/.gcp/jarvis-vertex.json' };
+  }
+
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS && fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
+    return { keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS };
+  }
+
   if (process.env.GCP_VERTEX_CREDENTIALS) {
     try {
       const raw = process.env.GCP_VERTEX_CREDENTIALS.trim();
@@ -26,14 +34,6 @@ function getCredentialsConfig(): any {
     } catch (e) {
       console.warn('[Vertex AI] Failed parsing GCP_VERTEX_CREDENTIALS:', e);
     }
-  }
-
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS && fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
-    return { keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS };
-  }
-
-  if (fs.existsSync('/home/harshans279/.gcp/jarvis-vertex.json')) {
-    return { keyFilename: '/home/harshans279/.gcp/jarvis-vertex.json' };
   }
 
   return null;
@@ -91,11 +91,9 @@ export function mapToVertexModel(requestedModel: string): { model: string; locat
   const normalized = requestedModel.toLowerCase();
 
   // Gemini 3.x Series (Global Multi-Region Endpoint)
-  if (normalized.includes('3.8')) {
+  // Note: Gemini 3.7 Flash is decommissioned; 3.8 Flash is the live frontier standard.
+  if (normalized.includes('3.8') || normalized.includes('3.7')) {
     return { model: 'gemini-3.8-flash', location: 'global' };
-  }
-  if (normalized.includes('3.7')) {
-    return { model: 'gemini-3.7-flash', location: 'global' };
   }
   if (normalized.includes('3.6')) {
     return { model: 'gemini-3.6-flash', location: 'global' };

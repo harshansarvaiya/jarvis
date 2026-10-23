@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     const result = await runJarvisAgent(sanitizedEffectiveMessages, {
       apiKey: apiKey || process.env.GEMINI_API_KEY,
-      model: model || 'gemini-3.7-flash',
+      model: model || 'gemini-3.8-flash',
       groqApiKey: groqApiKey || process.env.GROQ_API_KEY,
       githubToken: githubToken || process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_TOKEN,
       provider: provider || 'auto',

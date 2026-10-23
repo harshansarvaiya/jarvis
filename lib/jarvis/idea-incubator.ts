@@ -61,7 +61,7 @@ Output strictly valid JSON with this exact schema:
     if (isVertexAIAvailable()) {
       try {
         const vRes = await callVertexAIGenerate({
-          model: 'gemini-3.7-flash',
+          model: 'gemini-3.8-flash',
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.2,

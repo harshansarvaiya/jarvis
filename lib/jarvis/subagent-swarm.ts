@@ -98,7 +98,7 @@ export async function executeSubagentTask(options: {
     name: `Specialist (${agentId})`,
     role: `${agentId} Specialist`,
     category: 'REFACTORING' as const,
-    recommendedModel: 'gemini-3.7-flash',
+    recommendedModel: 'gemini-3.8-flash',
     tools: ['read_workspace_file', 'grep_search', 'cloud_execute_command'],
     systemPrompt: `You are an elite Staff-level AI Specialist focusing on ${agentId}. You provide rigorous, empirical, and verified analysis with zero fluff.`,
   };
@@ -176,7 +176,7 @@ Please provide your rigorous specialist evaluation:
   if (isVertexAIAvailable()) {
     try {
       const vRes = await callVertexAIGenerate({
-        model: 'gemini-3.7-flash',
+        model: 'gemini-3.8-flash',
         contents: [{ role: 'user', parts: [{ text: promptContent }] }],
         systemInstruction: { parts: [{ text: subagentSystemPrompt }] },
         generationConfig: {
@@ -209,7 +209,7 @@ Please provide your rigorous specialist evaluation:
 
     if (geminiKey) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${geminiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${geminiKey}`;
         const gRes = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

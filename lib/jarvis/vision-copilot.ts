@@ -77,7 +77,7 @@ Provide your analysis in strictly valid JSON matching this schema:
     // 1. Primary: Vertex AI Gemini 3.7 Flash
     if (isVertexAIAvailable()) {
       const vertexRes = await callVertexAIGenerate({
-        model: 'gemini-3.7-flash',
+        model: 'gemini-3.8-flash',
         contents: [
           {
             role: 'user',
@@ -108,7 +108,7 @@ Provide your analysis in strictly valid JSON matching this schema:
     // 2. Fallback: Google AI Studio Gemini API Direct Key
     if (!rawJsonResponse && (apiKey || process.env.GEMINI_API_KEY)) {
       const activeKey = apiKey || process.env.GEMINI_API_KEY;
-      const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${activeKey}`;
+      const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${activeKey}`;
 
       const directRes = await fetch(directUrl, {
         method: 'POST',

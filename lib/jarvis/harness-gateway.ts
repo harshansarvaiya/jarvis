@@ -67,7 +67,7 @@ export async function processOmnichannelMessage(
   // 3. Execute Sovereign Agent Pipeline (Vertex AI, Groq LPU, NVIDIA NIM, GitHub Models)
   const agentRes = await runJarvisAgent(chatMessages, {
     orchestrationMode: 'auto',
-    model: 'gemini-3.7-flash',
+    model: 'gemini-3.8-flash',
   });
 
   const durationMs = Date.now() - startTime;

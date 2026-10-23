@@ -111,7 +111,7 @@ export function parseTeamBlueprint(content: string): TeamBlueprint {
     role: a.role || a.name || 'Autonomous Specialist',
     category: a.category || 'ARCHITECTURE',
     systemPrompt: a.systemPrompt || a.prompt || a.instructions || `You are ${a.name || a.role}, a specialized autonomous agent serving Sir.`,
-    recommendedModel: a.recommendedModel || a.model || 'gemini-3.7-flash',
+    recommendedModel: a.recommendedModel || a.model || 'gemini-3.8-flash',
     tools: Array.isArray(a.tools) ? a.tools : ['read_workspace_file', 'grep_workspace', 'manage_task'],
     icon: a.icon || '🤖',
     description: a.description || a.role || '',
@@ -227,7 +227,7 @@ export async function applyTeamBlueprint(blueprint: TeamBlueprint): Promise<Blue
         role: a.role,
         category: a.category || 'ARCHITECTURE',
         systemPrompt: a.systemPrompt || '',
-        recommendedModel: a.recommendedModel || 'gemini-3.7-flash',
+        recommendedModel: a.recommendedModel || 'gemini-3.8-flash',
         tools: a.tools || ['read_workspace_file', 'grep_workspace', 'manage_task'],
       }))
     );

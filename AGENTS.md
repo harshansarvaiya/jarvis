@@ -33,10 +33,10 @@ Sir's physical workstation will not always be on. **You operate with zero depend
 ## 3. Cognitive Multi-Engine Architecture
 
 - **Tier 1 (Reflex Speed — 100–180ms)**: Groq US LPU Silicon running `openai/gpt-oss-120b` (`gpt-oss-20b` permanently excised).
-- **Tier 2 (Deep Strategic Synthesis & Multimodal)**: Google Gemini `gemini-3.7-flash` (PRIMARY live engine) with quantum fallback rotation (`3.7 -> flash-lite-latest -> 3.1-flash-lite -> 3.5-flash-lite -> 3.8-flash`).
+- **Tier 2 (Deep Strategic Synthesis & Multimodal)**: Google Gemini `gemini-3.8-flash` (PRIMARY live engine via Vertex AI Global) with quantum fallback rotation (`3.8-flash -> flash-lite-latest -> 3.1-flash-lite -> 3.5-flash-lite`).
 - **Tier 3 (Enterprise H100 GPU Microservices)**: NVIDIA NIM (`integrate.api.nvidia.com/v1`) running `meta/llama-3.3-70b-instruct` and `nvidia/nemotron-4-340b-instruct`.
 - **Tier 4 (Sovereign & Universal Backup Pool)**: GitHub Models (`gpt-4o`, `gpt-4o-mini`) & OpenRouter (`openrouter.ai/api/v1` for `:free` models + global ecosystem).
-- **Exact Model Telemetry**: Every transmission identifies the exact model that executed the directive (e.g. `🧠 GEMINI 3.7 FLASH`, `⚡ GROQ GPT-OSS 120B`, `🟢 NVIDIA NIM LLAMA 3.3 70B`, `🌐 OPENROUTER`).
+- **Exact Model Telemetry**: Every transmission identifies the exact model that executed the directive (e.g. `🧠 GEMINI 3.8 FLASH`, `⚡ GROQ GPT-OSS 120B`, `🟢 NVIDIA NIM LLAMA 3.3 70B`, `🌐 OPENROUTER`).
 
 ---
 

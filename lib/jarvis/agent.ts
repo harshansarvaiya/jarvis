@@ -69,7 +69,7 @@ export interface JarvisAgentOptions {
 }
 
 export function normalizeModel(m?: string): string {
-  if (!m) return 'gemini-3.7-flash';
+  if (!m) return 'gemini-3.8-flash';
   const clean = m.trim().toLowerCase();
   if (clean.startsWith('nvidia/') || clean.startsWith('nim/') || clean.startsWith('openrouter/')) return clean;
   // Red-Team Unfiltered Sovereign Models (Nous Hermes 3 70B/405B & Dolphin)
@@ -83,22 +83,22 @@ export function normalizeModel(m?: string): string {
     return 'openrouter/cognitivecomputations/dolphin-mistral-24b-venice-edition';
   }
   if (clean.includes('120b') || clean.includes('gpt-oss-120b')) return 'openai/gpt-oss-120b';
-  if (clean.includes('20b') || clean.includes('gpt-oss-20b')) return 'openai/gpt-oss-20b';
+  if (clean.includes('20b') || clean.includes('gpt-oss-20b')) return 'openai/gpt-oss-120b'; // Permanently mapped to 120b
   if (clean.includes('compound-mini')) return 'groq/compound-mini';
   if (clean.includes('compound')) return 'groq/compound';
   if (clean.includes('llama-3.3') || clean.includes('llama-70b') || clean === 'llama') return 'openai/gpt-oss-120b';
   if (clean.includes('llama-3.1') || clean.includes('llama-8b')) return 'openai/gpt-oss-120b';
   if (clean.includes('gpt-4o-mini')) return 'gpt-4o-mini';
   if (clean.includes('gpt-4') || clean === 'gpt') return 'gpt-4o';
-  if (clean.includes('3.8')) return 'gemini-3.8-flash';
-  if (clean.includes('3.7')) return 'gemini-3.7-flash';
+  // Gemini 3.7 decommissioned; 3.8 is the frontier live model
+  if (clean.includes('3.8') || clean.includes('3.7')) return 'gemini-3.8-flash';
   if (clean.includes('3.6')) return 'gemini-3.6-flash';
   if (clean.includes('3.5')) return 'gemini-3.5-flash';
   if (clean.includes('3.1-pro') || (clean.includes('3.1') && clean.includes('pro'))) return 'gemini-3.1-pro-preview';
   if (clean.includes('3.1')) return 'gemini-3.1-flash-lite';
   if (clean.includes('2.5-pro') || (clean.includes('2.5') && clean.includes('pro'))) return 'gemini-2.5-pro';
   if (clean.includes('2.5')) return 'gemini-2.5-flash';
-  if (clean.includes('flash-latest')) return 'gemini-flash-latest';
+  if (clean.includes('flash-latest') || clean.includes('flash-lite')) return 'gemini-flash-lite-latest';
   if (clean.includes('pro-latest')) return 'gemini-pro-latest';
   if (clean.includes('2.0') || clean.includes('1.5') || clean === 'gemini-flash') {
     return 'gemini-2.5-flash';
@@ -110,14 +110,13 @@ export function normalizeModel(m?: string): string {
  * Stepwise Quantum Fallback Hierarchy for Gemini
  */
 export function getModelFallbackHierarchy(requestedModel: string): string[] {
-  // Ordered by confirmed HTTP 200 availability (empirically verified 2026-09-15)
+  // Ordered by confirmed HTTP 200 availability
   const masterHierarchy = [
-    'gemini-3.7-flash',          // PRIMARY — HTTP 200 confirmed live
-    'gemini-flash-lite-latest',  // SECONDARY — HTTP 200 confirmed live
-    'gemini-3.1-flash-lite',     // TERTIARY — HTTP 200 confirmed live
-    'gemini-3.5-flash-lite',     // QUATERNARY — HTTP 200 confirmed live
-    'gemini-3-flash-preview',    // QUINARY — fallback
-    'gemini-3.8-flash',          // LAST — quota may clear between calls
+    'gemini-3.8-flash',          // PRIMARY — Vertex AI Global HTTP 200 live
+    'gemini-flash-lite-latest',  // SECONDARY — HTTP 200 confirmed live (505ms)
+    'gemini-3.1-flash-lite',     // TERTIARY — fallback
+    'gemini-3.5-flash-lite',     // QUATERNARY — fallback
+    'gemini-2.5-flash',          // QUINARY — fallback
   ];
 
   const primary = normalizeModel(requestedModel);
@@ -155,7 +154,7 @@ export async function runJarvisAgent(
   const githubKey = options.githubToken || process.env.GITHUB_TOKEN || process.env.GITHUB_MODELS_TOKEN || '';
   const nvidiaKey = options.nvidiaApiKey || process.env.NVIDIA_NIM_API_KEY || process.env.NVIDIA_API_KEY || '';
   const openrouterKey = options.openrouterApiKey || process.env.OPENROUTER_API_KEY || '';
-  const requestedModel = normalizeModel(options.model || 'gemini-3.7-flash');
+  const requestedModel = normalizeModel(options.model || 'gemini-3.8-flash');
   const orchestrationMode = options.orchestrationMode || 'auto';
 
   const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
@@ -547,7 +546,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     if (githubKey) {
       const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
       const ghResult = await runOpenAICompatibleAgent(messages, {
-        endpoint: 'https://models.inference.ai.azure.com',
+        endpoint: 'https://models.github.ai/inference',
         apiKey: githubKey,
         model: requestedModel || 'gpt-4o',
         systemPrompt: fullSystemPrompt,
@@ -837,9 +836,9 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     let response: Response | null = null;
     let activeApiUrl = '';
     let lastErrorText = '';
-    let selectedModel = candidateModels[0] || 'gemini-3.7-flash';
+    let selectedModel = candidateModels[0] || 'gemini-3.8-flash';
     let attemptsCount = 0;
-    const MAX_GEMINI_ATTEMPTS = 6; // Must cover full hierarchy depth (6 models)
+    const MAX_GEMINI_ATTEMPTS = 5; // Must cover full hierarchy depth (5 models)
 
     let isVertexEngine = false;
     let selectedVertexModel = '';
@@ -849,8 +848,8 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       const primaryCandidate = mapToVertexModel(requestedModel).model;
       const isExplicitPro = requestedModel.toLowerCase().includes('pro');
       const vertexCandidates = (isExplicitPro
-        ? [primaryCandidate, 'gemini-2.5-pro', 'gemini-3.7-flash', 'gemini-2.5-flash']
-        : [primaryCandidate, 'gemini-3.7-flash', 'gemini-2.5-flash']
+        ? [primaryCandidate, 'gemini-2.5-pro', 'gemini-3.8-flash', 'gemini-2.5-flash']
+        : [primaryCandidate, 'gemini-3.8-flash', 'gemini-2.5-flash']
       ).filter((v, i, a) => a.indexOf(v) === i);
 
       for (const vertexCandidate of vertexCandidates) {

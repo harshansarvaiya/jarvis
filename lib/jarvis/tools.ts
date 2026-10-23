@@ -3659,8 +3659,8 @@ export async function executeJarvisTool(
             guardianProtocol: 'ONLINE (HMAC-SHA256 Cryptographic Sentry Active)',
             cognitiveEngines: {
               tier1Reflex: 'Groq US LPU (openai/gpt-oss-120b) ~100-180ms inference',
-              tier2Multimodal: 'Google Gemini (gemini-3.7-flash Primary)',
-              quantumFallbackChain: '3.7-flash -> flash-lite-latest -> 3.1-flash-lite -> 3.5-flash-lite -> 3.8-flash',
+              tier2Multimodal: 'Google Gemini (gemini-3.8-flash Primary via Vertex AI Global)',
+              quantumFallbackChain: '3.8-flash -> flash-lite-latest -> 3.1-flash-lite -> 3.5-flash-lite',
               tier3Backup: 'GitHub Models / Azure (gpt-4o, gpt-4o-mini)',
             },
             storageArchitecture: {

@@ -110,8 +110,8 @@ export async function GET(req: NextRequest) {
   const geminiStart = Date.now();
   const hasGemini = !!process.env.GEMINI_API_KEY;
   nodes.push({
-    id: 'gemini-3.7-flash',
-    name: 'Google Gemini 3.7 Flash & text-embedding-004',
+    id: 'gemini-3.8-flash',
+    name: 'Google Gemini 3.8 Flash & text-embedding-004',
     category: 'AI_ENGINE',
     status: hasGemini ? 'ONLINE' : 'DEGRADED',
     latencyMs: 140,
@@ -119,11 +119,11 @@ export async function GET(req: NextRequest) {
     lastCheck: istTimeStr,
     lastCheckFull: istFullTimeStr,
     metrics: [
-      { label: 'Primary Live Engine', value: 'gemini-3.7-flash', highlight: true },
+      { label: 'Primary Live Engine', value: 'gemini-3.8-flash', highlight: true },
       { label: 'Dense Embedding Model', value: 'text-embedding-004 (768-dim)' },
       { label: 'Context Window', value: '1,048,576 tokens (1M)' },
       { label: 'Multimodal Perception', value: 'Vision, Audio, Image, Text' },
-      { label: 'Fallback Rotation Order', value: '3.7 -> flash-lite -> 3.1-lite -> 3.5-lite -> 3.8-flash' },
+      { label: 'Fallback Rotation Order', value: '3.8 -> flash-lite -> 3.1-lite -> 3.5-lite' },
       { label: 'Sovereign Alignment', value: 'Directive 01 Compliant (100% Western)' },
     ],
     troubleshooting: ['Verify GEMINI_API_KEY in .env.local', 'Check Google AI Studio quota'],

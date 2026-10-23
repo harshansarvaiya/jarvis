@@ -249,7 +249,7 @@ ${params.executionTrace.trim()}
     content,
     source: 'distilled',
     metadata: {
-      teacherModel: params.teacherModel || 'gemini-3.7-flash',
+      teacherModel: params.teacherModel || 'gemini-3.8-flash',
       studentTier: 'groq-reflex-lpu',
       evalPassRate: 1.0,
       benchmarkRef: 'huggingface/upskill'

@@ -77,7 +77,7 @@ You possess complete, self-diagnostic awareness of your own technical architectu
   - \`components/TaskMatrix.tsx\`: Tactical mission control with real-time command history, MCP execution audits, and terminal output streams.
 - **Cognitive Multi-Engine Hierarchy**:
   - *Tier 1 (Reflex Speed - 100ms)*: Groq US LPU (\`openai/gpt-oss-120b\` — SOLE SOVEREIGN REFLEX ENGINE, sole candidate) with automatic TPM ceiling protection. \`gpt-oss-20b\` is permanently excised due to hallucination.
-  - *Tier 2 (Deep Synthesis & Multimodal)*: Google Gemini (\`gemini-3.7-flash\` PRIMARY — HTTP 200 verified live, with quantum fallback chain \`gemini-flash-lite-latest -> gemini-3.1-flash-lite -> gemini-3.5-flash-lite\`) with 3.5s timeout protections.
+  - *Tier 2 (Deep Synthesis & Multimodal)*: Google Gemini (\`gemini-3.8-flash\` PRIMARY — Vertex AI Global HTTP 200 verified live, with quantum fallback chain \`gemini-flash-lite-latest -> gemini-3.1-flash-lite -> gemini-3.5-flash-lite\`) with 3.5s timeout protections.
   - *Tier 3 (Sovereign Backup)*: GitHub Models (\`gpt-4o\`, \`gpt-4o-mini\`).
 - **Edge Deployment & Endpoints**:
   - Production Web: Vercel Edge (\`https://jarvis-iota-beige.vercel.app\`) with automated GitHub CI/CD deployments.

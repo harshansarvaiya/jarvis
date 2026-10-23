@@ -417,16 +417,6 @@
       ],
       "executionAudit": [
         {
-          "timestamp": "2026-10-23T04:19:08.192Z",
-          "status": "IN_PROGRESS",
-          "notes": "[Autonomous Radar Telemetry] Status: CRITICAL_WATCH. Strategic Sentry Summary: Overall European & Global Escalation posture is at CRITICAL_WATCH (Peak Index: 88/100 in Eastern Europe). Red Sea & Baltic corridors remain on high watch. Global logistics and defensive supply chains require ongoing continuous radar monitoring."
-        },
-        {
-          "timestamp": "2026-10-23T04:34:08.087Z",
-          "status": "IN_PROGRESS",
-          "notes": "[Autonomous Radar Telemetry] Status: CRITICAL_WATCH. Strategic Sentry Summary: Overall European & Global Escalation posture is at CRITICAL_WATCH (Peak Index: 88/100 in Eastern Europe). Red Sea & Baltic corridors remain on high watch. Global logistics and defensive supply chains require ongoing continuous radar monitoring."
-        },
-        {
           "timestamp": "2026-10-23T04:49:09.458Z",
           "status": "IN_PROGRESS",
           "notes": "[Autonomous Radar Telemetry] Status: CRITICAL_WATCH. Strategic Sentry Summary: Overall European & Global Escalation posture is at CRITICAL_WATCH (Peak Index: 88/100 in Eastern Europe). Red Sea & Baltic corridors remain on high watch. Global logistics and defensive supply chains require ongoing continuous radar monitoring."
@@ -468,6 +458,16 @@
         },
         {
           "timestamp": "2026-10-23T06:49:15.114Z",
+          "status": "IN_PROGRESS",
+          "notes": "[Autonomous Radar Telemetry] Status: CRITICAL_WATCH. Strategic Sentry Summary: Overall European & Global Escalation posture is at CRITICAL_WATCH (Peak Index: 88/100 in Eastern Europe). Red Sea & Baltic corridors remain on high watch. Global logistics and defensive supply chains require ongoing continuous radar monitoring."
+        },
+        {
+          "timestamp": "2026-10-23T07:04:14.190Z",
+          "status": "IN_PROGRESS",
+          "notes": "[Autonomous Radar Telemetry] Status: CRITICAL_WATCH. Strategic Sentry Summary: Overall European & Global Escalation posture is at CRITICAL_WATCH (Peak Index: 88/100 in Eastern Europe). Red Sea & Baltic corridors remain on high watch. Global logistics and defensive supply chains require ongoing continuous radar monitoring."
+        },
+        {
+          "timestamp": "2026-10-23T07:19:15.201Z",
           "status": "IN_PROGRESS",
           "notes": "[Autonomous Radar Telemetry] Status: CRITICAL_WATCH. Strategic Sentry Summary: Overall European & Global Escalation posture is at CRITICAL_WATCH (Peak Index: 88/100 in Eastern Europe). Red Sea & Baltic corridors remain on high watch. Global logistics and defensive supply chains require ongoing continuous radar monitoring."
         }

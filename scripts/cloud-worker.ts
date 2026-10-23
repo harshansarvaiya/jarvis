@@ -228,7 +228,7 @@ async function reflectAndRefineSkill(task: any, error: any, originalPrompt: stri
 
     const reflectionResult = await runJarvisAgent(
       [{ role: "user", content: reflectionPrompt }],
-      { model: "gemini-3.7-flash", orchestrationMode: "auto" }
+      { model: "gemini-3.8-flash", orchestrationMode: "auto" }
     );
 
     const match = reflectionResult.reply.match(/```(?:\w+)?\n([\s\S]*?)\n```/);
@@ -358,7 +358,7 @@ Synthesize a high-impact, professional pre-market trading executive summary for 
 
               const result = await runJarvisAgent(
                 [{ role: 'user', content: synthPrompt }],
-                { model: 'gemini-3.7-flash', orchestrationMode: 'auto' }
+                { model: 'gemini-3.8-flash', orchestrationMode: 'auto' }
               );
 
               console.log(`[Cloud Worker] 🤖 Synthesized intelligence briefing (${result.telemetry?.latencyMs}ms).`);

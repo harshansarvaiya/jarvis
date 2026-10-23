@@ -202,7 +202,7 @@ Output strictly valid JSON matching this schema:
 Output ONLY the JSON object. Zero markdown conversational fluff.`;
 
       const aiRes = await callVertexAIGenerate({
-        model: 'gemini-3.7-flash',
+        model: 'gemini-3.8-flash',
         contents: [
           {
             role: 'user',

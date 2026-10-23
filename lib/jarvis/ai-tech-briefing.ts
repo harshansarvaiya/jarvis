@@ -27,7 +27,7 @@ Keep it composed, high-signal, zero fluff. Use clean markdown with bullet points
   try {
     const result = await runJarvisAgent(
       [{ role: 'user', content: prompt }],
-      { model: 'gemini-3.7-flash', orchestrationMode: 'auto' }
+      { model: 'gemini-3.8-flash', orchestrationMode: 'auto' }
     );
 
     const briefingBody = result.reply || 'Strategic executive briefing generated.';

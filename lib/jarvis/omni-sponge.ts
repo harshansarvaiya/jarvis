@@ -343,7 +343,7 @@ Output ONLY the JSON object. Zero markdown conversational filler.`;
   contents.push({ role: 'user', parts });
 
   const aiRes = await callVertexAIGenerate({
-    model: 'gemini-3.7-flash',
+    model: 'gemini-3.8-flash',
     contents,
     generationConfig: {
       temperature: 0.2,

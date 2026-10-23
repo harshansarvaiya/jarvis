@@ -101,7 +101,7 @@ async function handleShortcutDirective(userPrompt: string, isVoice = false) {
 
   // 2. Execute J.A.R.V.I.S. Core Engine
   const result = await runJarvisAgent(contextMessages, {
-    model: 'gemini-3.7-flash',
+    model: 'gemini-3.8-flash',
     orchestrationMode: 'auto',
   });
 

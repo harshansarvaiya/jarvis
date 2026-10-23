@@ -112,9 +112,9 @@ function getDynamicWelcomeMessage(): Message {
     content: `${greeting}, Sir. J.A.R.V.I.S. Mark II is online and fully synchronized. All six Core Directives — Guardian Protocol, Benevolent Alignment, Evolutionary Adaptation, Sovereign Loyalty, Push Pipeline, and Zero-Thrashing Integrity — are actively governing operations under Stage 5 Sovereign Performance Mode. How may I advance our objectives?`,
     timestamp: 'ONLINE',
     telemetry: {
-      engineUsed: 'Gemini 3.7 Flash Core',
+      engineUsed: 'Gemini 3.8 Flash Core',
       provider: 'google',
-      model: 'gemini-3.7-flash',
+      model: 'gemini-3.8-flash',
       latencyMs: 120,
       archetype: 'REFLEX_SPEED',
       failoverOccurred: false,
@@ -130,11 +130,8 @@ function formatModelBadge(telemetry?: any) {
   const rawModel = telemetry.model || telemetry.engineUsed || 'gemini-3.8-flash';
   const m = String(rawModel).toLowerCase();
 
-  if (m.includes('3.8')) {
+  if (m.includes('3.8') || m.includes('3.7')) {
     return { title: 'GEMINI 3.8 FLASH', model: 'gemini-3.8-flash', icon: '🧠' };
-  }
-  if (m.includes('3.7')) {
-    return { title: 'GEMINI 3.7 FLASH', model: 'gemini-3.7-flash', icon: '🧠' };
   }
   if (m.includes('3.6')) {
     return { title: 'GEMINI 3.6 FLASH', model: 'gemini-3.6-flash', icon: '🧠' };

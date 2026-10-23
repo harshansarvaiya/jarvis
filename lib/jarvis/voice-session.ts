@@ -139,10 +139,10 @@ CRITICAL RULES FOR SPOKEN VOICE CONVERSATION:
     { role: 'user', content: rawSpeech },
   ];
 
-  // Prefer Groq LPU (gpt-oss-120b or llama-3.3-70b) for sub-180ms voice reflex if available, else Gemini 3.7 Flash
+  // Prefer Groq LPU (gpt-oss-120b or llama-3.3-70b) for sub-180ms voice reflex if available, else Gemini 3.8 Flash
   const preferredModel = process.env.GROQ_API_KEY
     ? 'openai/gpt-oss-120b'
-    : 'gemini-3.7-flash';
+    : 'gemini-3.8-flash';
 
   const agentResult = await runJarvisAgent(messages, {
     model: preferredModel,

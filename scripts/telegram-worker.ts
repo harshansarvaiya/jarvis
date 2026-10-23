@@ -245,7 +245,7 @@ async function processDirective(
     }));
 
     // Parse model/engine command override if supplied
-    let requestedModel = 'gemini-3.7-flash';
+    let requestedModel = 'gemini-3.8-flash';
     let requestedMode: any = 'auto';
     let cleanUserText = rawText.trim();
     let delegatedAgentId = explicitDelegatedAgentId;
@@ -310,13 +310,13 @@ async function processDirective(
       requestedMode = 'auto';
       cleanUserText = cleanUserText.replace(/^\/pro\s*/i, '').trim();
     } else if (cleanUserText.startsWith('/gemini') || cleanUserText.startsWith('/flash')) {
-      requestedModel = 'gemini-3.7-flash';
+      requestedModel = 'gemini-3.8-flash';
       requestedMode = 'auto';
       cleanUserText = cleanUserText.replace(/^\/(gemini|flash)\s*/i, '').trim();
     } else if (cleanUserText.startsWith('/friday')) {
       cleanUserText = cleanUserText.replace(/^\/friday\s*/i, '').trim();
       cleanUserText = `Friday, ${cleanUserText}`;
-      requestedModel = 'gemini-3.7-flash';
+      requestedModel = 'gemini-3.8-flash';
       requestedMode = 'auto';
     } else if (cleanUserText.startsWith('/image') || cleanUserText.startsWith('/draw') || cleanUserText.startsWith('/render')) {
       const promptText = cleanUserText.replace(/^\/(image|draw|render)\s*/i, '').trim();
@@ -329,12 +329,12 @@ async function processDirective(
         return;
       }
       cleanUserText = `Friday, synthesize an image using the generate_image tool with prompt: "${promptText}". Display the visual artifact for Sir.`;
-      requestedModel = 'gemini-3.7-flash';
+      requestedModel = 'gemini-3.8-flash';
       requestedMode = 'auto';
     } else if (cleanUserText.startsWith('/jarvis')) {
       cleanUserText = cleanUserText.replace(/^\/jarvis\s*/i, '').trim();
       cleanUserText = `Jarvis, ${cleanUserText}`;
-      requestedModel = 'gemini-3.7-flash';
+      requestedModel = 'gemini-3.8-flash';
       requestedMode = 'auto';
     } else if (cleanUserText.startsWith('/model ')) {
       const match = cleanUserText.match(/^\/model\s+([^\s]+)\s*(.*)$/i);
