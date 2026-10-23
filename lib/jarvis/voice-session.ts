@@ -146,7 +146,8 @@ CRITICAL RULES FOR SPOKEN VOICE CONVERSATION:
   const agentResult = await runJarvisAgent(messages, {
     model: preferredModel,
     provider: 'google',
-    orchestrationMode: 'auto',
+    orchestrationMode: 'gemini',
+    persona: persona === 'friday' ? 'FRIDAY' : 'JARVIS',
     apiKey: options.apiKey || process.env.GEMINI_API_KEY,
   });
 

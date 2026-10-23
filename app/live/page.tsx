@@ -64,13 +64,15 @@ export default function LiveVoicePage() {
   const wakeLockRef = useRef<any>(null);
   const transcriptBottomRef = useRef<HTMLDivElement | null>(null);
   const isSpeakingRef = useRef<boolean>(false);
+  const uplinkStateRef = useRef<UplinkState>('idle');
   const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const ttsWatchdogRef = useRef<NodeJS.Timeout | null>(null);
   const mimeTypeRef = useRef<string>('audio/webm');
 
-  // Sync isSpeakingRef with state
+  // Sync refs with state
   useEffect(() => {
+    uplinkStateRef.current = uplinkState;
     isSpeakingRef.current = uplinkState === 'speaking';
   }, [uplinkState]);
 
@@ -379,7 +381,7 @@ export default function LiveVoicePage() {
 
   // Start active speech recording segment with a fresh MediaRecorder instance (fixes iOS WebKit reuse bug)
   const startSpeechSegment = useCallback(() => {
-    if (isRecordingSpeechRef.current || isSpeakingRef.current || uplinkState === 'thinking') return;
+    if (isRecordingSpeechRef.current || isSpeakingRef.current || uplinkStateRef.current === 'thinking') return;
     if (!mediaStreamRef.current) return;
 
     try {
@@ -588,7 +590,7 @@ export default function LiveVoicePage() {
           }
 
           // If not currently recording and not thinking, trigger recorder
-          if (!isRecordingSpeechRef.current && !isSpeakingRef.current && uplinkState !== 'thinking') {
+          if (!isRecordingSpeechRef.current && !isSpeakingRef.current && uplinkStateRef.current !== 'thinking') {
             startSpeechSegment();
           }
 
@@ -621,8 +623,8 @@ export default function LiveVoicePage() {
       ctx.clearRect(0, 0, width, height);
 
       const isSpeaking = isSpeakingRef.current;
-      const isThinking = uplinkState === 'thinking';
-      const isRecording = uplinkState === 'recording' || isRecordingSpeechRef.current;
+      const isThinking = uplinkStateRef.current === 'thinking';
+      const isRecording = uplinkStateRef.current === 'recording' || isRecordingSpeechRef.current;
 
       const baseColor = isThinking
         ? 'rgba(168, 85, 247, ' // Purple
@@ -844,6 +846,60 @@ export default function LiveVoicePage() {
               }`}
             />
             {statusMessage}
+          </div>
+
+          {/* Dedicated Push-to-Talk Action Button */}
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              onClick={() => {
+                triggerHaptic('medium');
+                if (uplinkState === 'idle') {
+                  startAudioPipeline();
+                } else if (isRecordingSpeechRef.current || uplinkState === 'recording') {
+                  finalizeSpeechSegment();
+                } else if (uplinkState === 'speaking') {
+                  handleBargeIn();
+                } else if (uplinkState === 'listening') {
+                  startSpeechSegment();
+                }
+              }}
+              className={`px-5 py-2.5 rounded-xl font-mono text-xs font-bold transition-all shadow-lg flex items-center gap-2 ${
+                isRecordingSpeechRef.current || uplinkState === 'recording'
+                  ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse ring-4 ring-red-500/30'
+                  : uplinkState === 'thinking'
+                  ? 'bg-purple-950/80 border border-purple-500/60 text-purple-300'
+                  : uplinkState === 'speaking'
+                  ? 'bg-emerald-950/80 border border-emerald-500/60 text-emerald-300'
+                  : 'bg-cyan-500 hover:bg-cyan-400 text-black active:scale-95 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+              }`}
+            >
+              {isRecordingSpeechRef.current || uplinkState === 'recording' ? (
+                <>
+                  <Flame className="w-4 h-4 text-white animate-bounce" />
+                  <span>STOP & SEND (TAP)</span>
+                </>
+              ) : uplinkState === 'thinking' ? (
+                <>
+                  <Sparkles className="w-4 h-4 text-purple-300 animate-spin" />
+                  <span>GROQ WHISPER & REASONING...</span>
+                </>
+              ) : uplinkState === 'speaking' ? (
+                <>
+                  <Volume2 className="w-4 h-4 text-emerald-300 animate-pulse" />
+                  <span>SPEAKING (TAP TO INTERRUPT)</span>
+                </>
+              ) : uplinkState === 'idle' ? (
+                <>
+                  <Mic className="w-4 h-4 text-black" />
+                  <span>TAP TO CONNECT VOICE</span>
+                </>
+              ) : (
+                <>
+                  <Mic className="w-4 h-4 text-black" />
+                  <span>TAP TO TALK (PUSH-TO-TALK)</span>
+                </>
+              )}
+            </button>
           </div>
 
           {/* Live User Speech Interim */}
