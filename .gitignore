@@ -56,6 +56,8 @@ next-env.d.ts
 /data/jarvis-open-loops.json
 /data/jarvis-temporal-anchor.json
 /data/deliverables-history.json
+/data/records/
+*.pdf
 scripts/inspect-chats.ts
 /scratch/
 /public/generated-images/*
