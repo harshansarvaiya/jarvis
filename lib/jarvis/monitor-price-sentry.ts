@@ -1,9 +1,9 @@
 /**
  * J.A.R.V.I.S. Mark II — Autonomous Hardware Price Sentry
  * 
- * Monitors target displays for Sir (Harshan Sarvaiya):
- * 1. Acer Nitro XV272U V3 (27" 2K 180Hz Ergonomic Fast IPS) [Target: <= ₹15,000 / restock alert]
- * 2. Acer PM161QT (15.6" Full HD 10-Point Touch) [Target: <= ₹10,000 / drop from ₹10,699]
+ * Monitors target displays and hardware for Sir (Harshan Sarvaiya):
+ * 1. Acer PM161QT (15.6" Full HD 10-Point Touch) [Target: <= ₹10,000 / drop from ₹10,699]
+ * 2. AM5 Workstation Components (Ryzen 5 7600, B650M, DDR5, NVMe, PSU)
  * 
  * Uses structured Schema.org JSON-LD extraction and sanity bounds to guarantee ZERO false positives
  * from promotional banners, exchange values, EMI amounts, or related carousel accessories.
@@ -30,22 +30,6 @@ export interface PriceSentryState {
 }
 
 const DEFAULT_TARGETS: Record<string, MonitorTarget> = {
-  'acer-xv272u-v3-amazon': {
-    id: 'acer-xv272u-v3-amazon',
-    name: 'Acer Nitro XV272U V3 (27" 2K 180Hz) - Amazon',
-    url: 'https://www.amazon.in/Acer-Backlight-Monitor-Refresh-Certified/dp/B0CCSL95T1',
-    platform: 'amazon',
-    targetPriceThreshold: 15000,
-    minValidPrice: 12000,
-  },
-  'acer-xv272u-v3-flipkart': {
-    id: 'acer-xv272u-v3-flipkart',
-    name: 'Acer Nitro XV272U V3 (27" 2K 180Hz) - Flipkart',
-    url: 'https://www.flipkart.com/acer-nitro-68-58-cm-27-inch-wqhd-led-backlit-ips-panel-gaming-monitor-xv272u-v3/p/itm9425aca7daee4',
-    platform: 'flipkart',
-    targetPriceThreshold: 15000,
-    minValidPrice: 12000,
-  },
   'acer-pm161qt-amazon': {
     id: 'acer-pm161qt-amazon',
     name: 'Acer PM161QT (15.6" FHD Touch) - Amazon',
@@ -53,22 +37,6 @@ const DEFAULT_TARGETS: Record<string, MonitorTarget> = {
     platform: 'amazon',
     targetPriceThreshold: 10000,
     minValidPrice: 7000,
-  },
-  'acer-ed340cur-x0-amazon': {
-    id: 'acer-ed340cur-x0-amazon',
-    name: 'Acer Nitro ED340CUR X0 (34" UWQHD 200Hz Curved) - Amazon',
-    url: 'https://www.amazon.in/dp/B0GXPDRDGJ',
-    platform: 'amazon',
-    targetPriceThreshold: 23000,
-    minValidPrice: 18000,
-  },
-  'lg-34g600a-amazon': {
-    id: 'lg-34g600a-amazon',
-    name: 'LG UltraGear 34G600A (34" UWQHD 160Hz Curved) - Amazon',
-    url: 'https://www.amazon.in/dp/B0FXMKFX4S',
-    platform: 'amazon',
-    targetPriceThreshold: 20000,
-    minValidPrice: 14000,
   },
   'amd-ryzen-5-7600-amazon': {
     id: 'amd-ryzen-5-7600-amazon',
@@ -279,7 +247,14 @@ export async function runMonitorPriceSentrySweep(
       const stored = (await redis.get(stateKey)) as string | PriceSentryState | null;
       if (stored) {
         const parsed = typeof stored === 'string' ? JSON.parse(stored) : stored;
-        state.monitors = { ...DEFAULT_TARGETS, ...parsed.monitors };
+        const mergedMonitors: Record<string, MonitorTarget> = {};
+        for (const [key, target] of Object.entries(DEFAULT_TARGETS)) {
+          mergedMonitors[key] = {
+            ...target,
+            ...(parsed.monitors?.[key] || {}),
+          };
+        }
+        state.monitors = mergedMonitors;
       }
     } catch (e: any) {
       console.warn('[Price Sentry] Redis state read warning:', e.message);
@@ -309,15 +284,11 @@ export async function runMonitorPriceSentrySweep(
         if (shouldNotify) {
           target.lastNotifiedPrice = price;
           let discountDesc = `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Target: <= ₹${target.targetPriceThreshold.toLocaleString('en-IN')})\n• Card Checkout Net Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`;
-          if (target.id.includes('ed340cur')) {
-            discountDesc = `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Was ₹23,599!)\n• Card Checkout Net Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`;
-          } else if (target.id.includes('34g600a')) {
-            discountDesc = `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Historic Sale/Flash Deal! Was ₹31,999)\n• Card Checkout Net Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`;
-          } else if (target.id.includes('xv272u')) {
-            discountDesc = `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Was ₹19,000+!)\n• Card Checkout Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`;
+          if (target.id.includes('pm161')) {
+            discountDesc = `\n• Target Drop Confirmed: ₹${price.toLocaleString('en-IN')} (Target: <= ₹${target.targetPriceThreshold.toLocaleString('en-IN')})\n• Card Checkout Estimate: ~₹${Math.round(price * 0.9).toLocaleString('en-IN')}`;
           }
 
-          const isMonitor = target.id.includes('cur') || target.id.includes('34g600a') || target.id.includes('xv272') || target.id.includes('pm161');
+          const isMonitor = target.id.includes('pm161');
           const itemType = isMonitor ? 'tracked display' : 'PC build component';
           const alertTitle = `🎯 TARGET HIT: ${target.name.split(' - ')[0]} @ ₹${price.toLocaleString('en-IN')}`;
           const alertBody = `Sir, your ${itemType} has hit your sniper trigger threshold!${discountDesc}\n\n🔗 Direct Link: ${target.url}\n\n⚡ Recommendation: Strike immediately before flash allocations deplete.`;
