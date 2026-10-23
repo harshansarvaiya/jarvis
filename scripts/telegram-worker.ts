@@ -1173,8 +1173,9 @@ async function processDirective(
 
     if (wantsVoiceResponse) {
       try {
-        const { synthesizeMovieVoice } = await import('../lib/jarvis/tts');
-        const vocalContent = result.vocalSummary || result.reply.slice(0, 400);
+        const { synthesizeMovieVoice, sanitizeTextForSpeech } = await import('../lib/jarvis/tts');
+        // Provide the full operational substance in the voice memo so Sir hears the complete intelligence in AirPods
+        const vocalContent = sanitizeTextForSpeech(result.reply) || result.vocalSummary || 'Directives executed, Sir.';
         const voicePersona = result.telemetry?.persona === 'FRIDAY' ? 'FRIDAY' : 'JARVIS';
         const modulation = result.emotionSubtext?.voiceModulation;
         const voiceBuffer = await synthesizeMovieVoice(vocalContent, voicePersona, modulation);

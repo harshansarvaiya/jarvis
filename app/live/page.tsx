@@ -309,11 +309,17 @@ export default function LiveVoicePage() {
 
         const res = await fetch('/api/jarvis/voice/chat', {
           method: 'POST',
+          headers: {
+            'x-jarvis-auth': '1010',
+            'x-telegram-user-id': '864360540',
+          },
           body: formData,
+          signal: AbortSignal.timeout(30000),
         });
 
         if (!res.ok) {
-          throw new Error(`Voice endpoint error (HTTP ${res.status})`);
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Voice endpoint error (HTTP ${res.status})`);
         }
 
         const data = await res.json();
@@ -347,9 +353,9 @@ export default function LiveVoicePage() {
       } catch (err: any) {
         console.error('[Live Voice] Dispatch failed:', err);
         const fallback =
-          persona === 'friday'
-            ? 'Tactical reflex timeout, Sir. Re-establishing link.'
-            : 'Pardon me, Sir. Audio connection hesitated. Standing by.';
+          err?.message?.includes('timeout')
+            ? (persona === 'friday' ? 'Tactical reflex timeout, Sir. Re-establishing link.' : 'Voice connection hesitated, Sir.')
+            : `Voice connection error: ${err?.message || 'Retrying link.'}`;
         vocalizeResponse(fallback, fallback, [], 0);
       }
     },
@@ -371,33 +377,22 @@ export default function LiveVoicePage() {
     }
   }, []);
 
-  // Start active speech recording segment
+  // Start active speech recording segment with a fresh MediaRecorder instance (fixes iOS WebKit reuse bug)
   const startSpeechSegment = useCallback(() => {
     if (isRecordingSpeechRef.current || isSpeakingRef.current || uplinkState === 'thinking') return;
+    if (!mediaStreamRef.current) return;
 
     try {
-      if (mediaStreamRef.current && mediaRecorderRef.current) {
-        const recorder = mediaRecorderRef.current;
-        if (recorder.state === 'inactive') {
-          audioChunksRef.current = [];
-          speechStartTimeRef.current = Date.now();
-          isRecordingSpeechRef.current = true;
-          setUplinkState('recording');
-          setStatusMessage('🎙️ Hearing speech... Speak naturally');
-          triggerHaptic('light');
-          recorder.start(150);
-        }
-      }
-    } catch (err) {
-      console.warn('[Live Voice] Failed to start recorder segment:', err);
-    }
-  }, [uplinkState]);
-
-  // Setup Continuous MediaRecorder with automatic chunk recycling
-  const setupMediaRecorder = (stream: MediaStream) => {
-    try {
-      const mime = mimeTypeRef.current || 'audio/webm';
+      const stream = mediaStreamRef.current;
+      const mime = mimeTypeRef.current || '';
       const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+
+      audioChunksRef.current = [];
+      speechStartTimeRef.current = Date.now();
+      isRecordingSpeechRef.current = true;
+      setUplinkState('recording');
+      setStatusMessage('🎙️ Hearing speech... Speak naturally (or tap Orb to send)');
+      triggerHaptic('light');
 
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
@@ -410,8 +405,8 @@ export default function LiveVoicePage() {
         const chunks = [...audioChunksRef.current];
         audioChunksRef.current = [];
 
-        if (chunks.length > 0 && totalDuration > 350) {
-          const blob = new Blob(chunks, { type: mimeTypeRef.current || 'audio/webm' });
+        if (chunks.length > 0 && totalDuration > 300) {
+          const blob = new Blob(chunks, { type: mime || 'audio/webm' });
           dispatchAudioChunk(blob);
         } else {
           setUplinkState('listening');
@@ -420,10 +415,11 @@ export default function LiveVoicePage() {
       };
 
       mediaRecorderRef.current = recorder;
+      recorder.start(150);
     } catch (err) {
-      console.error('[Live Voice] MediaRecorder setup error:', err);
+      console.warn('[Live Voice] Failed to start recorder segment:', err);
     }
-  };
+  }, [uplinkState, dispatchAudioChunk]);
 
   // Start Full-Duplex Microphone & Web Audio Spectrum
   const startAudioPipeline = async () => {
@@ -438,10 +434,7 @@ export default function LiveVoicePage() {
       });
       mediaStreamRef.current = stream;
 
-      // 1. Setup MediaRecorder for Cloud Whisper VAD
-      setupMediaRecorder(stream);
-
-      // 2. Initialize Web Audio Context for Spectrum Analysis & VAD
+      // 1. Initialize Web Audio Context for Spectrum Analysis & VAD
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       const audioCtx = new AudioCtx();
       if (audioCtx.state === 'suspended') {
@@ -565,8 +558,8 @@ export default function LiveVoicePage() {
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
 
-    const SPEECH_THRESHOLD = 18; // Volume threshold for speech detection
-    const SILENCE_DEBOUNCE_MS = 850; // Trailing silence before dispatching to Whisper
+    const SPEECH_THRESHOLD = 10; // Optimized for AirPods / earbud microphone gain
+    const SILENCE_DEBOUNCE_MS = 900; // Trailing silence before dispatching to Whisper
 
     const render = () => {
       animationFrameRef.current = requestAnimationFrame(render);
@@ -924,8 +917,11 @@ export default function LiveVoicePage() {
           <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
             <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
               <Headphones className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Barge-in: Active</span>
-              <span className="text-[10px] text-cyan-500/60">({detectedMime.replace(/;.*$/, '')})</span>
+              <span>Barge-in</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono transition-colors ${audioLevel > 10 ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 animate-pulse' : 'bg-slate-900 text-slate-500'}`}>
+                Mic: {Math.round(audioLevel)}
+              </span>
+              <span className="text-[10px] text-cyan-500/60 hidden sm:inline">({detectedMime.replace(/;.*$/, '')})</span>
             </div>
 
             <div className="flex items-center gap-2">

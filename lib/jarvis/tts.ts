@@ -140,8 +140,9 @@ export async function synthesizeMovieVoice(
   const cleanSpoken = sanitizeTextForSpeech(text);
   if (!cleanSpoken) return null;
 
-  const truncatedText = cleanSpoken.length > 600
-    ? `${cleanSpoken.slice(0, 580)}... and more details are available in the briefing.`
+  // Allow up to 2,500 characters for rich, articulate spoken briefings without premature cutoffs
+  const truncatedText = cleanSpoken.length > 2500
+    ? `${cleanSpoken.slice(0, 2450)}... and further technical details are logged in the written brief, Sir.`
     : cleanSpoken;
 
   // 1. Primary: Google Cloud Neural TTS (100% reliable on GCP & Vercel, zero 403 blocks)
