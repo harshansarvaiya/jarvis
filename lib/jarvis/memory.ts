@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { redactSecretsAndPii } from './security/secret-sentry';
 
 export type Priority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
@@ -268,6 +269,20 @@ export function saveJarvisState(state: JarvisState): void {
   try {
     ensureDataDir();
     state.lastActive = new Date().toISOString();
+
+    // Directive 01 Defense-in-depth: scrub any leaked secrets before serialization
+    if (Array.isArray(state.memories)) {
+      for (const m of state.memories) {
+        if (m.content) m.content = redactSecretsAndPii(m.content).sanitized;
+        if (m.context) m.context = redactSecretsAndPii(m.context).sanitized;
+      }
+    }
+    if (Array.isArray(state.logs)) {
+      for (const l of state.logs) {
+        if (l.message) l.message = redactSecretsAndPii(l.message).sanitized;
+      }
+    }
+
     cachedMemoryState = state;
 
     // 1. Local disk persistence
@@ -456,20 +471,25 @@ export function addMemory(
 ): MemoryItem {
   const state = loadJarvisState();
   const inferredTier = tier || getMemoryTier({ category, tier });
+
+  // Guard against accidental credential assimilation (Directive 01)
+  const cleanContent = redactSecretsAndPii(content).sanitized;
+  const cleanContext = context ? redactSecretsAndPii(context).sanitized : undefined;
+
   const newMemory: MemoryItem = {
     id: `mem-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     tier: inferredTier,
     category,
-    content,
+    content: cleanContent,
     confidence,
-    context,
+    context: cleanContext,
     triggers,
     recipe,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
   state.memories.unshift(newMemory);
-  addLog(state, 'EVOLUTION', `Memory assimilated [${inferredTier}:${category}]: ${content.slice(0, 60)}...`);
+  addLog(state, 'EVOLUTION', `Memory assimilated [${inferredTier}:${category}]: ${cleanContent.slice(0, 60)}...`);
   saveJarvisState(state);
 
   // Asynchronous sync to Supermemory Cloud (Non-blocking edge sync)

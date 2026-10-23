@@ -41,6 +41,8 @@ export const SECRET_PATTERNS: Array<{ type: string; pattern: RegExp; severity: '
 
   // 3. Google & Vertex AI
   { type: 'GOOGLE_API_KEY', pattern: /\bAIzaSy[A-Za-z0-9\-_]{33}\b/, severity: 'CRITICAL', description: 'Google Cloud / Gemini API Key' },
+  { type: 'GOOGLE_OAUTH_CLIENT_SECRET', pattern: /\bGOCSPX-[A-Za-z0-9_-]{28,}\b/, severity: 'CRITICAL', description: 'Google Cloud OAuth 2.0 Client Secret' },
+  { type: 'GOOGLE_OAUTH_CLIENT_ID', pattern: /\b\d{10,14}-[a-z0-9_]{20,50}\.apps\.googleusercontent\.com\b/, severity: 'HIGH', description: 'Google Cloud OAuth 2.0 Client ID' },
   { type: 'GCP_SERVICE_ACCOUNT', pattern: /"type":\s*"service_account",\s*"project_id"/, severity: 'CRITICAL', description: 'Google Cloud Service Account JSON Key' },
 
   // 4. AWS Access & Secret Keys
@@ -73,11 +75,15 @@ const IGNORE_EXTENSIONS = new Set([
 
 const IGNORE_DIRS = new Set([
   'node_modules', '.next', '.git', 'out', 'dist', 'build', '.cache',
-  'data', 'brain-sync', '.system_generated', '.npm'
+  'brain-sync', '.system_generated', '.npm',
+  // Sensitive gitignored data subdirectories (never scan raw private archives/trajectories)
+  'trajectories', 'vault', 'sandboxes', 'backups', 'private',
 ]);
 
 const IGNORE_FILENAMES = new Set([
-  'secret-sentry.ts', 'sast.ts', 'shield.ts', 'antigravity-chronicles.md'
+  'secret-sentry.ts', 'sast.ts', 'shield.ts', 'antigravity-chronicles.md',
+  'jarvis-chats.json', 'jarvis-chronicles.json', 'autonomous_log.json',
+  'ingest-antigravity-transcript.ts', 'jarvis_knowledge_chunks.json', 'jarvis_knowledge_docs.json'
 ]);
 
 /**

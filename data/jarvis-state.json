@@ -417,11 +417,6 @@
       ],
       "executionAudit": [
         {
-          "timestamp": "2026-10-23T04:04:28.826Z",
-          "status": "IN_PROGRESS",
-          "notes": "[Autonomous Radar Telemetry] Status: CRITICAL_WATCH. Strategic Sentry Summary: Overall European & Global Escalation posture is at CRITICAL_WATCH (Peak Index: 88/100 in Eastern Europe). Red Sea & Baltic corridors remain on high watch. Global logistics and defensive supply chains require ongoing continuous radar monitoring."
-        },
-        {
           "timestamp": "2026-10-23T04:19:08.192Z",
           "status": "IN_PROGRESS",
           "notes": "[Autonomous Radar Telemetry] Status: CRITICAL_WATCH. Strategic Sentry Summary: Overall European & Global Escalation posture is at CRITICAL_WATCH (Peak Index: 88/100 in Eastern Europe). Red Sea & Baltic corridors remain on high watch. Global logistics and defensive supply chains require ongoing continuous radar monitoring."
@@ -468,6 +463,11 @@
         },
         {
           "timestamp": "2026-10-23T06:34:13.467Z",
+          "status": "IN_PROGRESS",
+          "notes": "[Autonomous Radar Telemetry] Status: CRITICAL_WATCH. Strategic Sentry Summary: Overall European & Global Escalation posture is at CRITICAL_WATCH (Peak Index: 88/100 in Eastern Europe). Red Sea & Baltic corridors remain on high watch. Global logistics and defensive supply chains require ongoing continuous radar monitoring."
+        },
+        {
+          "timestamp": "2026-10-23T06:49:15.114Z",
           "status": "IN_PROGRESS",
           "notes": "[Autonomous Radar Telemetry] Status: CRITICAL_WATCH. Strategic Sentry Summary: Overall European & Global Escalation posture is at CRITICAL_WATCH (Peak Index: 88/100 in Eastern Europe). Red Sea & Baltic corridors remain on high watch. Global logistics and defensive supply chains require ongoing continuous radar monitoring."
         }
@@ -1479,7 +1479,7 @@
       "id": "mem-1789934813554-x2fz",
       "tier": "SEMANTIC",
       "category": "PROJECT",
-      "content": "Successfully exchanged Google OAuth2 refresh token using client ID 450259247286-rt8r1bm060fbplpt1vgb556lmnrj9hk6.apps.googleusercontent.com and secret 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 for harshnas279@gmail.com. Gmail MCP integration is fully authorized.",
+      "content": "Successfully exchanged Google OAuth2 refresh token using client ID [REDACTED_GOOGLE_CLIENT_ID] and secret [REDACTED_GOOGLE_CLIENT_SECRET] for harshnas279@gmail.com. Gmail MCP integration is fully authorized.",
       "confidence": 0.95,
       "context": "User provided correct client ID and secret matching the refresh token.",
       "createdAt": "2026-09-20T20:06:53.554Z",
@@ -1880,7 +1880,7 @@
     {
       "id": "mem-1789383474865-u8kn",
       "category": "PROJECT",
-      "content": "GitHub repo for Jarvis UI with embedded token: https://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@github.com/harshansarvaiya/jarvis.git",
+      "content": "GitHub repo for Jarvis UI with embedded token: https://[REDACTED_GH_TOKEN]@github.com/harshansarvaiya/jarvis.git",
       "confidence": 0.9,
       "context": "Provided by Sir for direct push to main",
       "createdAt": "2026-09-14T10:57:54.866Z",
