@@ -27,17 +27,24 @@ export async function transcribeAudioBuffer(
     };
   }
 
-  // Normalize Telegram .oga / custom extensions to Groq-supported format (.ogg / .wav / .mp3)
+  // Normalize filenames & MIME types for Groq Whisper LPU compatibility
   let cleanFilename = filename.split('/').pop() || 'audio.ogg';
-  if (cleanFilename.endsWith('.oga')) {
-    cleanFilename = cleanFilename.replace(/\.oga$/i, '.ogg');
-  }
-  if (!cleanFilename.match(/\.(flac|mp3|mp4|mpeg|mpga|m4a|ogg|opus|wav|webm)$/i)) {
-    cleanFilename = `${cleanFilename}.ogg`;
-  }
+  let cleanMime = mimeType || 'audio/ogg';
 
-  let cleanMime = mimeType;
-  if (!cleanMime || cleanMime === 'application/octet-stream' || cleanMime === 'audio/oga') {
+  if (cleanMime.includes('mp4') || cleanMime.includes('m4a') || cleanMime.includes('aac') || cleanFilename.match(/\.(mp4|m4a|aac)$/i)) {
+    cleanFilename = 'voice.m4a';
+    cleanMime = 'audio/mp4';
+  } else if (cleanMime.includes('webm') || cleanFilename.endsWith('.webm')) {
+    cleanFilename = 'voice.webm';
+    cleanMime = 'audio/webm';
+  } else if (cleanMime.includes('wav') || cleanFilename.endsWith('.wav')) {
+    cleanFilename = 'voice.wav';
+    cleanMime = 'audio/wav';
+  } else if (cleanFilename.endsWith('.oga') || cleanMime === 'audio/oga' || cleanMime.includes('ogg')) {
+    cleanFilename = 'voice.ogg';
+    cleanMime = 'audio/ogg';
+  } else if (!cleanFilename.match(/\.(flac|mp3|mp4|mpeg|mpga|m4a|ogg|opus|wav|webm)$/i)) {
+    cleanFilename = `${cleanFilename}.ogg`;
     cleanMime = 'audio/ogg';
   }
 

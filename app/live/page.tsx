@@ -17,10 +17,11 @@ import {
   Headphones,
   Radio,
   ArrowLeft,
+  Flame,
 } from 'lucide-react';
 
 type Persona = 'friday' | 'jarvis';
-type UplinkState = 'idle' | 'listening' | 'thinking' | 'speaking';
+type UplinkState = 'idle' | 'listening' | 'recording' | 'thinking' | 'speaking';
 
 interface VoiceMessage {
   id: string;
@@ -44,29 +45,60 @@ export default function LiveVoicePage() {
   const [messages, setMessages] = useState<VoiceMessage[]>([]);
   const [interimText, setInterimText] = useState<string>('');
   const [isTelegramMiniApp, setIsTelegramMiniApp] = useState(false);
-  const [wakeLockActive, setWakeLockActive] = useState(false);
-  const [lastBargeInTime, setLastBargeInTime] = useState<number>(0);
+  const [statusMessage, setStatusMessage] = useState<string>('Voice Engine Ready • Tap Orb to Connect');
+  const [detectedMime, setDetectedMime] = useState<string>('');
 
   // Audio / WebRTC Refs
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const isRecordingSpeechRef = useRef<boolean>(false);
+  const speechStartTimeRef = useRef<number>(0);
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSpeechTimeRef = useRef<number>(0);
   const recognitionRef = useRef<any>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const wakeLockRef = useRef<any>(null);
   const transcriptBottomRef = useRef<HTMLDivElement | null>(null);
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isSpeakingRef = useRef<boolean>(false);
+  const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const ttsWatchdogRef = useRef<NodeJS.Timeout | null>(null);
+  const mimeTypeRef = useRef<string>('audio/webm');
 
-  // Update isSpeakingRef to synchronize with synchronous event handlers
+  // Sync isSpeakingRef with state
   useEffect(() => {
     isSpeakingRef.current = uplinkState === 'speaking';
   }, [uplinkState]);
 
+  // Determine best supported Audio MIME type across iOS Safari / Android / Desktop
+  const getSupportedMimeType = useCallback(() => {
+    if (typeof MediaRecorder === 'undefined') return '';
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/aac',
+      'audio/ogg',
+      'audio/wav',
+    ];
+    for (const c of candidates) {
+      try {
+        if (MediaRecorder.isTypeSupported(c)) return c;
+      } catch {}
+    }
+    return '';
+  }, []);
+
   // Telegram Mini App Initialization & Screen WakeLock
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const mime = getSupportedMimeType();
+      mimeTypeRef.current = mime;
+      setDetectedMime(mime || 'none');
+
       const tg = (window as any).Telegram?.WebApp;
       if (tg) {
         setIsTelegramMiniApp(true);
@@ -82,11 +114,8 @@ export default function LiveVoicePage() {
         try {
           if ('wakeLock' in navigator) {
             wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
-            setWakeLockActive(true);
           }
-        } catch {
-          // Wake lock rejected or unsupported
-        }
+        } catch {}
       };
       requestWakeLock();
     }
@@ -97,7 +126,7 @@ export default function LiveVoicePage() {
         try { wakeLockRef.current.release(); } catch {}
       }
     };
-  }, []);
+  }, [getSupportedMimeType]);
 
   // Trigger Telegram Haptic Feedback
   const triggerHaptic = (style: 'light' | 'medium' | 'heavy' | 'selection' = 'medium') => {
@@ -123,115 +152,232 @@ export default function LiveVoicePage() {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
+      if (ttsWatchdogRef.current) clearInterval(ttsWatchdogRef.current);
       isSpeakingRef.current = false;
       setUplinkState('listening');
-      setLastBargeInTime(Date.now());
+      setStatusMessage('Listening... Speak anytime (Barge-in armed)');
       triggerHaptic('heavy');
     }
   }, []);
 
-  // Handle Assistant Vocal Synthesis
-  const vocalizeResponse = useCallback((vocalText: string, fullReply: string, tools: any[], latencyMs: number) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) {
-      setUplinkState('listening');
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-    setUplinkState('speaking');
-    isSpeakingRef.current = true;
-
-    const utterance = new SpeechSynthesisUtterance(vocalText);
-    utterance.rate = speechRate;
-    utterance.pitch = persona === 'friday' ? 1.05 : 0.95;
-
-    // Prefer British English voices
-    const voices = window.speechSynthesis.getVoices();
-    const britishVoice = voices.find(
-      (v) =>
-        v.name.includes('Daniel') ||
-        v.name.includes('George') ||
-        v.name.includes('UK English Male') ||
-        (persona === 'friday' && (v.name.includes('Martha') || v.name.includes('UK English Female') || v.lang === 'en-GB')) ||
-        v.lang === 'en-GB'
-    );
-    if (britishVoice) utterance.voice = britishVoice;
-
-    utterance.onstart = () => {
-      setUplinkState('speaking');
-      isSpeakingRef.current = true;
-      triggerHaptic('light');
-    };
-
-    utterance.onend = () => {
-      setUplinkState('listening');
-      isSpeakingRef.current = false;
-    };
-
-    utterance.onerror = () => {
-      setUplinkState('listening');
-      isSpeakingRef.current = false;
-    };
-
-    window.speechSynthesis.speak(utterance);
-
-    // Append to transcript
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `msg-${Date.now()}-a`,
-        sender: 'agent',
-        text: vocalText,
-        persona,
-        tools: tools.map((t) => t.name),
-        latencyMs,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ]);
-  }, [persona, speechRate]);
-
-  // Dispatch Speech to Fast Reflex AI Route
-  const dispatchVoiceTurn = useCallback(async (userSpeech: string) => {
-    if (!userSpeech.trim()) return;
-
-    setUplinkState('thinking');
-    setInterimText('');
-    triggerHaptic('medium');
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `msg-${Date.now()}-u`,
-        sender: 'user',
-        text: userSpeech,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ]);
-
-    try {
-      const res = await fetch('/api/jarvis/voice/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          speech: userSpeech,
-          persona,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Voice chat returned HTTP ${res.status}`);
+  // Handle Assistant Vocal Synthesis with iOS Safari Anti-GC Watchdog
+  const vocalizeResponse = useCallback(
+    (vocalText: string, fullReply: string, tools: any[], latencyMs: number) => {
+      if (typeof window === 'undefined' || !window.speechSynthesis) {
+        setUplinkState('listening');
+        setStatusMessage('Listening... Speak anytime (Barge-in armed)');
+        return;
       }
 
-      const data = await res.json();
-      vocalizeResponse(data.vocalText, data.fullMarkdownReply, data.toolCallsExecuted || [], data.latencyMs);
-    } catch (err: any) {
-      console.error('[Live Voice] Error during dispatch:', err);
-      const fallback = persona === 'friday'
-        ? 'Tactical reflex timeout, Sir. Re-establishing link.'
-        : 'Pardon me, Sir. Audio connection hesitated. Standing by.';
-      vocalizeResponse(fallback, fallback, [], 0);
+      window.speechSynthesis.cancel();
+      if (ttsWatchdogRef.current) clearInterval(ttsWatchdogRef.current);
+
+      setUplinkState('speaking');
+      setStatusMessage('Speaking • Tap or speak to interrupt');
+      isSpeakingRef.current = true;
+
+      const utterance = new SpeechSynthesisUtterance(vocalText);
+      activeUtteranceRef.current = utterance; // Retain reference to prevent iOS GC freeze
+      utterance.rate = speechRate;
+      utterance.pitch = persona === 'friday' ? 1.05 : 0.95;
+
+      // Prefer British / Irish English voices
+      const voices = window.speechSynthesis.getVoices();
+      const britishVoice = voices.find(
+        (v) =>
+          v.name.includes('Daniel') ||
+          v.name.includes('George') ||
+          v.name.includes('UK English Male') ||
+          (persona === 'friday' &&
+            (v.name.includes('Martha') ||
+              v.name.includes('Moira') ||
+              v.name.includes('UK English Female') ||
+              v.lang === 'en-IE' ||
+              v.lang === 'en-GB')) ||
+          v.lang === 'en-GB' ||
+          v.lang === 'en-IE'
+      );
+      if (britishVoice) utterance.voice = britishVoice;
+
+      const cleanupUtterance = () => {
+        if (ttsWatchdogRef.current) clearInterval(ttsWatchdogRef.current);
+        isSpeakingRef.current = false;
+        setUplinkState('listening');
+        setStatusMessage('Listening... Speak anytime (Barge-in armed)');
+      };
+
+      utterance.onstart = () => {
+        setUplinkState('speaking');
+        isSpeakingRef.current = true;
+        triggerHaptic('light');
+      };
+
+      utterance.onend = cleanupUtterance;
+      utterance.onerror = cleanupUtterance;
+
+      // iOS Safari Watchdog: verify speaking state doesn't hang silently
+      ttsWatchdogRef.current = setInterval(() => {
+        if (typeof window !== 'undefined' && window.speechSynthesis) {
+          if (!window.speechSynthesis.speaking && isSpeakingRef.current) {
+            cleanupUtterance();
+          }
+        }
+      }, 400);
+
+      window.speechSynthesis.speak(utterance);
+
+      // Append Assistant turn to transcript
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `msg-${Date.now()}-a`,
+          sender: 'agent',
+          text: vocalText,
+          persona,
+          tools: tools.map((t) => t.name),
+          latencyMs,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+    },
+    [persona, speechRate]
+  );
+
+  // Dispatch Raw Audio Buffer directly to Groq Whisper & Friday Agent
+  const dispatchAudioChunk = useCallback(
+    async (audioBlob: Blob) => {
+      if (!audioBlob || audioBlob.size < 400) {
+        setUplinkState('listening');
+        setStatusMessage('Listening... Speak anytime (Barge-in armed)');
+        return;
+      }
+
+      setUplinkState('thinking');
+      setStatusMessage('⚡ Groq Whisper LPU Transcribing & Reasoning...');
+      triggerHaptic('medium');
+
+      try {
+        const formData = new FormData();
+        const extension = mimeTypeRef.current.includes('mp4') ? 'voice.m4a' : 'voice.webm';
+        formData.append('file', audioBlob, extension);
+        formData.append('persona', persona);
+
+        const res = await fetch('/api/jarvis/voice/chat', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!res.ok) {
+          throw new Error(`Voice endpoint error (HTTP ${res.status})`);
+        }
+
+        const data = await res.json();
+
+        // If silence or empty audio was returned
+        if (data.silence || !data.transcript) {
+          setUplinkState('listening');
+          setStatusMessage('Listening... Speak anytime (Barge-in armed)');
+          return;
+        }
+
+        // Log user speech to transcript immediately
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `msg-${Date.now()}-u`,
+            sender: 'user',
+            text: data.transcript,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+        ]);
+
+        // Vocalize Friday's response
+        vocalizeResponse(
+          data.vocalText,
+          data.fullMarkdownReply,
+          data.toolCallsExecuted || [],
+          data.latencyMs || 0
+        );
+      } catch (err: any) {
+        console.error('[Live Voice] Dispatch failed:', err);
+        const fallback =
+          persona === 'friday'
+            ? 'Tactical reflex timeout, Sir. Re-establishing link.'
+            : 'Pardon me, Sir. Audio connection hesitated. Standing by.';
+        vocalizeResponse(fallback, fallback, [], 0);
+      }
+    },
+    [persona, vocalizeResponse]
+  );
+
+  // Stop active speech recording segment and send to Whisper
+  const finalizeSpeechSegment = useCallback(() => {
+    if (!isRecordingSpeechRef.current) return;
+    isRecordingSpeechRef.current = false;
+
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state === 'recording') {
+      try {
+        recorder.stop();
+      } catch (err) {
+        console.warn('[Live Voice] Recorder stop warning:', err);
+      }
     }
-  }, [persona, vocalizeResponse]);
+  }, []);
+
+  // Start active speech recording segment
+  const startSpeechSegment = useCallback(() => {
+    if (isRecordingSpeechRef.current || isSpeakingRef.current || uplinkState === 'thinking') return;
+
+    try {
+      if (mediaStreamRef.current && mediaRecorderRef.current) {
+        const recorder = mediaRecorderRef.current;
+        if (recorder.state === 'inactive') {
+          audioChunksRef.current = [];
+          speechStartTimeRef.current = Date.now();
+          isRecordingSpeechRef.current = true;
+          setUplinkState('recording');
+          setStatusMessage('🎙️ Hearing speech... Speak naturally');
+          triggerHaptic('light');
+          recorder.start(150);
+        }
+      }
+    } catch (err) {
+      console.warn('[Live Voice] Failed to start recorder segment:', err);
+    }
+  }, [uplinkState]);
+
+  // Setup Continuous MediaRecorder with automatic chunk recycling
+  const setupMediaRecorder = (stream: MediaStream) => {
+    try {
+      const mime = mimeTypeRef.current || 'audio/webm';
+      const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const totalDuration = Date.now() - speechStartTimeRef.current;
+        const chunks = [...audioChunksRef.current];
+        audioChunksRef.current = [];
+
+        if (chunks.length > 0 && totalDuration > 350) {
+          const blob = new Blob(chunks, { type: mimeTypeRef.current || 'audio/webm' });
+          dispatchAudioChunk(blob);
+        } else {
+          setUplinkState('listening');
+          setStatusMessage('Listening... Speak anytime (Barge-in armed)');
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+    } catch (err) {
+      console.error('[Live Voice] MediaRecorder setup error:', err);
+    }
+  };
 
   // Start Full-Duplex Microphone & Web Audio Spectrum
   const startAudioPipeline = async () => {
@@ -246,87 +392,65 @@ export default function LiveVoicePage() {
       });
       mediaStreamRef.current = stream;
 
-      // Initialize Web Audio Context for Spectrum Analysis
+      // 1. Setup MediaRecorder for Cloud Whisper VAD
+      setupMediaRecorder(stream);
+
+      // 2. Initialize Web Audio Context for Spectrum Analysis & VAD
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       const audioCtx = new AudioCtx();
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
       audioContextRef.current = audioCtx;
 
       const source = audioCtx.createMediaStreamSource(stream);
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.4;
       source.connect(analyser);
       analyserRef.current = analyser;
 
-      // Start continuous speech recognition
+      // 3. Fallback Web Speech Recognition for Real-time Interim Display (if browser allows)
       const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRec) {
-        const recognition = new SpeechRec();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
+        try {
+          const recognition = new SpeechRec();
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.lang = 'en-US';
 
-        recognition.onstart = () => {
-          setUplinkState('listening');
-        };
+          recognition.onresult = (event: any) => {
+            let liveTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              liveTranscript += event.results[i][0].transcript;
+            }
+            if (liveTranscript.trim().length > 1 && isSpeakingRef.current) {
+              handleBargeIn();
+            }
+            setInterimText(liveTranscript);
+          };
 
-        recognition.onresult = (event: any) => {
-          let liveTranscript = '';
-          let isFinal = false;
+          recognition.onerror = () => {};
+          recognition.onend = () => {
+            if (mediaStreamRef.current && !isMicMuted) {
+              try { recognition.start(); } catch {}
+            }
+          };
 
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const chunk = event.results[i][0].transcript;
-            liveTranscript += chunk;
-            if (event.results[i].isFinal) isFinal = true;
-          }
-
-          // Smart Barge-In: If user starts speaking while Friday is vocalizing, immediately cut her off
-          if (liveTranscript.trim().length > 1 && isSpeakingRef.current) {
-            handleBargeIn();
-          }
-
-          setInterimText(liveTranscript);
-
-          // Clear any pending silence timer
-          if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-
-          // If speech is marked final, or after 850ms of trailing silence, dispatch to LLM
-          if (isFinal) {
-            dispatchVoiceTurn(liveTranscript);
-          } else {
-            silenceTimerRef.current = setTimeout(() => {
-              if (liveTranscript.trim().length > 2 && uplinkState !== 'thinking') {
-                dispatchVoiceTurn(liveTranscript);
-              }
-            }, 850);
-          }
-        };
-
-        recognition.onerror = (e: any) => {
-          console.warn('[Live Voice] Recognition error:', e.error);
-          if (e.error === 'no-speech') return;
-          if (uplinkState !== 'speaking' && uplinkState !== 'thinking') {
-            setUplinkState('listening');
-          }
-        };
-
-        recognition.onend = () => {
-          // Keep continuous duplex connection open unless explicitly stopped
-          if (mediaStreamRef.current && !isMicMuted) {
-            try { recognition.start(); } catch {}
-          }
-        };
-
-        recognitionRef.current = recognition;
-        recognition.start();
+          recognitionRef.current = recognition;
+          recognition.start();
+        } catch {}
       }
 
       setUplinkState('listening');
+      setStatusMessage('Listening... Speak anytime (Barge-in armed)');
       drawVisualizerSpectrum();
 
       // Vocal Greeting
-      const greeting = persona === 'friday'
-        ? 'Live uplink established. Friday standing by.'
-        : 'Good day, Sir. Jarvis at your service. Full-duplex voice active.';
+      const greeting =
+        persona === 'friday'
+          ? 'Live uplink established. Friday standing by.'
+          : 'Good day, Sir. Jarvis at your service. Full-duplex voice active.';
       vocalizeResponse(greeting, greeting, [], 0);
     } catch (err: any) {
       console.error('[Live Voice] Failed to acquire microphone:', err);
@@ -338,7 +462,15 @@ export default function LiveVoicePage() {
   const stopAudioPipeline = () => {
     triggerHaptic('heavy');
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    if (ttsWatchdogRef.current) clearInterval(ttsWatchdogRef.current);
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+
+    isRecordingSpeechRef.current = false;
+
+    if (mediaRecorderRef.current) {
+      try { mediaRecorderRef.current.stop(); } catch {}
+      mediaRecorderRef.current = null;
+    }
 
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch {}
@@ -360,6 +492,7 @@ export default function LiveVoicePage() {
     }
 
     setUplinkState('idle');
+    setStatusMessage('Voice Engine Ready • Tap Orb to Connect');
     setAudioLevel(0);
   };
 
@@ -374,7 +507,7 @@ export default function LiveVoicePage() {
     }
   };
 
-  // Canvas Holographic Visualizer Loop
+  // Canvas Holographic Visualizer Loop with VAD Voice Activity Detection
   const drawVisualizerSpectrum = () => {
     const canvas = canvasRef.current;
     const analyser = analyserRef.current;
@@ -385,6 +518,9 @@ export default function LiveVoicePage() {
 
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
+
+    const SPEECH_THRESHOLD = 18; // Volume threshold for speech detection
+    const SILENCE_DEBOUNCE_MS = 850; // Trailing silence before dispatching to Whisper
 
     const render = () => {
       animationFrameRef.current = requestAnimationFrame(render);
@@ -397,6 +533,47 @@ export default function LiveVoicePage() {
       const avg = sum / bufferLength;
       setAudioLevel(avg);
 
+      const now = Date.now();
+
+      // ==========================================================
+      // VAD Voice Activity Detection State Machine
+      // ==========================================================
+      if (!isMicMuted) {
+        // 1. User Voice Activity Detected
+        if (avg > SPEECH_THRESHOLD) {
+          lastSpeechTimeRef.current = now;
+
+          // Barge-in check: If Friday is vocalizing, user speech interrupts her immediately
+          if (isSpeakingRef.current) {
+            handleBargeIn();
+          }
+
+          // If not currently recording and not thinking, trigger recorder
+          if (!isRecordingSpeechRef.current && !isSpeakingRef.current && uplinkState !== 'thinking') {
+            startSpeechSegment();
+          }
+
+          // Clear any pending silence timer
+          if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+            silenceTimerRef.current = null;
+          }
+        } else {
+          // 2. Trailing Silence Detected while actively recording
+          if (isRecordingSpeechRef.current && !silenceTimerRef.current) {
+            silenceTimerRef.current = setTimeout(() => {
+              silenceTimerRef.current = null;
+              if (isRecordingSpeechRef.current) {
+                finalizeSpeechSegment();
+              }
+            }, SILENCE_DEBOUNCE_MS);
+          }
+        }
+      }
+
+      // ==========================================================
+      // Visualizer Canvas Rendering
+      // ==========================================================
       const width = canvas.width;
       const height = canvas.height;
       const centerX = width / 2;
@@ -404,24 +581,27 @@ export default function LiveVoicePage() {
 
       ctx.clearRect(0, 0, width, height);
 
-      // Status Colors
       const isSpeaking = isSpeakingRef.current;
       const isThinking = uplinkState === 'thinking';
+      const isRecording = uplinkState === 'recording' || isRecordingSpeechRef.current;
+
       const baseColor = isThinking
-        ? 'rgba(147, 51, 234, ' // Purple
+        ? 'rgba(168, 85, 247, ' // Purple
         : isSpeaking
         ? 'rgba(16, 185, 129, ' // Emerald
-        : 'rgba(6, 182, 212, '; // Cyan
+        : isRecording
+        ? 'rgba(239, 68, 68, ' // Red / Coral (Active Recording)
+        : 'rgba(6, 182, 212, '; // Cyan (Listening)
 
-      // Draw Center Arc Reactor Core Glow
-      const coreRadius = 55 + (avg / 255) * 25;
-      const gradient = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, coreRadius * 1.5);
-      gradient.addColorStop(0, `${baseColor}0.85)`);
-      gradient.addColorStop(0.5, `${baseColor}0.35)`);
+      // Center Arc Reactor Core Glow
+      const coreRadius = 55 + (avg / 255) * 30;
+      const gradient = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, coreRadius * 1.6);
+      gradient.addColorStop(0, `${baseColor}0.9)`);
+      gradient.addColorStop(0.5, `${baseColor}0.4)`);
       gradient.addColorStop(1, `${baseColor}0)`);
 
       ctx.beginPath();
-      ctx.arc(centerX, centerY, coreRadius * 1.5, 0, 2 * Math.PI);
+      ctx.arc(centerX, centerY, coreRadius * 1.6, 0, 2 * Math.PI);
       ctx.fillStyle = gradient;
       ctx.fill();
 
@@ -429,8 +609,8 @@ export default function LiveVoicePage() {
       const bars = 48;
       const angleStep = (2 * Math.PI) / bars;
       for (let i = 0; i < bars; i++) {
-        const value = dataArray[i % bufferLength] || 10;
-        const barHeight = Math.max(8, (value / 255) * 70);
+        const value = dataArray[i % bufferLength] || 8;
+        const barHeight = Math.max(8, (value / 255) * 75);
         const angle = i * angleStep;
 
         const x1 = centerX + Math.cos(angle) * (coreRadius + 4);
@@ -450,8 +630,8 @@ export default function LiveVoicePage() {
       // Concentric Dashed Tactical Rings
       ctx.save();
       ctx.translate(centerX, centerY);
-      ctx.rotate(Date.now() * 0.0005);
-      ctx.strokeStyle = `${baseColor}0.3)`;
+      ctx.rotate(Date.now() * 0.0006);
+      ctx.strokeStyle = `${baseColor}0.35)`;
       ctx.lineWidth = 1.5;
       ctx.setLineDash([6, 12]);
       ctx.beginPath();
@@ -461,6 +641,22 @@ export default function LiveVoicePage() {
     };
 
     render();
+  };
+
+  // Center Orb Click Handler: Starts call or finishes speech immediately
+  const handleOrbClick = () => {
+    triggerHaptic('medium');
+    if (uplinkState === 'idle') {
+      startAudioPipeline();
+    } else if (uplinkState === 'speaking') {
+      handleBargeIn();
+    } else if (isRecordingSpeechRef.current) {
+      // Tap while speaking sends immediately to Whisper
+      finalizeSpeechSegment();
+    } else if (uplinkState === 'listening') {
+      // Force-start a recording segment
+      startSpeechSegment();
+    }
   };
 
   return (
@@ -484,7 +680,7 @@ export default function LiveVoicePage() {
                   {persona === 'friday' ? '🛡️ F.R.I.D.A.Y.' : '⚡ J.A.R.V.I.S.'}
                 </span>
                 <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-950/70 border border-cyan-500/40 text-cyan-300">
-                  DUPLEX 2.0
+                  WHISPER LPU
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 font-mono">
@@ -537,7 +733,6 @@ export default function LiveVoicePage() {
 
         {/* Central Orb & Spectrum Visualizer */}
         <section className="flex-1 flex flex-col items-center justify-center relative px-4">
-          {/* Subtle Background Grid Glow */}
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-950/20 via-slate-950/60 to-[#030712] pointer-events-none" />
 
           {/* Interactive Visualizer Canvas */}
@@ -547,12 +742,12 @@ export default function LiveVoicePage() {
               width={340}
               height={340}
               className="w-[280px] h-[280px] sm:w-[320px] sm:h-[320px] cursor-pointer"
-              onClick={uplinkState === 'idle' ? startAudioPipeline : handleBargeIn}
+              onClick={handleOrbClick}
             />
 
             {/* Core Interactive Center Tap Target */}
             <div
-              onClick={uplinkState === 'idle' ? startAudioPipeline : handleBargeIn}
+              onClick={handleOrbClick}
               className={`absolute w-24 h-24 rounded-full flex flex-col items-center justify-center cursor-pointer transition-all duration-300 shadow-2xl ${
                 uplinkState === 'idle'
                   ? 'bg-gradient-to-br from-slate-900 to-cyan-950 border border-cyan-500/40 hover:scale-105 active:scale-95'
@@ -560,6 +755,8 @@ export default function LiveVoicePage() {
                   ? 'bg-gradient-to-br from-purple-900 to-slate-950 border border-purple-500/60 scale-105 animate-pulse'
                   : uplinkState === 'speaking'
                   ? 'bg-gradient-to-br from-emerald-900 to-slate-950 border border-emerald-500/60 ring-2 ring-emerald-400/40'
+                  : uplinkState === 'recording' || isRecordingSpeechRef.current
+                  ? 'bg-gradient-to-br from-red-900 to-slate-950 border border-red-500/80 ring-2 ring-red-400/60 scale-105 animate-pulse'
                   : 'bg-gradient-to-br from-cyan-900 to-slate-950 border border-cyan-400/80 ring-2 ring-cyan-400/30'
               }`}
             >
@@ -571,12 +768,17 @@ export default function LiveVoicePage() {
               ) : uplinkState === 'thinking' ? (
                 <>
                   <Sparkles className="w-8 h-8 text-purple-300 animate-spin mb-1" />
-                  <span className="text-[9px] font-mono text-purple-300">REASONING</span>
+                  <span className="text-[9px] font-mono text-purple-300">WHISPER LPU</span>
                 </>
               ) : uplinkState === 'speaking' ? (
                 <>
                   <Volume2 className="w-8 h-8 text-emerald-300 animate-pulse mb-1" />
                   <span className="text-[9px] font-mono text-emerald-300">SPEAKING</span>
+                </>
+              ) : uplinkState === 'recording' || isRecordingSpeechRef.current ? (
+                <>
+                  <Flame className="w-8 h-8 text-red-400 animate-bounce mb-1" />
+                  <span className="text-[9px] font-mono text-red-300">HEARING YOU</span>
                 </>
               ) : (
                 <>
@@ -597,16 +799,15 @@ export default function LiveVoicePage() {
                   ? 'bg-purple-400 animate-ping'
                   : uplinkState === 'speaking'
                   ? 'bg-emerald-400 animate-pulse'
+                  : uplinkState === 'recording' || isRecordingSpeechRef.current
+                  ? 'bg-red-400 animate-ping'
                   : 'bg-cyan-400 animate-pulse'
               }`}
             />
-            {uplinkState === 'idle' && 'Voice Engine Ready • Tap Orb to Connect'}
-            {uplinkState === 'listening' && 'Listening... Speak anytime (Barge-in armed)'}
-            {uplinkState === 'thinking' && 'Groq LPU Sub-Second Neural Reflex...'}
-            {uplinkState === 'speaking' && 'Speaking • Tap or speak to interrupt'}
+            {statusMessage}
           </div>
 
-          {/* Live User Speech Bubble / Interim Transcription */}
+          {/* Live User Speech Interim */}
           {interimText && (
             <div className="mt-3 max-w-sm px-4 py-2 rounded-xl bg-cyan-950/60 border border-cyan-400/40 text-cyan-200 text-xs font-mono text-center shadow-lg animate-fade-in">
               &ldquo;{interimText}&rdquo;
@@ -630,7 +831,7 @@ export default function LiveVoicePage() {
           <div className="flex-1 overflow-y-auto py-2 space-y-2 pr-1 text-xs">
             {messages.length === 0 ? (
               <div className="h-full flex items-center justify-center text-slate-500 text-center font-mono text-xs">
-                No active transcript yet. Tap the Arc Reactor orb to start speaking.
+                No active transcript yet. Speak into your AirPods or tap the Orb to start.
               </div>
             ) : (
               messages.map((m) => (
@@ -649,9 +850,9 @@ export default function LiveVoicePage() {
                       <span>{m.sender === 'user' ? 'Sir' : m.persona === 'friday' ? '🛡️ Friday' : '⚡ Jarvis'}</span>
                       <span>•</span>
                       <span>{m.timestamp}</span>
-                      {m.latencyMs && (
+                      {m.latencyMs ? (
                         <span className="text-cyan-400 font-mono text-[9px]">({m.latencyMs}ms)</span>
-                      )}
+                      ) : null}
                     </div>
                     <p className="leading-relaxed">{m.text}</p>
                     {m.tools && m.tools.length > 0 && (
@@ -659,7 +860,7 @@ export default function LiveVoicePage() {
                         {m.tools.map((tool, idx) => (
                           <span
                             key={idx}
-                            className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-purple-950/60 border border-purple-500/40 text-purple-300"
+                            className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-950/60 border border-purple-500/40 text-purple-300"
                           >
                             ⚡ {tool}
                           </span>
@@ -678,10 +879,11 @@ export default function LiveVoicePage() {
             <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
               <Headphones className="w-3.5 h-3.5 text-cyan-400" />
               <span>Barge-in: Active</span>
+              <span className="text-[10px] text-cyan-500/60">({detectedMime.replace(/;.*$/, '')})</span>
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Playback Speed Rate (1.0x / 1.15x / 1.25x) */}
+              {/* Playback Speed Rate */}
               <button
                 onClick={() => {
                   const nextRate = speechRate === 1.0 ? 1.15 : speechRate === 1.15 ? 1.25 : 1.0;
