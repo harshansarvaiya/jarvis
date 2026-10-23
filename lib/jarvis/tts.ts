@@ -1,47 +1,56 @@
 /**
  * J.A.R.V.I.S. & F.R.I.D.A.Y. Movie-Fidelity Neural Speech Synthesis Substrate
- * Powered by Microsoft Azure Cloud Neural Speech (Edge TTS)
- * 100% Free, Zero API Keys Required, Zero VM Thrashing (Directive 06 Compliant)
+ * Powered by Google Cloud Neural Text-to-Speech (GCP Vertex Enterprise Credits)
+ * with Edge TTS secondary fallback.
  * 
  * Authentic Movie Personas:
- * - F.R.I.D.A.Y. (MCU Kerry Condon): en-IE-EmilyNeural (Warm Irish AI cadence)
- * - J.A.R.V.I.S. (MCU Paul Bettany): en-GB-RyanNeural [pitch: -4Hz, rate: +2%] (Refined British Baritone)
- * - KHUSHI (Indic Conversational Persona): en-IN-NeerjaNeural (Natural Hinglish/Indian English)
+ * - F.R.I.D.A.Y. (MCU Kerry Condon): en-GB-Neural2-F (Crisp British/Irish AI tone)
+ * - J.A.R.V.I.S. (MCU Paul Bettany): en-GB-Neural2-D (Refined British Baritone)
+ * - KHUSHI (Indic Conversational Persona): en-IN-Neural2-A (Natural Indian English)
  */
 
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { EdgeTTS } from 'node-edge-tts';
+import { getVertexAccessToken } from './vertex';
 
 export type VoicePersona = 'FRIDAY' | 'JARVIS' | 'KHUSHI';
 
 export interface TTSVoiceConfig {
   voice: string;
   lang: string;
+  googleVoice: string;
+  googleLang: string;
   pitch?: string;
   rate?: string;
 }
 
 export const MOVIE_VOICE_CONFIGS: Record<VoicePersona, TTSVoiceConfig> = {
-  // Kerry Condon — Authentic Irish AI from Avengers: Age of Ultron / Infinity War / Endgame
+  // F.R.I.D.A.Y. — Kerry Condon MCU persona
   FRIDAY: {
     voice: 'en-IE-EmilyNeural',
     lang: 'en-IE',
+    googleVoice: 'en-GB-Neural2-F',
+    googleLang: 'en-GB',
     pitch: '+0Hz',
     rate: '+3%',
   },
-  // Paul Bettany — Refined British Baritone from Iron Man 1-3 & The Avengers
+  // J.A.R.V.I.S. — Paul Bettany British Baritone
   JARVIS: {
     voice: 'en-GB-RyanNeural',
     lang: 'en-GB',
+    googleVoice: 'en-GB-Neural2-D',
+    googleLang: 'en-GB',
     pitch: '-4Hz',
     rate: '+2%',
   },
-  // Khushi — Conversational Indian English / Hinglish Companion
+  // KHUSHI — Natural Indic English Companion
   KHUSHI: {
     voice: 'en-IN-NeerjaNeural',
     lang: 'en-IN',
+    googleVoice: 'en-IN-Neural2-A',
+    googleLang: 'en-IN',
     pitch: '+0Hz',
     rate: '+2%',
   },
@@ -54,31 +63,74 @@ export function sanitizeTextForSpeech(rawText: string): string {
   if (!rawText) return '';
 
   return rawText
-    // Remove code blocks
     .replace(/```[\s\S]*?```/g, ' Code block omitted for brevity. ')
-    // Remove inline code
     .replace(/`([^`]+)`/g, '$1')
-    // Remove markdown headers
     .replace(/^#{1,6}\s+/gm, '')
-    // Remove markdown links [text](url) -> text
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    // Remove bare URLs
     .replace(/https?:\/\/[^\s]+/g, '')
-    // Remove bold/italics asterisks and underscores
     .replace(/(\*\*|\*|__|_)/g, '')
-    // Remove blockquotes
     .replace(/^>\s*/gm, '')
-    // Remove bullet points / list numbers
     .replace(/^(\*|-|\d+\.)\s+/gm, '')
-    // Remove HTML tags
     .replace(/<[^>]+>/g, '')
-    // Clean up excessive whitespace and punctuation
     .replace(/\s+/g, ' ')
     .trim();
 }
 
 /**
- * Synthesizes text into high-fidelity neural audio MP3 buffer matching movie personas.
+ * Synthesizes speech using Google Cloud Neural TTS (Enterprise GCP Credits)
+ */
+async function synthesizeGoogleCloudTTS(
+  text: string,
+  persona: VoicePersona = 'FRIDAY'
+): Promise<Buffer | null> {
+  try {
+    const token = await getVertexAccessToken();
+    if (!token) return null;
+
+    const cfg = MOVIE_VOICE_CONFIGS[persona] || MOVIE_VOICE_CONFIGS.FRIDAY;
+    const projectId = process.env.GCP_PROJECT_ID || 'antigravity-cloud-runner';
+
+    const res = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        'x-goog-user-project': projectId,
+      },
+      body: JSON.stringify({
+        input: { text },
+        voice: {
+          languageCode: cfg.googleLang,
+          name: cfg.googleVoice,
+        },
+        audioConfig: {
+          audioEncoding: 'OGG_OPUS', // Native format for Telegram Voice Notes & Web Audio
+          speakingRate: 1.05,
+          pitch: persona === 'JARVIS' ? -2.0 : 0.0,
+        },
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.warn(`[Google TTS] HTTP ${res.status}: ${errText.slice(0, 100)}`);
+      return null;
+    }
+
+    const data = await res.json();
+    if (data.audioContent) {
+      return Buffer.from(data.audioContent, 'base64');
+    }
+    return null;
+  } catch (err: any) {
+    console.warn('[Google TTS] Synthesis warning:', err?.message || err);
+    return null;
+  }
+}
+
+/**
+ * Synthesizes text into high-fidelity neural audio buffer matching movie personas.
  */
 export async function synthesizeMovieVoice(
   text: string,
@@ -88,23 +140,26 @@ export async function synthesizeMovieVoice(
   const cleanSpoken = sanitizeTextForSpeech(text);
   if (!cleanSpoken) return null;
 
-  // Truncate to speech-friendly length (up to 800 characters for vocal summaries)
-  const truncatedText = cleanSpoken.length > 800
-    ? `${cleanSpoken.slice(0, 780)}... and more details are available in the briefing.`
+  const truncatedText = cleanSpoken.length > 600
+    ? `${cleanSpoken.slice(0, 580)}... and more details are available in the briefing.`
     : cleanSpoken;
 
+  // 1. Primary: Google Cloud Neural TTS (100% reliable on GCP & Vercel, zero 403 blocks)
+  const googleBuffer = await synthesizeGoogleCloudTTS(truncatedText, persona);
+  if (googleBuffer && googleBuffer.length > 0) {
+    return googleBuffer;
+  }
+
+  // 2. Secondary Fallback: Edge TTS
   const cfg = MOVIE_VOICE_CONFIGS[persona] || MOVIE_VOICE_CONFIGS.FRIDAY;
   const tempPath = path.join(os.tmpdir(), `tts_${Date.now()}_${Math.random().toString(36).slice(2)}.mp3`);
-
-  const activePitch = options?.pitch || cfg.pitch;
-  const activeRate = options?.rate || cfg.rate;
 
   try {
     const tts = new EdgeTTS({
       voice: cfg.voice,
       lang: cfg.lang,
-      pitch: activePitch,
-      rate: activeRate,
+      pitch: options?.pitch || cfg.pitch,
+      rate: options?.rate || cfg.rate,
       outputFormat: 'audio-24khz-48kbitrate-mono-mp3',
     });
 
@@ -112,14 +167,11 @@ export async function synthesizeMovieVoice(
 
     if (fs.existsSync(tempPath)) {
       const buffer = fs.readFileSync(tempPath);
-      try {
-        fs.unlinkSync(tempPath);
-      } catch {}
+      try { fs.unlinkSync(tempPath); } catch {}
       return buffer;
     }
     return null;
   } catch (err: any) {
-    console.error(`[TTS Engine] Error synthesizing voice for ${persona}:`, err?.message || err);
     try {
       if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
     } catch {}

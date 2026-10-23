@@ -65,6 +65,7 @@ export default function LiveVoicePage() {
   const transcriptBottomRef = useRef<HTMLDivElement | null>(null);
   const isSpeakingRef = useRef<boolean>(false);
   const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const ttsWatchdogRef = useRef<NodeJS.Timeout | null>(null);
   const mimeTypeRef = useRef<string>('audio/webm');
 
@@ -149,6 +150,10 @@ export default function LiveVoicePage() {
   // Barge-In Speech Interruption Protocol
   const handleBargeIn = useCallback(() => {
     if (isSpeakingRef.current) {
+      if (audioElementRef.current) {
+        try { audioElementRef.current.pause(); } catch {}
+        audioElementRef.current = null;
+      }
       if (typeof window !== 'undefined' && window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
@@ -160,9 +165,9 @@ export default function LiveVoicePage() {
     }
   }, []);
 
-  // Handle Assistant Vocal Synthesis with iOS Safari Anti-GC Watchdog
-  const vocalizeResponse = useCallback(
-    (vocalText: string, fullReply: string, tools: any[], latencyMs: number) => {
+  // Browser SpeechSynthesis Fallback
+  const fallbackSpeechSynthesis = useCallback(
+    (vocalText: string, tools: any[] = [], latencyMs: number = 0) => {
       if (typeof window === 'undefined' || !window.speechSynthesis) {
         setUplinkState('listening');
         setStatusMessage('Listening... Speak anytime (Barge-in armed)');
@@ -177,11 +182,10 @@ export default function LiveVoicePage() {
       isSpeakingRef.current = true;
 
       const utterance = new SpeechSynthesisUtterance(vocalText);
-      activeUtteranceRef.current = utterance; // Retain reference to prevent iOS GC freeze
+      activeUtteranceRef.current = utterance;
       utterance.rate = speechRate;
       utterance.pitch = persona === 'friday' ? 1.05 : 0.95;
 
-      // Prefer British / Irish English voices
       const voices = window.speechSynthesis.getVoices();
       const britishVoice = voices.find(
         (v) =>
@@ -215,7 +219,6 @@ export default function LiveVoicePage() {
       utterance.onend = cleanupUtterance;
       utterance.onerror = cleanupUtterance;
 
-      // iOS Safari Watchdog: verify speaking state doesn't hang silently
       ttsWatchdogRef.current = setInterval(() => {
         if (typeof window !== 'undefined' && window.speechSynthesis) {
           if (!window.speechSynthesis.speaking && isSpeakingRef.current) {
@@ -225,7 +228,13 @@ export default function LiveVoicePage() {
       }, 400);
 
       window.speechSynthesis.speak(utterance);
+    },
+    [persona, speechRate]
+  );
 
+  // Handle Assistant Vocal Synthesis with Direct Neural Audio & WebKit Watchdog
+  const vocalizeResponse = useCallback(
+    (vocalText: string, fullReply: string, tools: any[], latencyMs: number, audioBase64?: string) => {
       // Append Assistant turn to transcript
       setMessages((prev) => [
         ...prev,
@@ -239,8 +248,44 @@ export default function LiveVoicePage() {
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
+
+      // 1. Prefer Direct Neural Audio Buffer if available
+      if (audioBase64 && typeof window !== 'undefined') {
+        try {
+          if (audioElementRef.current) {
+            audioElementRef.current.pause();
+            audioElementRef.current = null;
+          }
+
+          const audio = new Audio(`data:audio/ogg;base64,${audioBase64}`);
+          audioElementRef.current = audio;
+          setUplinkState('speaking');
+          setStatusMessage('Speaking • Tap or speak to interrupt');
+          isSpeakingRef.current = true;
+
+          const cleanupAudio = () => {
+            isSpeakingRef.current = false;
+            audioElementRef.current = null;
+            setUplinkState('listening');
+            setStatusMessage('Listening... Speak anytime (Barge-in armed)');
+          };
+
+          audio.onended = cleanupAudio;
+          audio.onerror = () => {
+            fallbackSpeechSynthesis(vocalText, tools, latencyMs);
+          };
+
+          audio.play().catch(() => {
+            fallbackSpeechSynthesis(vocalText, tools, latencyMs);
+          });
+          return;
+        } catch {}
+      }
+
+      // 2. Fallback to client browser SpeechSynthesis
+      fallbackSpeechSynthesis(vocalText, tools, latencyMs);
     },
-    [persona, speechRate]
+    [fallbackSpeechSynthesis, persona]
   );
 
   // Dispatch Raw Audio Buffer directly to Groq Whisper & Friday Agent
@@ -291,12 +336,13 @@ export default function LiveVoicePage() {
           },
         ]);
 
-        // Vocalize Friday's response
+        // Vocalize Friday's response with direct neural audio
         vocalizeResponse(
           data.vocalText,
           data.fullMarkdownReply,
           data.toolCallsExecuted || [],
-          data.latencyMs || 0
+          data.latencyMs || 0,
+          data.audioBase64
         );
       } catch (err: any) {
         console.error('[Live Voice] Dispatch failed:', err);

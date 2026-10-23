@@ -2,7 +2,7 @@
  * J.A.R.V.I.S. Mark II / F.R.I.D.A.Y. — Sovereign Live Voice Session Engine
  * 
  * Provides real-time full-duplex conversational reasoning, voice-specific prompt tuning,
- * instant vocal text sanitization, and sub-200ms latency execution.
+ * instant vocal text sanitization, and sub-second latency execution.
  * 
  * Designed for:
  * - Live Web PWA Full-Duplex Room (/live)
@@ -10,14 +10,14 @@
  * - AirPods Hands-Free / Driving Duplex Mode
  * 
  * Directives:
- * - Directive 01: 100% Western AI Silicon (Groq US LPU / Gemini Flash).
+ * - Directive 01: 100% Western AI Silicon (Vertex AI Gemini Flash / Groq LPU).
  * - Directive 04: Sovereign Loyalty & Relentless Execution.
  * - Directive 06: Zero-Thrashing cloud API architecture.
  */
 
 import { runJarvisAgent } from './agent';
-import { ChatMessageRecord, getUniversalChatHistory, appendUniversalChatMessage } from './storage';
-import { extractCinematicVocalSummary } from './orchestrator';
+import { getUniversalChatHistory, appendUniversalChatMessage } from './storage';
+import { synthesizeMovieVoice } from './tts';
 
 export interface VoiceDialogueTurnOptions {
   persona?: 'jarvis' | 'friday';
@@ -35,6 +35,7 @@ export interface VoiceDialogueTurnResult {
   toolCallsExecuted: Array<{ name: string; args: any; result?: any }>;
   latencyMs: number;
   engine: string;
+  audioBase64?: string;
 }
 
 /**
@@ -77,7 +78,7 @@ export function cleanTextForVoiceOutput(rawText: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 
-  // Keep spoken response to 1-3 natural sentences (max ~280 characters) to prevent audio fatigue
+  // Keep spoken response to 1-3 natural sentences to prevent audio fatigue
   const sentences = speech.match(/[^.!?]+[.!?]+/g) || [speech];
   if (sentences.length > 3) {
     speech = sentences.slice(0, 3).join(' ').trim();
@@ -92,7 +93,7 @@ export function cleanTextForVoiceOutput(rawText: string): string {
 
 /**
  * Executes an ultra-low latency voice dialogue turn.
- * Leverages Groq US LPU reflex or Gemini 3.7 Flash with a voice-prioritized system instruction.
+ * Leverages Gemini 2.5 Flash on Vertex AI for deterministic ~3s voice reflex and tool calling.
  */
 export async function executeVoiceDialogueTurn(
   options: VoiceDialogueTurnOptions
@@ -116,14 +117,14 @@ CRITICAL RULES FOR SPOKEN VOICE CONVERSATION:
 1. You are communicating through Sir's AirPods / Phone Voice Uplink.
 2. Speak ONLY in natural conversational prose suitable for immediate speech synthesis.
 3. NEVER output markdown formatting (no asterisks, bullet points, hashes, backticks, or tables).
-4. Keep the response to 1 to 3 sentences maximum. Be direct, authoritative, and helpful.
-5. If Sir asks you to do something (check tasks, examine radar, run a build, or search), execute the necessary tool and report the outcome vocally.`;
+4. Keep the response to 1 to 2 sentences maximum. Be direct, authoritative, and concise.
+5. If Sir asks you to do something (check tasks, examine radar, inspect infrastructure, or search), execute the tool and report the outcome vocally.`;
 
-  // Fetch recent conversation context for continuity (master role only)
+  // Fetch recent conversation context (last 4 turns for speed)
   let recentHistory: any[] = [];
   if (role !== 'guest') {
     try {
-      const fullHistory = await getUniversalChatHistory(6);
+      const fullHistory = await getUniversalChatHistory(4);
       recentHistory = fullHistory.map((m) => ({
         role: m.role === 'assistant' ? 'model' : 'user',
         content: m.content,
@@ -139,17 +140,14 @@ CRITICAL RULES FOR SPOKEN VOICE CONVERSATION:
     { role: 'user', content: rawSpeech },
   ];
 
-  // Prefer Groq LPU (gpt-oss-120b or llama-3.3-70b) for sub-180ms voice reflex if available, else Gemini 3.8 Flash
-  const preferredModel = process.env.GROQ_API_KEY
-    ? 'openai/gpt-oss-120b'
-    : 'gemini-3.8-flash';
+  // Gemini 2.5 Flash on Vertex AI provides consistent ~3s response time with tool calling support
+  const preferredModel = 'gemini-2.5-flash';
 
   const agentResult = await runJarvisAgent(messages, {
     model: preferredModel,
-    provider: process.env.GROQ_API_KEY ? 'groq' : 'google',
-    orchestrationMode: 'groq',
+    provider: 'google',
+    orchestrationMode: 'auto',
     apiKey: options.apiKey || process.env.GEMINI_API_KEY,
-    groqApiKey: options.groqApiKey || process.env.GROQ_API_KEY,
   });
 
   const latencyMs = Date.now() - startTime;
@@ -178,6 +176,15 @@ CRITICAL RULES FOR SPOKEN VOICE CONVERSATION:
     }
   }
 
+  // Synthesize neural audio in background or inline
+  let audioBase64: string | undefined;
+  try {
+    const audioBuf = await synthesizeMovieVoice(vocalText, persona === 'friday' ? 'FRIDAY' : 'JARVIS');
+    if (audioBuf) {
+      audioBase64 = audioBuf.toString('base64');
+    }
+  } catch {}
+
   return {
     vocalText,
     fullMarkdownReply: rawReply,
@@ -185,5 +192,6 @@ CRITICAL RULES FOR SPOKEN VOICE CONVERSATION:
     toolCallsExecuted: agentResult.toolCallsExecuted || [],
     latencyMs,
     engine: agentResult.telemetry?.model || agentResult.telemetry?.engineUsed || preferredModel,
+    audioBase64,
   };
 }

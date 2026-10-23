@@ -468,7 +468,10 @@ export class TelegramGateway {
     try {
       const formData = new FormData();
       formData.append('chat_id', String(chatId));
-      formData.append('voice', new Blob([new Uint8Array(voiceBuffer)], { type: 'audio/mpeg' }), 'voice.mp3');
+      const isOgg = voiceBuffer.slice(0, 4).toString() === 'OggS';
+      const filename = isOgg ? 'voice.oga' : 'voice.mp3';
+      const mime = isOgg ? 'audio/ogg' : 'audio/mpeg';
+      formData.append('voice', new Blob([new Uint8Array(voiceBuffer)], { type: mime }), filename);
       if (options?.caption) {
         formData.append('caption', options.caption.slice(0, 1024));
       }
