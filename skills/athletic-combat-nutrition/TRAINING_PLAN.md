@@ -39,5 +39,11 @@ At 103 kg, unassisted bodyweight pull-ups and push-ups place excessive joint she
 *   **Seated Calf Raises:** 3 sets x 15 reps
 *   **Farmer's Carries (Heavy Dumbbells):** 3 sets x 30 paces (Grip strength & trap armor)
 
-### Saturday & Sunday: Recovery & Mobility
-*   Full rest or brisk outdoor walking to clear steps. Mobility work for hips and thoracic spine.
+### Saturday: MMA Explosive Power & Rotational Conditioning
+*   **Medicine Ball Rotational Throws (Wall Slams):** 4 sets x 8 reps/side (Simulating knockout torque & core rotational power)
+*   **Hex Bar Deadlift Jumps (or Explosive Kettlebell Swings):** 4 sets x 5 reps (Explosive triple extension for takedown power)
+*   **Heavy Battle Ropes / Sled Pushes:** 4 sets x 30 seconds (Lactate threshold & anaerobic conditioning)
+*   **Heavy Farmer’s Carries / Sandbag Cleans:** 3 sets x 30 paces (Grappling grip & structural trap armor)
+
+### Sunday: Complete Recovery & Mobility
+*   Full rest, hydration, and gentle mobility work for hips, ankles, and thoracic spine.
