@@ -1,40 +1,43 @@
-# MMA Fighter Recomposition Training Protocol (Sir - 103kg, 6'1")
+# Sovereign MMA-Fighter Physique Training Protocol (103kg Regressed)
 
-## Training Philosophy
-Designed for dense muscle, rotational power, neck/trap durability, and explosive pushing/pulling strength. Integrated with push-ups and pull-ups to complement heavy compound lifting.
+## Core Philosophy
+At 103 kg, unassisted bodyweight pull-ups and push-ups place excessive joint shear and relative strength demands before baseline tendon conditioning is established. We substitute high-yield machine and cable regressions to build combat-ready raw pulling power, pressing thickness, and neck/core armor safely.
 
-## Weekly Split (5 Days On, 2 Days Off: Wednesday & Sunday)
+---
 
-### Monday: Push A (Heavy Press & Explosive Push)
-- Overhead Barbell Press: 3 sets x 5 reps
-- Weighted Dips or Bench Press: 3 sets x 6 reps
-- Plyometric Push-ups: 4 sets x 12 reps
-- Heavy Core Rotational Med-Ball Slams: 3 sets x 15 reps
+## 5-Day Split Architecture
 
-### Tuesday: Pull A (Width & Thickness)
-- Weighted Pull-ups: 4 sets x 6 reps
-- Barbell Rows: 3 sets x 8 reps
-- Face Pulls: 4 sets x 15 reps (Posture & Rear Delts)
-- Trap Bar Deadlifts / Heavy Shrugs: 3 sets x 5 reps
+### Monday: Upper Power & Pull (Back / Biceps / Rear Delts)
+*   **Lat Pulldowns (Wide Grip):** 4 sets x 8–10 reps (Building V-taper without bodyweight bottleneck)
+*   **Seated Cable Rows:** 4 sets x 8–10 reps (Mid-back thickness for clinch stability)
+*   **Chest-Supported T-Bar Rows:** 3 sets x 10–12 reps
+*   **Incline Dumbbell Bicep Curls:** 3 sets x 12 reps
+*   **Face Pulls / Rear Delt Flyes:** 4 sets x 15 reps (Postural armor)
 
-### Wednesday: REST & RECOVERY
-- Active recovery, walking, and mobility work.
+### Tuesday: Lower Strength (Squat & Posterior Chain)
+*   **Leg Press or Goblet Squats:** 4 sets x 8–10 reps
+*   **Romanian Deadlifts (Dumbbell or Barbell):** 4 sets x 8–10 reps (Hamstring/glute explosiveness for takedowns)
+*   **Seated Leg Curls:** 3 sets x 12 reps
+*   **Standing Calf Raises:** 4 sets x 15 reps
 
-### Thursday: Lower A (Explosive Power & Base)
-- Front Squats or Goblet Squats: 4 sets x 6 reps
-- Romanian Deadlifts: 3 sets x 8 reps
-- Standing Calf Raises: 4 sets x 12 reps
-- Hanging Leg Raises: 4 sets x 12 reps
+### Wednesday: Active Recovery & Core Armor
+*   **Cardio:** 10,000 steps baseline + 20 mins Zone 2 stationary cycling.
+*   **Core / Neck Armor:**
+    *   Planks: 3 x 60s
+    *   Pallof Press: 3 x 12 reps/side (Rotational anti-movement)
+    *   Neck Harness / Isometric Neck Flexion/Extension: 3 x 15 reps (Essential for absorbing combat impact)
 
-### Friday: Upper B (Calisthenics & Combat Endurance)
-- Pull-up Pyramids (Strict form): To failure / Max reps
-- Diamond Push-ups & Archer Push-ups superset: 4 sets x 15 reps total
-- Neck Harness / Plate Resistance: 3 sets x 15 reps (Essential for MMA chin durability)
+### Thursday: Upper Push & Shoulders (Chest / Triceps / Lateral Delts)
+*   **Incline Dumbbell Press (or Machine Chest Press):** 4 sets x 8–10 reps (Safe joint angle, high pectoral activation)
+*   **Seated Overhead Dumbbell Press:** 3 sets x 8–10 reps (Shoulder stability and punch lockout)
+*   **Cable Lateral Raises:** 4 sets x 12–15 reps (Broad shoulder cap aesthetic)
+*   **Tricep Pushdowns (Rope):** 3 sets x 12–15 reps
 
-### Saturday: Full Body Athletic & Grip
-- Farmer's Walks (Heavy carries): 4 sets x 40 meters
-- Kettlebell Swings: 4 sets x 20 reps
-- Sled Push / High-Intensity Conditioning: 15 minutes
+### Friday: Lower Hypertrophy & Unilateral Strength
+*   **Bulgarian Split Squats (Bodyweight or light DBs):** 3 sets x 8–10 reps/leg
+*   **Leg Extensions:** 3 sets x 12–15 reps
+*   **Seated Calf Raises:** 3 sets x 15 reps
+*   **Farmer's Carries (Heavy Dumbbells):** 3 sets x 30 paces (Grip strength & trap armor)
 
-### Sunday: REST
-- Complete physical recovery.
+### Saturday & Sunday: Recovery & Mobility
+*   Full rest or brisk outdoor walking to clear steps. Mobility work for hips and thoracic spine.
