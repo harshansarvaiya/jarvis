@@ -33,6 +33,7 @@ export interface OpenAICompatibleOptions {
   systemPrompt: string;
   temperature?: number;
   maxTokens?: number;
+  timeoutMs?: number;
   extraHeaders?: Record<string, string>;
   tools?: any[];
 }
@@ -45,7 +46,7 @@ export async function runOpenAICompatibleAgent(
   toolCallsExecuted: Array<{ name: string; args: any; result: any }>;
   error?: string;
 }> {
-  const { endpoint, apiKey, model, systemPrompt, temperature = 0.4, maxTokens = 1536, extraHeaders = {}, tools: customTools } = options;
+  const { endpoint, apiKey, model, systemPrompt, temperature = 0.4, maxTokens = 1536, timeoutMs = 15000, extraHeaders = {}, tools: customTools } = options;
 
   const toolCallsExecuted: Array<{ name: string; args: any; result: any }> = [];
 
@@ -108,7 +109,7 @@ export async function runOpenAICompatibleAgent(
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
 
       if (!res.ok) {
@@ -121,7 +122,7 @@ export async function runOpenAICompatibleAgent(
             method: 'POST',
             headers,
             body: JSON.stringify(requestBody),
-            signal: AbortSignal.timeout(6000),
+            signal: AbortSignal.timeout(timeoutMs),
           });
           if (!res.ok) {
             const retryErr = await res.text().catch(() => '');

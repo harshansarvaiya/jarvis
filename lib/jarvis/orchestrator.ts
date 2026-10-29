@@ -10,7 +10,7 @@
  */
 
 export type OperationalArchetype = 'MULTIMODAL_PERCEPTION' | 'REFLEX_SPEED' | 'DEEP_SYNTHESIS' | 'RED_TEAM_SANDBOX';
-export type ActivePersona = 'FRIDAY' | 'JARVIS';
+export type ActivePersona = 'FRIDAY' | 'JARVIS' | 'VIS';
 
 export interface OrchestrationTelemetry {
   engineUsed: string;

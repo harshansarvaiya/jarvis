@@ -1034,13 +1034,18 @@ async function processDirective(
       image: base64Image,
     });
 
-    // 2. Invoke J.A.R.V.I.S. / F.R.I.D.A.Y. Agent
-    const isFridayDirective = /friday/i.test(cleanUserText);
+    // 2. Invoke J.A.R.V.I.S. / F.R.I.D.A.Y. / V.I.S. Agent
+    const isFridayDirective = /\bfriday\b/i.test(cleanUserText);
+    const isVisDirective = /\bvis\b/i.test(cleanUserText) || cleanUserText.startsWith('/vis');
+    const assignedPersona = isVisDirective ? 'VIS' : isFridayDirective ? 'FRIDAY' : undefined;
+    const assignedMode = isVisDirective ? 'sovereign-arc' : requestedMode;
+    const assignedModel = isVisDirective ? 'vis' : requestedModel;
+
     const result = await runJarvisAgent(contextMessages, {
-      model: requestedModel,
-      orchestrationMode: requestedMode,
+      model: assignedModel,
+      orchestrationMode: assignedMode,
       specializedAgentId: delegatedAgentId,
-      persona: isFridayDirective ? 'FRIDAY' : undefined,
+      persona: assignedPersona,
       incognito: isIncognito,
       onProgress: async (stepText: string) => {
         gateway.sendTypingAction(chatId).catch(() => {});
@@ -1086,8 +1091,9 @@ async function processDirective(
       responseText += `🎙️ *[Transcribed]*: _"${cleanUserText}"_\n\n`;
     }
 
+    const isVis = result.telemetry?.persona === 'VIS' || result.telemetry?.provider === 'sovereign-arc';
     const isFriday = result.telemetry?.persona === 'FRIDAY';
-    const personaHeader = isFriday ? '🛡️ **F.R.I.D.A.Y.**' : '⚡ **J.A.R.V.I.S.**';
+    const personaHeader = isVis ? '🧠 **V.I.S.**' : isFriday ? '🛡️ **F.R.I.D.A.Y.**' : '⚡ **J.A.R.V.I.S.**';
 
     if (delegatedProfile) {
       responseText += `${personaHeader} ➔ *[Specialist: ${delegatedProfile.name}]*\n\n`;
@@ -1103,11 +1109,14 @@ async function processDirective(
       responseText += `\n\n⚙️ _Executed: ${uniqueTools.map((t) => `\`${t}\``).join(', ')}_`;
     }
 
-    // Append Telemetry Badge (F.R.I.D.A.Y. vs J.A.R.V.I.S.)
+    // Append Telemetry Badge (V.I.S. vs F.R.I.D.A.Y. vs J.A.R.V.I.S.)
     if (result.telemetry) {
       const engineName = result.telemetry.engineUsed || 'Vertex AI Gemini 3.8';
-      const isFriday = result.telemetry.persona === 'FRIDAY';
-      const badgePrefix = isFriday ? '🛡️ `[F.R.I.D.A.Y. APEX]' : '⚡ `[J.A.R.V.I.S. TACTICAL]';
+      const badgePrefix = isVis
+        ? '🧠 `[V.I.S. SOVEREIGN]'
+        : isFriday
+        ? '🛡️ `[F.R.I.D.A.Y. APEX]'
+        : '⚡ `[J.A.R.V.I.S. TACTICAL]';
       responseText += `\n\n${badgePrefix} ${engineName} // ${result.telemetry.latencyMs}ms\``;
     }
 

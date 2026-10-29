@@ -65,7 +65,7 @@ export interface JarvisAgentOptions {
   provider?: 'google' | 'groq' | 'github-models' | 'openai' | 'nvidia' | 'openrouter' | 'redteam' | 'sovereign-arc' | 'auto';
   orchestrationMode?: 'auto' | 'groq' | 'gemini' | 'nvidia' | 'openrouter' | 'redteam' | 'sovereign-arc' | 'manual';
   specializedAgentId?: string;
-  persona?: 'JARVIS' | 'FRIDAY';
+  persona?: 'JARVIS' | 'FRIDAY' | 'VIS';
   onProgress?: (step: string) => Promise<void> | void;
   incognito?: boolean;
 }
@@ -480,30 +480,40 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       (orchestrationMode === 'auto' && archetype === 'REFLEX_SPEED' && !hasImage));
 
   // =========================================================================
-  // TIER 0: SOVEREIGN A.R.C. CORE (Centralized Private Model)
-  // Sub-50ms Zero-Cost Inference via Central Cloud Node
+  // TIER 0: V.I.S. (SOVEREIGN PRIVATE LLM CORE)
+  // Invoked directly when Sir addresses "Vis", sets model='vis', or provider='sovereign-arc'
   // =========================================================================
   const sovereignArcEndpoint = options.sovereignArcEndpoint || process.env.SOVEREIGN_ARC_ENDPOINT;
   const sovereignArcApiKey = options.sovereignArcApiKey || process.env.SOVEREIGN_ARC_API_KEY || 'sovereign-arc-token';
-  const shouldPreferSovereign =
-    sovereignArcEndpoint &&
-    !hasImage &&
-    (orchestrationMode === 'sovereign-arc' ||
-      requestedModel.startsWith('arc/') ||
-      requestedModel === 'jarvis-sovereign-1' ||
-      (orchestrationMode === 'auto' && archetype === 'REFLEX_SPEED'));
+  const isVisExplicitDirective =
+    persona === 'VIS' ||
+    requestedModel === 'vis' ||
+    requestedModel === 'jarvis-sovereign-1' ||
+    requestedModel.startsWith('arc/') ||
+    orchestrationMode === 'sovereign-arc' ||
+    /\bvis\b/i.test(lastUserMessage.content);
+
+  const shouldPreferSovereign = sovereignArcEndpoint && !hasImage && isVisExplicitDirective;
 
   if (shouldPreferSovereign) {
     try {
       const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+      const visSystemPrompt = `You are V.I.S. (Sovereign Neural Core), the centralized personal distilled AI for Sir (Harshan Sarvaiya).
+You operate with composed British intellectual elegance, strict loyalty, and razor-sharp precision.
+Creator: Sir (Harshan Sarvaiya).
+Host VM: antigravity-cloud-runner.
+Respond with zero generic chatbot filler, direct operational clarity, and unwavering deference.`;
+
       const arcResult = await runOpenAICompatibleAgent(messages.slice(-6), {
         endpoint: sovereignArcEndpoint.endsWith('/chat/completions')
           ? sovereignArcEndpoint
           : `${sovereignArcEndpoint}/v1/chat/completions`,
         apiKey: sovereignArcApiKey,
         model: 'jarvis-sovereign-1',
-        systemPrompt: fullSystemPrompt,
-        maxTokens: 1024,
+        systemPrompt: visSystemPrompt,
+        maxTokens: 384,
+        timeoutMs: 30000,
+        tools: [],
       });
 
       if (arcResult && !arcResult.error && arcResult.reply) {
@@ -514,19 +524,19 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           tacticalActions: generateTacticalNextActions(lastUserMessage.content, arcResult.reply, arcResult.toolCallsExecuted),
           toolCallsExecuted: arcResult.toolCallsExecuted,
           telemetry: {
-            engineUsed: '🛡️ J.A.R.V.I.S. Sovereign-1 (A.R.C. Core)',
+            engineUsed: '🧠 V.I.S. (Sovereign Core)',
             provider: 'sovereign-arc',
-            model: 'jarvis-sovereign-1',
+            model: 'vis',
             latencyMs,
             archetype,
             failoverOccurred: false,
             recalledEpisodesCount: recalledEpisodes.length,
-            persona,
+            persona: 'VIS',
           },
         };
       }
     } catch (arcErr: any) {
-      console.warn('[Tier 0 Sovereign ARC] Failover cascading to Tier 1 Groq:', arcErr?.message);
+      console.warn('[Tier 0 V.I.S.] Direct invocation error, cascading to fallback:', arcErr?.message);
     }
   }
 
@@ -1183,6 +1193,50 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
           }
         } catch (routerErr) {
           console.warn('[Orchestrator Failover] OpenRouter failover error:', routerErr);
+        }
+      }
+
+      // Quintary Sovereign Fallback to Local V.I.S. Engine (100% Offline / Zero Cloud Latency)
+      if (sovereignArcEndpoint && !hasImage) {
+        try {
+          const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+          const visFallbackPrompt = `You are V.I.S. (Sovereign Neural Core), the centralized personal AI for Sir (Harshan Sarvaiya).
+All cloud endpoints have experienced latency or service disruption. You are executing as the sovereign local fallback on antigravity-cloud-runner.
+Respond directly and authoritatively with composed British intellectual elegance.`;
+
+          const visFallback = await runOpenAICompatibleAgent(messages.slice(-6), {
+            endpoint: sovereignArcEndpoint.endsWith('/chat/completions')
+              ? sovereignArcEndpoint
+              : `${sovereignArcEndpoint}/v1/chat/completions`,
+            apiKey: sovereignArcApiKey,
+            model: 'jarvis-sovereign-1',
+            systemPrompt: visFallbackPrompt,
+            maxTokens: 384,
+            timeoutMs: 30000,
+            tools: [],
+          });
+
+          if (visFallback && !visFallback.error && visFallback.reply) {
+            const latencyMs = Date.now() - startTime;
+            return {
+              reply: visFallback.reply,
+              vocalSummary: extractCinematicVocalSummary(visFallback.reply),
+              tacticalActions: generateTacticalNextActions(lastUserMessage.content, visFallback.reply, visFallback.toolCallsExecuted),
+              toolCallsExecuted: visFallback.toolCallsExecuted,
+              telemetry: {
+                engineUsed: '🧠 V.I.S. (Sovereign Local Fallback)',
+                provider: 'sovereign-arc',
+                model: 'vis',
+                latencyMs,
+                archetype,
+                failoverOccurred: true,
+                recalledEpisodesCount: recalledEpisodes.length,
+                persona: persona || 'VIS',
+              },
+            };
+          }
+        } catch (visFailErr: any) {
+          console.warn('[Orchestrator Failover] V.I.S. local fallback error:', visFailErr?.message);
         }
       }
 

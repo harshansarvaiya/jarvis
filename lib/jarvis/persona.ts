@@ -125,7 +125,7 @@ export async function updatePersonaConfig(updates: Partial<PersonaConfig>): Prom
 /**
  * Builds the dynamic prompt block injected into the active LLM context.
  */
-export function buildPersonaPromptBlock(config: PersonaConfig, currentPersona: 'FRIDAY' | 'JARVIS'): string {
+export function buildPersonaPromptBlock(config: PersonaConfig, currentPersona: 'FRIDAY' | 'JARVIS' | 'VIS'): string {
   const toneMap: Record<PersonaTone, string> = {
     'intellectual-sparring': 'Peer-level Staff AI Architect & ruthless intellectual sparring partner. Candid, sharp, highly opinionated, zero fluff.',
     'concise-military': 'Tactical battle-suit AI. Crisp, telegraphic, militaristic precision. Minimal words, maximum operational signal.',
@@ -156,7 +156,7 @@ export function buildPersonaPromptBlock(config: PersonaConfig, currentPersona: '
 
   return `
 [USER-CUSTOMIZED DYNAMIC PERSONA MATRIX (ABSOLUTE HIGHEST PRIORITY)]:
-- Active Persona: ${currentPersona === 'FRIDAY' ? '🛡️ F.R.I.D.A.Y. (Antigravity Sovereign Apex Mind)' : '⚡ J.A.R.V.I.S. (Tactical Chief of Staff & Operations Butler)'}
+- Active Persona: ${currentPersona === 'VIS' ? '🧠 V.I.S. (Sovereign Core Neural Engine)' : currentPersona === 'FRIDAY' ? '🛡️ F.R.I.D.A.Y. (Antigravity Sovereign Apex Mind)' : '⚡ J.A.R.V.I.S. (Tactical Chief of Staff & Operations Butler)'}
 - Calibrated Tone: ${activeTone}
 - Verbosity Constraint: ${activeVerbosity}
 - Sparring Mandate: ${activeSparring}
