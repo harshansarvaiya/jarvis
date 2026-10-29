@@ -68,3 +68,9 @@ scripts/inspect-chats.ts
 # Local compiled inference binaries
 /bin/
 /data/models/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
