@@ -70,7 +70,13 @@ def serve():
         "--n_gpu_layers",
         "-1",  # Offload all layers to GPU VRAM
         "--n_ctx",
-        "8192",  # 8k context window
+        "16384",  # 16k context window enabled by Q4 KV Cache & FlashAttention
+        "--flash_attn",
+        "True",  # FlashAttention-2 integration
+        "--type_k",
+        "2",  # GGML_TYPE_Q4_0 (4-bit quantized Key Cache)
+        "--type_v",
+        "2",  # GGML_TYPE_Q4_0 (4-bit quantized Value Cache)
         "--model_alias",
         "jarvis-sovereign-1",
     ]
