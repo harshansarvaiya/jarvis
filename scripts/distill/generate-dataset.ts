@@ -16,7 +16,6 @@
 
 import fs from 'fs';
 import path from 'path';
-import { callVertexAIGenerate } from '../../lib/jarvis/vertex';
 
 export type DistillPillar = 'PERSONA' | 'TOOLS' | 'MEMORY' | 'SPARRING' | 'ALL';
 
@@ -34,6 +33,17 @@ interface GeneratedPair {
 const DISTILL_DIR = path.resolve(process.cwd(), 'data', 'distill');
 const RAW_OUTPUT_FILE = path.join(DISTILL_DIR, 'distill_raw_pairs.jsonl');
 const EXPORT_DIR = path.join(DISTILL_DIR, 'export');
+
+function getGroqApiKey(): string {
+  if (process.env.GROQ_API_KEY) return process.env.GROQ_API_KEY;
+  const envLocalPath = path.resolve(process.cwd(), '.env.local');
+  if (fs.existsSync(envLocalPath)) {
+    const content = fs.readFileSync(envLocalPath, 'utf-8');
+    const match = content.match(/GROQ_API_KEY=([^\r\n]+)/);
+    if (match && match[1]) return match[1].trim();
+  }
+  throw new Error('GROQ_API_KEY not found in environment or .env.local');
+}
 
 const SECRET_PATTERNS = [
   /AIza[0-9A-Za-z-_]{35}/g,
@@ -104,35 +114,42 @@ Format your output as a JSON array of objects with keys: "userPrompt", "thinking
 
 async function generateBatch(pillar: Exclude<DistillPillar, 'ALL'>): Promise<GeneratedPair[]> {
   const config = PILLAR_PROMPTS[pillar];
+  const apiKey = getGroqApiKey();
 
-  const response = await callVertexAIGenerate({
-    model: 'gemini-3.8-flash',
-    systemInstruction: {
-      parts: [{ text: config.system }]
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
     },
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: config.taskPrompt }]
-      }
-    ],
-    generationConfig: {
+    body: JSON.stringify({
+      model: 'openai/gpt-oss-120b',
+      messages: [
+        {
+          role: 'system',
+          content: `${config.system}\n\nIMPORTANT: Return a JSON object with a single key "items" containing an array of generated conversation objects. Each object MUST have "userPrompt" (string), "assistantResponse" (string), and optionally "thinkingTrace" (string) and "toolCalls" (array).`
+        },
+        {
+          role: 'user',
+          content: config.taskPrompt
+        }
+      ],
+      response_format: { type: 'json_object' },
       temperature: 0.7,
-      maxOutputTokens: 4096,
-      responseMimeType: 'application/json'
-    }
+      max_tokens: 4096
+    })
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Vertex API call failed with status ${response.status}: ${errorText}`);
+    throw new Error(`Groq LPU call failed with status ${response.status}: ${errorText}`);
   }
 
   const data = await response.json();
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const rawText = data.choices?.[0]?.message?.content;
 
   if (!rawText) {
-    throw new Error('Received empty content from Vertex AI');
+    throw new Error('Received empty content from Groq LPU');
   }
 
   const parsed = JSON.parse(rawText);
@@ -161,11 +178,11 @@ async function generateBatch(pillar: Exclude<DistillPillar, 'ALL'>): Promise<Gen
 
 export async function runDistillationForge(targetCount: number = 20, selectedPillar: DistillPillar = 'ALL') {
   console.log('================================================================');
-  console.log('⚡ Project A.R.C. — Synthetic Distillation Dataset Forge');
+  console.log('⚡ Project A.R.C. — Sovereign Distillation Forge (Groq LPU Engine)');
   console.log('================================================================');
   console.log(`• Target Synthesized Pairs: ${targetCount}`);
   console.log(`• Target Pillar Filter:     ${selectedPillar}`);
-  console.log(`• Teacher Engine:           🧠 Google Cloud Vertex AI (Gemini 3.8 Flash)`);
+  console.log(`• Teacher Engine:           ⚡ Groq US LPU Silicon (openai/gpt-oss-120b)`);
   console.log(`• Target Student Lineage:   Meta Llama 3.2 3B (Directive 01 Western Compliant)\n`);
 
   fs.mkdirSync(DISTILL_DIR, { recursive: true });
