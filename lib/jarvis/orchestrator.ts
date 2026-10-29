@@ -14,7 +14,7 @@ export type ActivePersona = 'FRIDAY' | 'JARVIS';
 
 export interface OrchestrationTelemetry {
   engineUsed: string;
-  provider: 'groq' | 'google' | 'vertex-ai' | 'github-models' | 'openrouter' | 'offline';
+  provider: 'groq' | 'google' | 'vertex-ai' | 'github-models' | 'openrouter' | 'offline' | 'sovereign-arc';
   model: string;
   latencyMs: number;
   archetype: OperationalArchetype;

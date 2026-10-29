@@ -60,8 +60,10 @@ export interface JarvisAgentOptions {
   githubToken?: string;
   nvidiaApiKey?: string;
   openrouterApiKey?: string;
-  provider?: 'google' | 'groq' | 'github-models' | 'openai' | 'nvidia' | 'openrouter' | 'redteam' | 'auto';
-  orchestrationMode?: 'auto' | 'groq' | 'gemini' | 'nvidia' | 'openrouter' | 'redteam' | 'manual';
+  sovereignArcEndpoint?: string;
+  sovereignArcApiKey?: string;
+  provider?: 'google' | 'groq' | 'github-models' | 'openai' | 'nvidia' | 'openrouter' | 'redteam' | 'sovereign-arc' | 'auto';
+  orchestrationMode?: 'auto' | 'groq' | 'gemini' | 'nvidia' | 'openrouter' | 'redteam' | 'sovereign-arc' | 'manual';
   specializedAgentId?: string;
   persona?: 'JARVIS' | 'FRIDAY';
   onProgress?: (step: string) => Promise<void> | void;
@@ -476,6 +478,57 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       requestedModel.startsWith('openai/') ||
       requestedModel.startsWith('groq/') ||
       (orchestrationMode === 'auto' && archetype === 'REFLEX_SPEED' && !hasImage));
+
+  // =========================================================================
+  // TIER 0: SOVEREIGN A.R.C. CORE (Centralized Private Model)
+  // Sub-50ms Zero-Cost Inference via Central Cloud Node
+  // =========================================================================
+  const sovereignArcEndpoint = options.sovereignArcEndpoint || process.env.SOVEREIGN_ARC_ENDPOINT;
+  const sovereignArcApiKey = options.sovereignArcApiKey || process.env.SOVEREIGN_ARC_API_KEY || 'sovereign-arc-token';
+  const shouldPreferSovereign =
+    sovereignArcEndpoint &&
+    !hasImage &&
+    (orchestrationMode === 'sovereign-arc' ||
+      requestedModel.startsWith('arc/') ||
+      requestedModel === 'jarvis-sovereign-1' ||
+      (orchestrationMode === 'auto' && archetype === 'REFLEX_SPEED'));
+
+  if (shouldPreferSovereign) {
+    try {
+      const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+      const arcResult = await runOpenAICompatibleAgent(messages.slice(-6), {
+        endpoint: sovereignArcEndpoint.endsWith('/chat/completions')
+          ? sovereignArcEndpoint
+          : `${sovereignArcEndpoint}/v1/chat/completions`,
+        apiKey: sovereignArcApiKey,
+        model: 'jarvis-sovereign-1',
+        systemPrompt: fullSystemPrompt,
+        maxTokens: 1024,
+      });
+
+      if (arcResult && !arcResult.error && arcResult.reply) {
+        const latencyMs = Date.now() - startTime;
+        return {
+          reply: arcResult.reply,
+          vocalSummary: extractCinematicVocalSummary(arcResult.reply),
+          tacticalActions: generateTacticalNextActions(lastUserMessage.content, arcResult.reply, arcResult.toolCallsExecuted),
+          toolCallsExecuted: arcResult.toolCallsExecuted,
+          telemetry: {
+            engineUsed: '🛡️ J.A.R.V.I.S. Sovereign-1 (A.R.C. Core)',
+            provider: 'sovereign-arc',
+            model: 'jarvis-sovereign-1',
+            latencyMs,
+            archetype,
+            failoverOccurred: false,
+            recalledEpisodesCount: recalledEpisodes.length,
+            persona,
+          },
+        };
+      }
+    } catch (arcErr: any) {
+      console.warn('[Tier 0 Sovereign ARC] Failover cascading to Tier 1 Groq:', arcErr?.message);
+    }
+  }
 
   // =========================================================================
   // ROUTE A: GROQ US LPU REFLEX ENGINE (Sub-Second 100–180ms Dispatch)
