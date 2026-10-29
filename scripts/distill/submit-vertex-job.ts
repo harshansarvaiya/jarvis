@@ -90,7 +90,7 @@ gcloud storage cp gs://${BUCKET_NAME}/distill/latest/* .
 ls -la
 echo "=== Commencing Training Harness ==="
 python3 train_arc.py \\
-  --base_model meta-llama/Llama-3.2-3B-Instruct \\
+  --base_model unsloth/Llama-3.2-3B-Instruct \\
   --train_file train_master_arc.jsonl \\
   --val_file val_master_arc.jsonl \\
   --output_dir ./output_adapters \\

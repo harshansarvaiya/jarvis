@@ -237,7 +237,7 @@ def train(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="J.A.R.V.I.S. Mark II A.R.C. Distillation Harness")
-    parser.add_argument("--base_model", type=str, default="meta-llama/Llama-3.2-3B-Instruct")
+    parser.add_argument("--base_model", type=str, default="unsloth/Llama-3.2-3B-Instruct")
     parser.add_argument("--train_file", type=str, required=True, help="Path to train_master_arc.jsonl")
     parser.add_argument("--val_file", type=str, default=None, help="Path to val_master_arc.jsonl")
     parser.add_argument("--output_dir", type=str, default="./arc_model_output")
