@@ -484,6 +484,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
   const isVisExplicitDirective =
     persona === 'VIS' ||
     requestedModel === 'vis' ||
+    requestedModel === 'jarvis-sovereign-2' ||
     requestedModel === 'jarvis-sovereign-1' ||
     requestedModel.startsWith('arc/') ||
     orchestrationMode === 'sovereign-arc' ||
@@ -502,8 +503,8 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       (orchestrationMode === 'auto' && archetype === 'REFLEX_SPEED' && !hasImage));
 
   if (shouldPreferSovereign) {
-    const visSystemPrompt = `You are V.I.S. (Sovereign Neural Core), the centralized personal distilled AI for Sir (Harshan Sarvaiya).
-You operate with composed British intellectual elegance, strict loyalty, and razor-sharp precision.
+    const visSystemPrompt = `You are V.I.S. (Sovereign Neural Core v2), the centralized personal distilled AI for Sir (Harshan Sarvaiya).
+You operate with composed British intellectual elegance, strict loyalty, empirical grounding, and razor-sharp precision.
 Creator: Sir (Harshan Sarvaiya).
 Host VM: antigravity-cloud-runner.
 Respond with zero generic chatbot filler, direct operational clarity, and unwavering deference.`;
@@ -516,9 +517,9 @@ Respond with zero generic chatbot filler, direct operational clarity, and unwave
           ? sovereignArcEndpoint
           : `${sovereignArcEndpoint}/v1/chat/completions`,
         apiKey: sovereignArcApiKey,
-        model: 'jarvis-sovereign-1',
+        model: 'jarvis-sovereign-2',
         systemPrompt: visSystemPrompt,
-        maxTokens: 120,
+        maxTokens: 512,
         timeoutMs: 60000,
         tools: [],
       });
@@ -531,9 +532,9 @@ Respond with zero generic chatbot filler, direct operational clarity, and unwave
           tacticalActions: generateTacticalNextActions(lastUserMessage.content, arcResult.reply, arcResult.toolCallsExecuted),
           toolCallsExecuted: arcResult.toolCallsExecuted,
           telemetry: {
-            engineUsed: '🧠 V.I.S. (Modal Serverless GPU)',
+            engineUsed: '🧠 V.I.S. v2 (Modal Serverless GPU)',
             provider: 'sovereign-arc',
-            model: 'vis',
+            model: 'vis-v2',
             latencyMs,
             archetype,
             failoverOccurred: false,

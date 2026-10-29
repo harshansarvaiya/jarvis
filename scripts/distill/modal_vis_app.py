@@ -10,10 +10,11 @@ import modal
 
 app = modal.App("vis-sovereign-core")
 
-# Persistent volume containing our 1.9 GB GGUF model
+# Persistent volume containing our GGUF models
 vault_volume = modal.Volume.from_name("jarvis-vault")
 VAULT_MOUNT = "/vault"
-DEFAULT_MODEL_PATH = f"{VAULT_MOUNT}/models/jarvis-sovereign-1.gguf"
+V2_MODEL_PATH = f"{VAULT_MOUNT}/models/jarvis-sovereign-2_gguf/Llama-3.2-3B-Instruct.Q4_K_M.gguf"
+V1_MODEL_PATH = f"{VAULT_MOUNT}/models/jarvis-sovereign-1.gguf"
 
 # Container image with CUDA 12.4 runtime and precompiled llama-cpp-python
 image = (
@@ -45,7 +46,7 @@ def serve():
     Spawns llama-cpp-python OpenAI-compatible API server on port 8000.
     Modal maps this port automatically to a secure public HTTPS endpoint.
     """
-    model_path = DEFAULT_MODEL_PATH
+    model_path = V2_MODEL_PATH if os.path.exists(V2_MODEL_PATH) else V1_MODEL_PATH
     if not os.path.exists(model_path):
         for root, _, files in os.walk(VAULT_MOUNT):
             for f in files:
@@ -55,7 +56,7 @@ def serve():
             if os.path.exists(model_path):
                 break
 
-    print(f"[V.I.S. GPU SUBSTRATE] Resolved model path: {model_path} (exists={os.path.exists(model_path)})")
+    print(f"[V.I.S. GPU SUBSTRATE v2] Resolved model path: {model_path} (exists={os.path.exists(model_path)})")
 
     cmd = [
         "python3",
@@ -78,7 +79,7 @@ def serve():
         "--type_v",
         "2",  # GGML_TYPE_Q4_0 (4-bit quantized Value Cache)
         "--model_alias",
-        "jarvis-sovereign-1",
+        "jarvis-sovereign-2",
     ]
     print(f"[V.I.S. GPU SUBSTRATE] Launching server: {' '.join(cmd)}")
     subprocess.Popen(cmd)
