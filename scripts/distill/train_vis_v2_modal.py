@@ -113,7 +113,7 @@ def train_and_export_vis_v2(
         args=TrainingArguments(
             per_device_train_batch_size=2,
             gradient_accumulation_steps=4,
-            warmup_ratio=0.05,
+            warmup_steps=5,
             max_steps=max_steps,
             learning_rate=learning_rate,
             fp16=not torch.cuda.is_bf16_supported(),
