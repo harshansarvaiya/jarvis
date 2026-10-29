@@ -12,9 +12,8 @@ app = modal.App("vis-sovereign-core")
 
 # Persistent volume containing our 1.9 GB GGUF model
 vault_volume = modal.Volume.from_name("jarvis-vault")
-MODEL_DIR = "/models"
-MODEL_FILENAME = "jarvis-sovereign-1.gguf"
-MODEL_PATH = f"{MODEL_DIR}/{MODEL_FILENAME}"
+VAULT_MOUNT = "/vault"
+DEFAULT_MODEL_PATH = f"{VAULT_MOUNT}/models/jarvis-sovereign-1.gguf"
 
 # Container image with CUDA 12.4 runtime and precompiled llama-cpp-python
 image = (
@@ -36,22 +35,34 @@ image = (
 @app.function(
     image=image,
     gpu="T4",  # Highly cost-efficient NVIDIA T4 (16GB VRAM)
-    volumes={MODEL_DIR: vault_volume},
+    volumes={VAULT_MOUNT: vault_volume},
     timeout=300,
-    container_idle_timeout=120,  # Auto-scales to zero after 2 minutes of idle -> $0 cost
+    scaledown_window=120,  # Auto-scales to zero after 2 minutes of idle -> $0 cost
 )
-@modal.web_server(port=8000, startup_timeout=60)
+@modal.web_server(8000, startup_timeout=120)
 def serve():
     """
     Spawns llama-cpp-python OpenAI-compatible API server on port 8000.
     Modal maps this port automatically to a secure public HTTPS endpoint.
     """
+    model_path = DEFAULT_MODEL_PATH
+    if not os.path.exists(model_path):
+        for root, _, files in os.walk(VAULT_MOUNT):
+            for f in files:
+                if f.endswith(".gguf"):
+                    model_path = os.path.join(root, f)
+                    break
+            if os.path.exists(model_path):
+                break
+
+    print(f"[V.I.S. GPU SUBSTRATE] Resolved model path: {model_path} (exists={os.path.exists(model_path)})")
+
     cmd = [
         "python3",
         "-m",
         "llama_cpp.server",
         "--model",
-        MODEL_PATH,
+        model_path,
         "--host",
         "0.0.0.0",
         "--port",
@@ -60,7 +71,7 @@ def serve():
         "-1",  # Offload all layers to GPU VRAM
         "--n_ctx",
         "8192",  # 8k context window
-        "--alias",
+        "--model_alias",
         "jarvis-sovereign-1",
     ]
     print(f"[V.I.S. GPU SUBSTRATE] Launching server: {' '.join(cmd)}")

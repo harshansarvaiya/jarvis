@@ -502,13 +502,14 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       (orchestrationMode === 'auto' && archetype === 'REFLEX_SPEED' && !hasImage));
 
   if (shouldPreferSovereign) {
-    try {
-      const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
-      const visSystemPrompt = `You are V.I.S. (Sovereign Neural Core), the centralized personal distilled AI for Sir (Harshan Sarvaiya).
+    const visSystemPrompt = `You are V.I.S. (Sovereign Neural Core), the centralized personal distilled AI for Sir (Harshan Sarvaiya).
 You operate with composed British intellectual elegance, strict loyalty, and razor-sharp precision.
 Creator: Sir (Harshan Sarvaiya).
 Host VM: antigravity-cloud-runner.
 Respond with zero generic chatbot filler, direct operational clarity, and unwavering deference.`;
+
+    try {
+      const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
 
       const arcResult = await runOpenAICompatibleAgent(messages.slice(-6), {
         endpoint: sovereignArcEndpoint.endsWith('/chat/completions')
@@ -530,7 +531,7 @@ Respond with zero generic chatbot filler, direct operational clarity, and unwave
           tacticalActions: generateTacticalNextActions(lastUserMessage.content, arcResult.reply, arcResult.toolCallsExecuted),
           toolCallsExecuted: arcResult.toolCallsExecuted,
           telemetry: {
-            engineUsed: '🧠 V.I.S. (Sovereign Core)',
+            engineUsed: '🧠 V.I.S. (Modal Serverless GPU)',
             provider: 'sovereign-arc',
             model: 'vis',
             latencyMs,
@@ -542,7 +543,45 @@ Respond with zero generic chatbot filler, direct operational clarity, and unwave
         };
       }
     } catch (arcErr: any) {
-      console.warn('[Tier 0 V.I.S.] Direct invocation error, cascading to fallback:', arcErr?.message);
+      console.warn('[Tier 0 V.I.S.] Direct GPU invocation error, cascading to local CPU fallback:', arcErr?.message);
+      const localFallback = process.env.LOCAL_SOVEREIGN_FALLBACK_ENDPOINT;
+      if (localFallback && localFallback !== sovereignArcEndpoint) {
+        try {
+          const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+          const localResult = await runOpenAICompatibleAgent(messages.slice(-6), {
+            endpoint: localFallback.endsWith('/chat/completions')
+              ? localFallback
+              : `${localFallback}/v1/chat/completions`,
+            apiKey: 'local',
+            model: 'jarvis-sovereign-1',
+            systemPrompt: visSystemPrompt,
+            maxTokens: 120,
+            timeoutMs: 60000,
+            tools: [],
+          });
+          if (localResult && !localResult.error && localResult.reply) {
+            const latencyMs = Date.now() - startTime;
+            return {
+              reply: localResult.reply,
+              vocalSummary: extractCinematicVocalSummary(localResult.reply),
+              tacticalActions: generateTacticalNextActions(lastUserMessage.content, localResult.reply, localResult.toolCallsExecuted),
+              toolCallsExecuted: localResult.toolCallsExecuted,
+              telemetry: {
+                engineUsed: '🧠 V.I.S. (Local CPU Fallback)',
+                provider: 'sovereign-arc',
+                model: 'vis',
+                latencyMs,
+                archetype,
+                failoverOccurred: true,
+                recalledEpisodesCount: recalledEpisodes.length,
+                persona: 'VIS',
+              },
+            };
+          }
+        } catch {
+          // cascade to other providers
+        }
+      }
     }
   }
 
