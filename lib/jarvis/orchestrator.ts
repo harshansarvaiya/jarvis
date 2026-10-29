@@ -38,11 +38,14 @@ export interface PreThoughtReasoningPass {
 }
 
 /**
- * Detects whether Sir is addressing F.R.I.D.A.Y. (Antigravity Apex)
- * or J.A.R.V.I.S. (Tactical Chief of Staff)
+ * Detects whether Sir is addressing V.I.S. (Sovereign Core),
+ * F.R.I.D.A.Y. (Antigravity Apex), or J.A.R.V.I.S. (Tactical Chief of Staff)
  */
 export function detectActivePersona(prompt: string): { persona: ActivePersona; explicit: boolean } {
   const clean = prompt.toLowerCase();
+  if (/\bvis\b|\bv\.i\.s\b/i.test(clean)) {
+    return { persona: 'VIS', explicit: true };
+  }
   if (/\bfriday\b|\bf\.r\.i\.d\.a\.y\b/i.test(clean)) {
     return { persona: 'FRIDAY', explicit: true };
   }

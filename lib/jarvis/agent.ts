@@ -73,6 +73,7 @@ export interface JarvisAgentOptions {
 export function normalizeModel(m?: string): string {
   if (!m) return 'gemini-3.8-flash';
   const clean = m.trim().toLowerCase();
+  if (clean === 'vis' || clean === 'v.i.s.' || clean === 'jarvis-sovereign-1' || clean === 'arc') return 'vis';
   if (clean.startsWith('nvidia/') || clean.startsWith('nim/') || clean.startsWith('openrouter/')) return clean;
   // Red-Team Unfiltered Sovereign Models (Nous Hermes 3 70B/405B & Dolphin)
   if (clean.includes('hermes-405b') || clean.includes('hermes-titan') || clean.includes('redteam-titan')) {
@@ -183,8 +184,8 @@ export async function runJarvisAgent(
     lastUserMessage.content = shieldResult.sanitized;
   }
   const detected = detectActivePersona(lastUserMessage.content);
-  let persona: ActivePersona = detected.persona;
-  let personaExplicit = detected.explicit;
+  let persona: ActivePersona = options.persona || detected.persona;
+  let personaExplicit = detected.explicit || Boolean(options.persona);
   let toolCategory: JevToolCategory = 'ALL_TOOLS';
   let dynamicSubagentId: string | null = options.specializedAgentId || null;
 
@@ -203,6 +204,9 @@ export async function runJarvisAgent(
   const explicitCheck = detectActivePersona(lastUserMessage.content);
   if (explicitCheck.explicit) {
     persona = explicitCheck.persona;
+    personaExplicit = true;
+  } else if (options.persona) {
+    persona = options.persona;
     personaExplicit = true;
   }
 
@@ -471,14 +475,6 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
   const uncompressedPrompt = `${JARVIS_SYSTEM_PROMPT}\n\n${contextPrompt}${speculativeDraftPrompt}`;
   const fullSystemPrompt = compressSystemPrompt(uncompressedPrompt);
 
-  const shouldPreferGroq =
-    groqKey &&
-    persona !== 'FRIDAY' && // Friday ALWAYS engages the Apex Core (Vertex AI / Antigravity)
-    (orchestrationMode === 'groq' ||
-      requestedModel.startsWith('openai/') ||
-      requestedModel.startsWith('groq/') ||
-      (orchestrationMode === 'auto' && archetype === 'REFLEX_SPEED' && !hasImage));
-
   // =========================================================================
   // TIER 0: V.I.S. (SOVEREIGN PRIVATE LLM CORE)
   // Invoked directly when Sir addresses "Vis", sets model='vis', or provider='sovereign-arc'
@@ -494,6 +490,16 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
     /\bvis\b/i.test(lastUserMessage.content);
 
   const shouldPreferSovereign = sovereignArcEndpoint && !hasImage && isVisExplicitDirective;
+
+  const shouldPreferGroq =
+    groqKey &&
+    persona !== 'FRIDAY' && // Friday ALWAYS engages the Apex Core (Vertex AI / Antigravity)
+    persona !== 'VIS' &&
+    !isVisExplicitDirective &&
+    (orchestrationMode === 'groq' ||
+      requestedModel.startsWith('openai/') ||
+      requestedModel.startsWith('groq/') ||
+      (orchestrationMode === 'auto' && archetype === 'REFLEX_SPEED' && !hasImage));
 
   if (shouldPreferSovereign) {
     try {
