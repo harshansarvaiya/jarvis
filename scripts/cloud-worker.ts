@@ -477,7 +477,9 @@ async function checkScheduledBriefings() {
     // -------------------------------------------------------------
     // 1. DAILY 08:00 AM IST AUTONOMOUS MONETIZATION & OPPORTUNITY REPORT
     // -------------------------------------------------------------
-    const isMonetizationWindow = istHour === 8 && istMin >= 0 && istMin < 30;
+    // [DEACTIVATED PER SIR'S DIRECTIVE - REVENUE RADAR & BOUNTY PIPELINE SHUT DOWN]
+    const isMonetizationEnabled = process.env.ENABLE_MONETIZATION_RADAR === 'true';
+    const isMonetizationWindow = isMonetizationEnabled && istHour === 8 && istMin >= 0 && istMin < 30;
     if (isMonetizationWindow) {
       const monKey = `jarvis:briefing:monetization:${todayDateStr}`;
       const alreadySent = await isAlertDispatched(monKey);
@@ -1007,8 +1009,11 @@ async function consolidateCognitiveMemoriesWithJev() {
   }
 }
 
-// 9.6 Autonomous Algora & Polar Funded Open-Source Bounty Radar Sentry
+// 9.6 Autonomous Algora & Polar Funded Open-Source Bounty Radar Sentry (DEACTIVATED)
 async function checkFundedBountyOpportunities() {
+  if (process.env.ENABLE_MONETIZATION_RADAR !== 'true') {
+    return; // Deactivated per Sir's directive
+  }
   console.log('[Cloud Worker:Bounty Sentry] 💎 Sweeping Algora & Polar for funded open-source bounties...');
   try {
     const { scanFundedBounties } = await import('../lib/jarvis/bounty-sentry');

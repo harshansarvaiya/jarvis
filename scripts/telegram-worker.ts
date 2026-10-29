@@ -495,9 +495,10 @@ async function processDirective(
       cleanUserText.toLowerCase() === 'bounties'
     ) {
       gateway.sendTypingAction(chatId).catch(() => {});
-      const { runMonetizationScan, dispatchMonetizationReportToTelegram } = await import('../lib/jarvis/monetization_cron');
-      const report = await runMonetizationScan();
-      await dispatchMonetizationReportToTelegram(report);
+      await gateway.sendMessage(
+        chatId,
+        '🛑 **[REVENUE RADAR & BOUNTY PIPELINE DEACTIVATED]**\n\nThe autonomous 08:00 AM IST Revenue Radar and Bounty poller have been completely shut down per Sir\'s directive. No background sweeps or bounty scans are running.'
+      );
       return;
     } else if (
       cleanUserText === '/briefing' ||

@@ -59,6 +59,15 @@ export interface TriVectorRevenueReport {
  */
 export async function runMonetizationScan(): Promise<TriVectorRevenueReport> {
   const timestamp = new Date().toISOString();
+  if (process.env.ENABLE_MONETIZATION_RADAR !== 'true') {
+    return {
+      timestamp,
+      vector1_bounties: { status: 'IDLE', totalPoolValueUsd: 0, bounties: [], summary: 'Deactivated per Sir directive.' },
+      vector2_b2b_leads: { status: 'FALLBACK', leads: [], pipelineValueUsd: '$0', targetVertical: 'None' },
+      vector3_micro_saas: { opportunities: [], topPick: 'None' },
+      executiveActionPlan: ['Revenue Radar & Bounty pipeline powered down per Sir directive.']
+    };
+  }
   console.log(`[Revenue Engine] 🚀 Initiating Tri-Vector Monetization Scan at ${timestamp}...`);
 
   // ==========================================
