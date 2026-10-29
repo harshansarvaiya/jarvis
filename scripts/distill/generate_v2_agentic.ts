@@ -283,12 +283,12 @@ export async function runDatasetSynthesis(targetCount: number = 100) {
         }
         console.log(`[V.I.S. v2 Distiller] ✓ Added ${batch.length} trajectories. Progress: [${collected}/${targetCount}]`);
       }
-      // Pacing to stay comfortably under 8,000 TPM limit
-      console.log(`[V.I.S. v2 Distiller] ⏳ Pacing cooldown (24s) to respect Groq TPM quota...`);
-      await new Promise(r => setTimeout(r, 24000));
+      // Pacing to stay comfortably under 8,000 TPM limit (2,000 tokens per call / 30s = 4,000 TPM)
+      console.log(`[V.I.S. v2 Distiller] ⏳ Pacing cooldown (30s) to respect Groq TPM quota...`);
+      await new Promise(r => setTimeout(r, 30000));
     } catch (err: any) {
-      const waitSec = Math.ceil(err.retryAfterSeconds || 25);
-      console.warn(`[V.I.S. v2 Distiller] ⚠️ Rate limit paused. Backing off for ${waitSec}s...`);
+      const waitSec = Math.max(Math.ceil(err.retryAfterSeconds || 30), 30);
+      console.warn(`[V.I.S. v2 Distiller] ⚠️ Rate limit paused: ${err.message}. Backing off for ${waitSec}s...`);
       await new Promise(r => setTimeout(r, (waitSec + 2) * 1000));
     }
   }
