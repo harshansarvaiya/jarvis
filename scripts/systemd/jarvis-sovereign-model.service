@@ -1,0 +1,15 @@
+[Unit]
+Description=J.A.R.V.I.S. Sovereign-1 Private C++ Inference Engine (llama-server)
+After=network.target
+
+[Service]
+Type=simple
+User=harshans279
+WorkingDirectory=/home/harshans279/jarvis
+ExecStart=/home/harshans279/jarvis/bin/llama-server -m /home/harshans279/jarvis/data/models/jarvis-sovereign-1.gguf -c 2048 -t 2 --port 8080 --host 127.0.0.1 --alias jarvis-sovereign-1
+Restart=always
+RestartSec=5s
+MemoryMax=3.5G
+
+[Install]
+WantedBy=multi-user.target

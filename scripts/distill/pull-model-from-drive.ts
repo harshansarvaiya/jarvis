@@ -7,6 +7,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { GoogleAuth } from 'google-auth-library';
 
@@ -77,7 +78,7 @@ async function downloadFile(token: string, fileId: string, destPath: string, tot
 
   let downloadedBytes = 0;
   let lastReportTime = Date.now();
-  const readable = (res.body as any);
+  const readable = Readable.fromWeb(res.body as any);
 
   readable.on('data', (chunk: Buffer) => {
     downloadedBytes += chunk.length;
@@ -87,7 +88,7 @@ async function downloadFile(token: string, fileId: string, destPath: string, tot
       const mb = (downloadedBytes / (1024 * 1024)).toFixed(1);
       const totalMb = totalBytes ? (totalBytes / (1024 * 1024)).toFixed(1) : '?';
       const pct = totalBytes ? ((downloadedBytes / totalBytes) * 100).toFixed(1) + '%' : '';
-      console.log(`📦 Download progress: ${mb} MB / ${totalMb} MB ${pct}`);
+      console.log(`📦 Download progress: ${mb} MB / ${totalMb} MB (${pct})`);
     }
   });
 
