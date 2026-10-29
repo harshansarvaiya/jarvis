@@ -35,6 +35,7 @@ next-env.d.ts
 
 # local logs, private chat history, and scratch
 /data/trajectories/
+/data/distill/
 /data/jarvis_knowledge*.json
 /data/jarvis-chats.json
 /data/sir-profile.json
