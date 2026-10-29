@@ -43,13 +43,14 @@ def train_and_export_vis_v2(
     learning_rate: float = 2e-4,
     model_name: str = "unsloth/Llama-3.2-3B-Instruct-bnb-4bit",
 ):
+    import unsloth
+    from unsloth import FastLanguageModel
+    from unsloth.chat_templates import get_chat_template
     import json
     import torch
     from datasets import Dataset
     from trl import SFTTrainer
     from transformers import TrainingArguments
-    from unsloth import FastLanguageModel
-    from unsloth.chat_templates import get_chat_template
 
     print(f"[V.I.S. TRAINER] Received {len(dataset_lines)} trajectories for training.")
     print(f"[V.I.S. TRAINER] Base Model: {model_name} | Target Steps: {max_steps} | LR: {learning_rate}")
@@ -104,7 +105,7 @@ def train_and_export_vis_v2(
 
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         train_dataset=train_dataset,
         dataset_text_field="text",
         max_seq_length=max_seq_length,
