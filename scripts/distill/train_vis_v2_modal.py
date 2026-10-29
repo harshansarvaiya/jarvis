@@ -17,6 +17,7 @@ VAULT_MOUNT = "/vault"
 # Build optimized training image with Unsloth and PyTorch CUDA 12.4
 image = (
     modal.Image.debian_slim(python_version="3.10")
+    .apt_install("build-essential", "cmake", "git")
     .pip_install(
         "torch",
         "transformers",
@@ -135,16 +136,17 @@ def train_and_export_vis_v2(
     print(f"[V.I.S. TRAINER] Exporting fused model directly to Q4_K_M GGUF format at {export_dir}...")
     model.save_pretrained_gguf(export_dir, tokenizer, quantization_method="q4_k_m")
 
+    import shutil
     # Locate generated GGUF file and establish standard alias
     for root, _, files in os.walk(export_dir):
         for f in files:
             if f.endswith(".gguf"):
                 src_path = os.path.join(root, f)
                 alias_path = f"{VAULT_MOUNT}/models/jarvis-sovereign-2.gguf"
-                print(f"[V.I.S. TRAINER] Found GGUF artifact: {src_path} -> Linking to {alias_path}")
+                print(f"[V.I.S. TRAINER] Found GGUF artifact: {src_path} -> Copying to {alias_path}")
                 if os.path.exists(alias_path):
                     os.remove(alias_path)
-                os.link(src_path, alias_path) if hasattr(os, "link") else None
+                shutil.copy2(src_path, alias_path)
                 break
 
     vault_volume.commit()
