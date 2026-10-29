@@ -517,8 +517,8 @@ Respond with zero generic chatbot filler, direct operational clarity, and unwave
         apiKey: sovereignArcApiKey,
         model: 'jarvis-sovereign-1',
         systemPrompt: visSystemPrompt,
-        maxTokens: 384,
-        timeoutMs: 30000,
+        maxTokens: 120,
+        timeoutMs: 60000,
         tools: [],
       });
 
@@ -1217,8 +1217,8 @@ Respond directly and authoritatively with composed British intellectual elegance
             apiKey: sovereignArcApiKey,
             model: 'jarvis-sovereign-1',
             systemPrompt: visFallbackPrompt,
-            maxTokens: 384,
-            timeoutMs: 30000,
+            maxTokens: 120,
+            timeoutMs: 60000,
             tools: [],
           });
 
