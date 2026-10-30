@@ -253,7 +253,7 @@ Each multi-step conversation object has:
   return trajectories;
 }
 
-export async function runV3DatasetSynthesis(targetCount: number = 150) {
+export async function runV3DatasetSynthesis(targetCount: number = 200) {
   const outDir = path.resolve(process.cwd(), 'data', 'distill', 'v3_70b');
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
@@ -296,7 +296,7 @@ export async function runV3DatasetSynthesis(targetCount: number = 150) {
 
   console.log(`[V.I.S. v3 Distiller] 🎉 Complete! Master v3 file holds ${collected} multi-step trajectories in ${masterFile}`);
   
-  // Automatically trigger unified compilation to 250 trajectories upon completion
+  // Automatically trigger unified compilation to 300 total trajectories upon completion
   try {
     const { compileUnifiedV3Corpus } = await import('./prepare_v3_corpus');
     compileUnifiedV3Corpus();
@@ -306,6 +306,6 @@ export async function runV3DatasetSynthesis(targetCount: number = 150) {
 }
 
 if (process.argv[1] && process.argv[1].includes('generate_v3_70b')) {
-  const countArg = parseInt(process.argv[2] || '150', 10);
+  const countArg = parseInt(process.argv[2] || '200', 10);
   runV3DatasetSynthesis(countArg).catch(console.error);
 }
