@@ -382,48 +382,36 @@ Each multi-step conversation object must have:
   ];
 
   for (const model of models) {
-    let retries = 0;
-    while (retries < 2) {
-      try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              temperature: 0.7,
-              maxOutputTokens: 8192
-            }
-          }),
-          signal: AbortSignal.timeout(90000)
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          console.warn(`[Gemini Engine] Model ${model} HTTP ${response.status}:`, errText.slice(0, 120));
-          if (response.status === 503 || response.status === 429) {
-            retries++;
-            await new Promise(r => setTimeout(r, 6000));
-            continue;
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.7,
+            maxOutputTokens: 8192
           }
-          break;
-        }
+        }),
+        signal: AbortSignal.timeout(60000)
+      });
 
-        const data = await response.json();
-        const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!content) {
-          retries++;
-          continue;
-        }
-
-        const trajectories = parseRawTrajectories(content);
-        if (trajectories.length > 0) return trajectories;
-      } catch (e: any) {
-        console.warn(`[Gemini Engine] Execution error on ${model}:`, e.message);
-        retries++;
-        await new Promise(r => setTimeout(r, 4000));
+      if (!response.ok) {
+        const errText = await response.text();
+        console.warn(`[Gemini Engine] Model ${model} HTTP ${response.status}:`, errText.slice(0, 120));
+        continue;
       }
+
+      const data = await response.json();
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!content) continue;
+
+      const trajectories = parseRawTrajectories(content);
+      if (trajectories.length > 0) return trajectories;
+    } catch (e: any) {
+      console.warn(`[Gemini Engine] Execution error on ${model}:`, e.message);
+      continue;
     }
   }
 
