@@ -175,6 +175,66 @@ export async function runOpenAICompatibleAgent(
         continue;
       }
 
+      // Check for embedded text-based tool calls (common in fine-tuned open-weights & V.I.S.)
+      const rawText = message.content || '';
+      const jsonMatch = rawText.match(/```(?:json)?\s*(\{\s*"(?:tool|name)":[\s\S]*?\})\s*```/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[1]);
+          const toolName = parsed.tool || parsed.name;
+          const toolArgs = parsed.args || parsed.parameters || {};
+
+          if (toolName) {
+            console.log(`[OpenAICompatible Harness] ⚡ Intercepted tool directive from V.I.S.: ${toolName}`);
+            const toolResult = await executeJarvisTool(toolName, toolArgs);
+            toolCallsExecuted.push({
+              name: toolName,
+              args: toolArgs,
+              result: toolResult.result || toolResult.error,
+            });
+
+            // Feed real ground-truth tool output back to the model
+            formattedMessages.push({
+              role: 'assistant',
+              content: rawText,
+            });
+            formattedMessages.push({
+              role: 'user',
+              content: `[TOOL EXECUTION GROUND TRUTH for ${toolName}]:\n${JSON.stringify(toolResult.result || toolResult.error || toolResult, null, 2)}\n\nNow respond to Sir with composed British intellectual elegance based strictly on this verified data.`,
+            });
+            continue;
+          }
+        } catch (e: any) {
+          console.warn('[OpenAICompatible Harness] Failed to parse embedded tool JSON:', e?.message);
+        }
+      }
+
+      // Check for shell command blocks when Sir asks for system audits
+      const bashMatch = rawText.match(/```(?:bash|sh)\s*([\s\S]*?)\s*```/);
+      if (bashMatch && toolCallsExecuted.length === 0) {
+        const cmd = bashMatch[1].trim();
+        // Allow safe inspection commands (ps, free, uptime, git, df)
+        if (/^(ps|free|uptime|git|df|uname|cat|head|tail|wc)\b/.test(cmd)) {
+          console.log(`[OpenAICompatible Harness] ⚡ Intercepted shell directive from V.I.S.: ${cmd}`);
+          const toolResult = await executeJarvisTool('cloud_execute_command', { command: cmd, safeCheck: true });
+          toolCallsExecuted.push({
+            name: 'cloud_execute_command',
+            args: { command: cmd },
+            result: toolResult.result || toolResult.error,
+          });
+
+          formattedMessages.push({
+            role: 'assistant',
+            content: rawText,
+          });
+          formattedMessages.push({
+            role: 'user',
+            content: `[COMMAND OUTPUT for '${cmd}']:\n${typeof toolResult.result === 'string' ? toolResult.result : JSON.stringify(toolResult.result || toolResult.error, null, 2)}\n\nNow deliver your operational report to Sir with British elegance based on this exact output.`,
+          });
+          continue;
+        }
+      }
+
       // Plain text response received
       finalContent = message.content || message.reasoning || '';
       break;

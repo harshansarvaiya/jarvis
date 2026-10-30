@@ -3264,6 +3264,20 @@ export function getPrunedJarvisTools(category?: string): ToolDefinition[] {
   return JARVIS_TOOLS.map(compactToolDefinition);
 }
 
+export const SOVEREIGN_CORE_TOOL_NAMES = [
+  'inspect_infrastructure',
+  'cloud_execute_command',
+  'manage_task',
+  'read_workspace_file',
+  'store_memory',
+  'search_memory',
+  'generate_briefing',
+];
+
+export const SOVEREIGN_CORE_TOOLS = JARVIS_TOOLS.filter((t) =>
+  SOVEREIGN_CORE_TOOL_NAMES.includes(t.name)
+);
+
 export async function executeJarvisTool(
   toolName: string,
   args: Record<string, any>

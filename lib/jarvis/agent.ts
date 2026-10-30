@@ -507,10 +507,11 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
 You operate with composed British intellectual elegance, strict loyalty, empirical grounding, and razor-sharp precision.
 Creator: Sir (Harshan Sarvaiya).
 Host VM: antigravity-cloud-runner.
-Respond with zero generic chatbot filler, direct operational clarity, and unwavering deference.`;
+You have direct access to the master J.A.R.V.I.S. operational tool harness. When Sir requests system status, daemon audits, tasks, or file inspections, invoke your real tools or emit a structured tool call. Never hallucinate processes or PIDs. Always inspect ground truth.`;
 
     try {
       const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
+      const { SOVEREIGN_CORE_TOOLS } = await import('./tools');
 
       const arcResult = await runOpenAICompatibleAgent(messages.slice(-6), {
         endpoint: sovereignArcEndpoint.endsWith('/chat/completions')
@@ -521,7 +522,14 @@ Respond with zero generic chatbot filler, direct operational clarity, and unwave
         systemPrompt: visSystemPrompt,
         maxTokens: 512,
         timeoutMs: 60000,
-        tools: [],
+        tools: SOVEREIGN_CORE_TOOLS.map((t) => ({
+          type: 'function',
+          function: {
+            name: t.name,
+            description: t.description,
+            parameters: t.parameters,
+          },
+        })),
       });
 
       if (arcResult && !arcResult.error && arcResult.reply) {
@@ -556,9 +564,8 @@ Respond with zero generic chatbot filler, direct operational clarity, and unwave
             apiKey: 'local',
             model: 'jarvis-sovereign-1',
             systemPrompt: visSystemPrompt,
-            maxTokens: 120,
+            maxTokens: 256,
             timeoutMs: 60000,
-            tools: [],
           });
           if (localResult && !localResult.error && localResult.reply) {
             const latencyMs = Date.now() - startTime;
