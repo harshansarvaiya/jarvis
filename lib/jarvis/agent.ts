@@ -73,7 +73,7 @@ export interface JarvisAgentOptions {
 export function normalizeModel(m?: string): string {
   if (!m) return 'gemini-3.8-flash';
   const clean = m.trim().toLowerCase();
-  if (clean === 'vis' || clean === 'v.i.s.' || clean === 'jarvis-sovereign-1' || clean === 'arc') return 'vis';
+  if (clean === 'vis' || clean === 'v.i.s.' || clean === 'jarvis-sovereign-3' || clean === 'jarvis-sovereign-2' || clean === 'jarvis-sovereign-1' || clean === 'arc') return 'vis';
   if (clean.startsWith('nvidia/') || clean.startsWith('nim/') || clean.startsWith('openrouter/')) return clean;
   // Red-Team Unfiltered Sovereign Models (Nous Hermes 3 70B/405B & Dolphin)
   if (clean.includes('hermes-405b') || clean.includes('hermes-titan') || clean.includes('redteam-titan')) {
@@ -484,6 +484,7 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
   const isVisExplicitDirective =
     persona === 'VIS' ||
     requestedModel === 'vis' ||
+    requestedModel === 'jarvis-sovereign-3' ||
     requestedModel === 'jarvis-sovereign-2' ||
     requestedModel === 'jarvis-sovereign-1' ||
     requestedModel.startsWith('arc/') ||
@@ -524,7 +525,7 @@ MANDATORY REASONING PROTOCOL:
           ? sovereignArcEndpoint
           : `${sovereignArcEndpoint}/v1/chat/completions`,
         apiKey: sovereignArcApiKey,
-        model: 'jarvis-sovereign-2',
+        model: 'jarvis-sovereign-3',
         systemPrompt: visSystemPrompt,
         maxTokens: 2048, // Frontier test-time thinking & response budget
         timeoutMs: 120000,
@@ -546,9 +547,9 @@ MANDATORY REASONING PROTOCOL:
           tacticalActions: generateTacticalNextActions(lastUserMessage.content, arcResult.reply, arcResult.toolCallsExecuted),
           toolCallsExecuted: arcResult.toolCallsExecuted,
           telemetry: {
-            engineUsed: '🧠 V.I.S. v2 (Modal Serverless GPU)',
+            engineUsed: '🧠 V.I.S. v3-70B Titan (Modal Serverless GPU)',
             provider: 'sovereign-arc',
-            model: 'vis-v2',
+            model: 'vis-v3-70b',
             latencyMs,
             archetype,
             failoverOccurred: false,
