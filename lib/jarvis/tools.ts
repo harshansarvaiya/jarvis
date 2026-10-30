@@ -3272,6 +3272,8 @@ export const SOVEREIGN_CORE_TOOL_NAMES = [
   'store_memory',
   'search_memory',
   'generate_briefing',
+  'search_web',
+  'read_web_page',
 ];
 
 export const SOVEREIGN_CORE_TOOLS = JARVIS_TOOLS.filter((t) =>
