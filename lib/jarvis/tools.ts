@@ -3265,20 +3265,84 @@ export function getPrunedJarvisTools(category?: string): ToolDefinition[] {
 }
 
 export const SOVEREIGN_CORE_TOOL_NAMES = [
-  'inspect_infrastructure',
+  // DevOps & Cloud Runner
   'cloud_execute_command',
-  'manage_task',
+  'cloud_write_file',
+  'inspect_infrastructure',
+  // Workspace Engineering (F.R.I.D.A.Y. Apex Mind)
   'read_workspace_file',
+  'edit_workspace_file',
+  'grep_workspace',
+  'find_files',
+  'list_workspace_directory',
+  'search_code_graph',
+  'get_workspace_preflight',
+  // Git Production Pipeline
+  'git_status',
+  'git_diff',
+  'git_commit_and_push',
+  // Live Web & Autonomous Browser (Project Hands)
+  'search_web',
+  'read_web_page',
+  'browser_navigate_and_act',
+  // Memory, Tasks & Operational Cadence
+  'manage_task',
   'store_memory',
   'search_memory',
   'generate_briefing',
-  'search_web',
-  'read_web_page',
+  'manage_chronicles',
+  // Satellite Mesh & Remote Telemetry
+  'list_satellites',
+  'execute_satellite_command',
+  'satellite_action',
+  // Security, Protocols & Audits
+  'run_security_audit',
+  'generate_retro',
+  'run_sparc_workflow',
+  // Quant & Indian Stock Market
+  'analyze_nse_stock',
+  'scan_indian_market_catalysts',
+  'get_quant_portfolio_status',
+  // Apex Substrate
+  'invoke_antigravity_cli',
+  'notify_user',
 ];
 
-export const SOVEREIGN_CORE_TOOLS = JARVIS_TOOLS.filter((t) =>
-  SOVEREIGN_CORE_TOOL_NAMES.includes(t.name)
-);
+export function getSovereignTools(promptText: string = ''): ToolDefinition[] {
+  const matchedNames = new Set(SOVEREIGN_CORE_TOOL_NAMES);
+  const lower = promptText.toLowerCase();
+
+  // Dynamic intent-based specialized tool expansion
+  if (lower.includes('bounty') || lower.includes('issue')) {
+    matchedNames.add('solve_github_bounty');
+    matchedNames.add('scan_and_solve_top_bounty');
+  }
+  if (lower.includes('trade') || lower.includes('buy') || lower.includes('sell') || lower.includes('order')) {
+    matchedNames.add('execute_paper_trade');
+    matchedNames.add('manage_quant_trading_engine');
+    matchedNames.add('run_quant_market_scan');
+  }
+  if (lower.includes('image') || lower.includes('diagram') || lower.includes('chart') || lower.includes('draw')) {
+    matchedNames.add('generate_image');
+  }
+  if (lower.includes('subagent') || lower.includes('swarm') || lower.includes('delegate')) {
+    matchedNames.add('spawn_subagent_task');
+    matchedNames.add('delegate_subagent');
+  }
+  if (lower.includes('knowledge') || lower.includes('rag') || lower.includes('document')) {
+    matchedNames.add('rag_search_knowledge');
+    matchedNames.add('rag_ingest_document');
+  }
+  if (lower.includes('mcp') || lower.includes('playwright') || lower.includes('github') || lower.includes('calendar')) {
+    matchedNames.add('mcp_github');
+    matchedNames.add('mcp_playwright');
+    matchedNames.add('mcp_calendar');
+  }
+
+  return JARVIS_TOOLS.filter((t) => matchedNames.has(t.name)).map(compactToolDefinition);
+}
+
+export const SOVEREIGN_CORE_TOOLS = getSovereignTools();
 
 export async function executeJarvisTool(
   toolName: string,

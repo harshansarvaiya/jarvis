@@ -521,7 +521,8 @@ MANDATORY REASONING PROTOCOL:
 
     try {
       const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
-      const { SOVEREIGN_CORE_TOOLS } = await import('./tools');
+      const { getSovereignTools } = await import('./tools');
+      const sovereignToolsList = getSovereignTools(lastUserMessage.content);
 
       const arcResult = await runOpenAICompatibleAgent(messages.slice(-8), {
         endpoint: sovereignArcEndpoint.endsWith('/chat/completions')
@@ -532,7 +533,7 @@ MANDATORY REASONING PROTOCOL:
         systemPrompt: visSystemPrompt,
         maxTokens: 2048, // Frontier test-time thinking & response budget
         timeoutMs: 300000, // 5m envelope to allow cold-start GPU tensor loading without failover
-        tools: SOVEREIGN_CORE_TOOLS.map((t) => ({
+        tools: sovereignToolsList.map((t) => ({
           type: 'function',
           function: {
             name: t.name,
