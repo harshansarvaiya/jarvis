@@ -44,6 +44,7 @@ export async function runOpenAICompatibleAgent(
 ): Promise<{
   reply: string;
   toolCallsExecuted: Array<{ name: string; args: any; result: any }>;
+  internalThoughts?: string;
   error?: string;
 }> {
   const { endpoint, apiKey, model, systemPrompt, temperature = 0.4, maxTokens = 1536, timeoutMs = 15000, extraHeaders = {}, tools: customTools } = options;
@@ -178,36 +179,83 @@ export async function runOpenAICompatibleAgent(
 
       // Check for embedded text-based tool calls (common in fine-tuned open-weights & V.I.S.)
       const rawText = message.content || '';
-      const jsonMatch = rawText.match(/```(?:json)?\s*(\{\s*"(?:tool|name)":[\s\S]*?\})\s*```/);
-      if (jsonMatch) {
+
+      // Helper to extract tool calls from any format (markdown code blocks, raw JSON, or after thought tags)
+      let detectedTool: { name: string; args: any } | null = null;
+
+      // 1. Markdown code block ```json ... ``` or ``` ... ```
+      const codeBlockMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch) {
         try {
-          const parsed = JSON.parse(jsonMatch[1]);
-          const toolName = parsed.tool || parsed.name;
-          const toolArgs = parsed.args || parsed.parameters || {};
-
-          if (toolName) {
-            console.log(`[OpenAICompatible Harness] ⚡ Intercepted tool directive from V.I.S.: ${toolName}`);
-            const toolResult = await executeJarvisTool(toolName, toolArgs);
-            toolCallsExecuted.push({
-              name: toolName,
-              args: toolArgs,
-              result: toolResult.result || toolResult.error,
-            });
-
-            // Feed real ground-truth tool output back to the model
-            formattedMessages.push({
-              role: 'assistant',
-              content: rawText,
-            });
-            formattedMessages.push({
-              role: 'user',
-              content: `[TOOL EXECUTION GROUND TRUTH for ${toolName}]:\n${JSON.stringify(toolResult.result || toolResult.error || toolResult, null, 2)}\n\nNow respond to Sir with composed British intellectual elegance based strictly on this verified data.`,
-            });
-            continue;
+          const parsed = JSON.parse(codeBlockMatch[1].trim());
+          const name = parsed.tool || parsed.name;
+          let args = parsed.args || parsed.parameters || parsed.arguments || {};
+          if (typeof args === 'string') {
+            try { args = JSON.parse(args); } catch {}
           }
-        } catch (e: any) {
-          console.warn('[OpenAICompatible Harness] Failed to parse embedded tool JSON:', e?.message);
+          if (name && typeof name === 'string') {
+            detectedTool = { name, args: typeof args === 'object' && args !== null ? args : {} };
+          }
+        } catch {}
+      }
+
+      // 2. Bare JSON object containing "tool" or "name"
+      if (!detectedTool) {
+        const jsonObjectMatch = rawText.match(/(\{\s*"(?:tool|name)"\s*:\s*[\s\S]*?\})/);
+        if (jsonObjectMatch) {
+          try {
+            const parsed = JSON.parse(jsonObjectMatch[1].trim());
+            const name = parsed.tool || parsed.name;
+            let args = parsed.args || parsed.parameters || parsed.arguments || {};
+            if (typeof args === 'string') {
+              try { args = JSON.parse(args); } catch {}
+            }
+            if (name && typeof name === 'string') {
+              detectedTool = { name, args: typeof args === 'object' && args !== null ? args : {} };
+            }
+          } catch {}
         }
+      }
+
+      // 3. Clean thought block and parse remaining string if it's pure JSON
+      if (!detectedTool) {
+        const cleaned = rawText.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+        if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(cleaned);
+            const name = parsed.tool || parsed.name;
+            let args = parsed.args || parsed.parameters || parsed.arguments || {};
+            if (typeof args === 'string') {
+              try { args = JSON.parse(args); } catch {}
+            }
+            if (name && typeof name === 'string') {
+              detectedTool = { name, args: typeof args === 'object' && args !== null ? args : {} };
+            }
+          } catch {}
+        }
+      }
+
+      if (detectedTool) {
+        const toolName = detectedTool.name;
+        const toolArgs = detectedTool.args;
+        console.log(`[OpenAICompatible Harness] ⚡ Intercepted tool directive from ${model}: ${toolName}`);
+        const toolResult = await executeJarvisTool(toolName, toolArgs);
+        toolCallsExecuted.push({
+          name: toolName,
+          args: toolArgs,
+          result: toolResult.result || toolResult.error,
+        });
+
+        // Feed real ground-truth tool output back to the model
+        formattedMessages.push({
+          role: 'assistant',
+          content: rawText,
+        });
+        formattedMessages.push({
+          role: 'user',
+          content: `[TOOL EXECUTION GROUND TRUTH for ${toolName}]:\n${JSON.stringify(toolResult.result || toolResult.error || toolResult, null, 2)}\n\nNow respond to Sir with composed British intellectual elegance based strictly on this verified data.`,
+        });
+        continue;
       }
 
       // Check for shell command blocks when Sir asks for system audits
@@ -216,7 +264,7 @@ export async function runOpenAICompatibleAgent(
         const cmd = bashMatch[1].trim();
         // Allow safe inspection commands (ps, free, uptime, git, df)
         if (/^(ps|free|uptime|git|df|uname|cat|head|tail|wc)\b/.test(cmd)) {
-          console.log(`[OpenAICompatible Harness] ⚡ Intercepted shell directive from V.I.S.: ${cmd}`);
+          console.log(`[OpenAICompatible Harness] ⚡ Intercepted shell directive from ${model}: ${cmd}`);
           const toolResult = await executeJarvisTool('cloud_execute_command', { command: cmd, safeCheck: true });
           toolCallsExecuted.push({
             name: 'cloud_execute_command',
@@ -236,20 +284,56 @@ export async function runOpenAICompatibleAgent(
         }
       }
 
+      // Check if model halted at </thought> without emitting tool call or substantive reply text
+      const nonThoughtText = rawText.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+      if (rawText.includes('</thought>') && !nonThoughtText && loopCount < 4) {
+        console.log(`[OpenAICompatible Harness] ⚠️ ${model} halted at </thought> without emitting tool or report. Triggering ReAct continuation nudge...`);
+        formattedMessages.push({
+          role: 'assistant',
+          content: rawText,
+        });
+        formattedMessages.push({
+          role: 'user',
+          content: `[SYSTEM ACTION REQUIRED]: You closed your </thought> block without executing your planned tool or delivering your report. Proceed immediately to execute the tool via:
+\`\`\`json
+{
+  "tool": "<tool_name>",
+  "args": { ... }
+}
+\`\`\`
+Or deliver your final report to Sir based on your reasoning.`,
+        });
+        continue;
+      }
+
       // Plain text response received
       finalContent = message.content || message.reasoning || '';
       break;
     }
 
-    if (!finalContent && toolCallsExecuted.length > 0) {
-      finalContent = `Sir, I have executed your instructions directly:\n\n${toolCallsExecuted
+    // Process thoughts and clean reply
+    let extractedThoughts: string | undefined;
+    let cleanReply = finalContent;
+
+    const thoughtMatch = finalContent.match(/<thought>([\s\S]*?)<\/thought>/i);
+    if (thoughtMatch) {
+      extractedThoughts = thoughtMatch[1].trim();
+      const remainingText = finalContent.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+      if (remainingText) {
+        cleanReply = remainingText;
+      }
+    }
+
+    if (!cleanReply && toolCallsExecuted.length > 0) {
+      cleanReply = `Sir, I have executed your instructions directly:\n\n${toolCallsExecuted
         .map((tc) => `- ${tc.result?.message || tc.name + ' executed successfully.'}`)
         .join('\n')}`;
     }
 
     return {
-      reply: finalContent || 'All set, Sir. What shall we tackle next?',
+      reply: cleanReply || 'All set, Sir. What shall we tackle next?',
       toolCallsExecuted,
+      internalThoughts: extractedThoughts,
     };
   } catch (err: any) {
     console.error('[OpenAICompatible] Agent execution exception:', err);

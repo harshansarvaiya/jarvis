@@ -1113,6 +1113,10 @@ async function processDirective(
       responseText += `${personaHeader}\n\n`;
     }
 
+    if (result.internalThoughts && !result.reply.includes('<thought>')) {
+      responseText += `<blockquote expandable><b>💭 Cognitive Reasoning:</b>\n<i>${result.internalThoughts.trim()}</i></blockquote>\n\n`;
+    }
+
     responseText += result.reply;
 
     // Append sleek Tool Execution Indicator if tools were executed

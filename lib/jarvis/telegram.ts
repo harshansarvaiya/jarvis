@@ -105,9 +105,17 @@ export interface TelegramUpdate {
 export function formatMarkdownForTelegramHtml(text: string): string {
   if (!text) return '';
 
+  // 0. Handle cognitive reasoning thought blocks (<thought>...</thought>)
+  const thoughts: string[] = [];
+  let processed = text.replace(/<thought>([\s\S]*?)<\/thought>/gi, (_, thought) => {
+    const placeholder = `\u0000TH${thoughts.length}\u0000`;
+    thoughts.push(`<blockquote expandable><b>💭 Cognitive Reasoning:</b>\n<i>${escapeHtml(thought.trim())}</i></blockquote>\n\n`);
+    return placeholder;
+  });
+
   // 1. Preserve code blocks and inline code by replacing with unique non-character tokens
   const codeBlocks: string[] = [];
-  let processed = text.replace(/```(?:[a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g, (_, code) => {
+  processed = processed.replace(/```(?:[a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g, (_, code) => {
     const placeholder = `\u0000CB${codeBlocks.length}\u0000`;
     codeBlocks.push(`<pre><code>${escapeHtml(code.trim())}</code></pre>`);
     return placeholder;
@@ -122,7 +130,7 @@ export function formatMarkdownForTelegramHtml(text: string): string {
 
   // 2. Preserve valid Telegram HTML tags that may already be in the message
   const preservedHtmlTags: string[] = [];
-  const telegramTagRegex = /<\/?(?:b|strong|i|em|u|ins|s|strike|del|span|tg-spoiler|tg-emoji|blockquote|code|pre|a(?:\s+href="[^"]*")?)>/gi;
+  const telegramTagRegex = /<\/?(?:b|strong|i|em|u|ins|s|strike|del|span|tg-spoiler|tg-emoji|blockquote(?:\s+expandable)?|code|pre|a(?:\s+href="[^"]*")?)>/gi;
   processed = processed.replace(telegramTagRegex, (match) => {
     const placeholder = `\u0000HT${preservedHtmlTags.length}\u0000`;
     preservedHtmlTags.push(match);
@@ -151,6 +159,9 @@ export function formatMarkdownForTelegramHtml(text: string): string {
   // 6. Restore code blocks & inline code
   processed = processed.replace(/\u0000CB(\d+)\u0000/g, (_, idx) => codeBlocks[Number(idx)] || '');
   processed = processed.replace(/\u0000IC(\d+)\u0000/g, (_, idx) => inlineCodes[Number(idx)] || '');
+
+  // 7. Restore thought reasoning blocks
+  processed = processed.replace(/\u0000TH(\d+)\u0000/g, (_, idx) => thoughts[Number(idx)] || '');
 
   return processed;
 }

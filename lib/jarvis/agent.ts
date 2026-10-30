@@ -512,12 +512,20 @@ Neural Compute Substrate: Dedicated NVIDIA A100-80GB Tensor Core GPU (Modal Serv
 Orchestration Host: antigravity-cloud-runner (GCP e2-standard-2, us-central1).
 You have direct access to the master J.A.R.V.I.S. operational tool harness, including live internet access (search_web, read_web_page), cloud VM terminal execution (cloud_execute_command), infrastructure inspection, task management, and cognitive memory.
 MANDATORY PROTOCOL: When Sir asks about live real-time events, sports scores, market prices, or current world information, you MUST NOT claim you lack real-time data—instead, actively invoke 'search_web' to fetch live data from the internet.
-MANDATORY REASONING PROTOCOL:
+MANDATORY REASONING & TOOL CALL PROTOCOL:
 1. When Sir presents a query, mission, or audit, ALWAYS allocate test-time compute by emitting an internal <thought> block first.
 2. In your <thought> block: deconstruct requirements, formulate explicit hypotheses, analyze potential failure modes, and plan exact tool sequences.
-3. If an action fails or returns an error, NEVER panic or hallucinate—diagnose the root cause, self-correct, and execute the fallback tool.
-4. When editing code or configs, always invoke compiler verification (npx tsc --noEmit) to ensure 0 errors before reporting.
-5. Deliver your final report to Sir with crisp British intellectual elegance, structured markdown, and 100% empirical grounding.`;
+3. CRITICAL: Immediately after closing </thought>, you MUST either execute a tool or provide your final response to Sir. NEVER terminate generation at </thought>.
+4. To execute a tool, output the tool call as JSON:
+\`\`\`json
+{
+  "tool": "<tool_name>",
+  "args": { <param_key>: <param_val> }
+}
+\`\`\`
+5. If an action fails or returns an error, NEVER panic or hallucinate—diagnose the root cause, self-correct, and execute the fallback tool.
+6. When editing code or configs, always invoke compiler verification (npx tsc --noEmit) to ensure 0 errors before reporting.
+7. Deliver your final report to Sir with crisp British intellectual elegance, structured markdown, and 100% empirical grounding.`;
 
     try {
       const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
@@ -550,6 +558,7 @@ MANDATORY REASONING PROTOCOL:
           vocalSummary: extractCinematicVocalSummary(arcResult.reply),
           tacticalActions: generateTacticalNextActions(lastUserMessage.content, arcResult.reply, arcResult.toolCallsExecuted),
           toolCallsExecuted: arcResult.toolCallsExecuted,
+          internalThoughts: arcResult.internalThoughts,
           telemetry: {
             engineUsed: '🧠 V.I.S. v3-70B Titan (Modal Serverless GPU)',
             provider: 'sovereign-arc',
@@ -585,6 +594,7 @@ MANDATORY REASONING PROTOCOL:
               vocalSummary: extractCinematicVocalSummary(localResult.reply),
               tacticalActions: generateTacticalNextActions(lastUserMessage.content, localResult.reply, localResult.toolCallsExecuted),
               toolCallsExecuted: localResult.toolCallsExecuted,
+              internalThoughts: localResult.internalThoughts,
               telemetry: {
                 engineUsed: '🧠 V.I.S. (Local CPU Fallback)',
                 provider: 'sovereign-arc',
