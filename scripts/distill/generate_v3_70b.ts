@@ -127,6 +127,26 @@ In Step 3: Assistant reports to Sir confirming both memory validation and task c
     prompt: `Generate 2 direct, highly intellectual sparring conversations (WITHOUT tool calls).
 Sir asks complex Staff Architect systems questions (e.g. "Vis, evaluate Raft log compaction with snapshotting vs log truncating when scaling to 50,000 requests/sec across a multi-region cluster").
 The assistant reasons deeply in internal <thought> from first principles, addresses Sir as "Sir", challenges hidden latency/disk IO assumptions, and delivers world-class architectural guidance.`
+  },
+  {
+    name: 'MULTI_STEP_ERROR_RECOVERY_AND_RESILIENCE',
+    prompt: `Generate 2 multi-turn training conversations with ERROR RECOVERY & SELF-CORRECTION.
+Sir asks Vis to inspect a configuration or check a service log file.
+In Step 1: Assistant reasons in <thought>, executes read_workspace_file or cloud_execute_command on an initial path.
+Tool returns an error: e.g. "File not found" or "cat: /tmp/daemon.log: No such file or directory".
+In Step 2: Assistant DOES NOT hallucinate or panic. In <thought>, it analyzes the error, deduces the fallback location, and executes a secondary recovery command (e.g. cloud_execute_command("find . -name '*daemon*' -o -name '*worker*'")).
+Tool returns real recovery output.
+In Step 3: Assistant reports to Sir, clearly explaining the initial fault and the verified factual resolution with British poise.`
+  },
+  {
+    name: 'MULTI_STEP_PERFORMANCE_AND_PROCESS_AUDIT',
+    prompt: `Generate 2 multi-turn training conversations with MULTI-STEP tool chaining.
+Sir asks "Vis, audit our active background daemons, verify if any are consuming excessive memory, and check their uptime".
+In Step 1: Assistant evaluates in <thought>, calls inspect_infrastructure(target: 'RUNNER_PROCESSES').
+Tool returns daemon PIDs and memory usage.
+In Step 2: Assistant evaluates process states in <thought>, calls cloud_execute_command(command: "uptime && free -h", safeCheck: true).
+Tool returns system uptime and RAM statistics.
+In Step 3: Assistant cross-correlates system load with individual process footprints and delivers an executive operational assessment to Sir.`
   }
 ];
 
@@ -233,7 +253,7 @@ Each multi-step conversation object has:
   return trajectories;
 }
 
-export async function runV3DatasetSynthesis(targetCount: number = 50) {
+export async function runV3DatasetSynthesis(targetCount: number = 150) {
   const outDir = path.resolve(process.cwd(), 'data', 'distill', 'v3_70b');
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
@@ -265,19 +285,27 @@ export async function runV3DatasetSynthesis(targetCount: number = 50) {
         }
         console.log(`[V.I.S. v3 Distiller] ✓ Added ${batch.length} trajectories. Progress: [${collected}/${targetCount}]`);
       }
-      console.log(`[V.I.S. v3 Distiller] ⏳ Pacing cooldown (30s) to respect Groq TPM quota...`);
-      await new Promise(r => setTimeout(r, 30000));
+      console.log(`[V.I.S. v3 Distiller] ⏳ Pacing cooldown (25s) to respect Groq TPM quota...`);
+      await new Promise(r => setTimeout(r, 25000));
     } catch (err: any) {
-      const waitSec = Math.max(Math.ceil(err.retryAfterSeconds || 30), 30);
+      const waitSec = Math.max(Math.ceil(err.retryAfterSeconds || 25), 25);
       console.warn(`[V.I.S. v3 Distiller] ⚠️ Rate limit paused: ${err.message}. Backing off for ${waitSec}s...`);
       await new Promise(r => setTimeout(r, (waitSec + 2) * 1000));
     }
   }
 
   console.log(`[V.I.S. v3 Distiller] 🎉 Complete! Master v3 file holds ${collected} multi-step trajectories in ${masterFile}`);
+  
+  // Automatically trigger unified compilation to 250 trajectories upon completion
+  try {
+    const { compileUnifiedV3Corpus } = await import('./prepare_v3_corpus');
+    compileUnifiedV3Corpus();
+  } catch (e: any) {
+    console.warn('[V.I.S. v3 Distiller] Automatic corpus unification warning:', e?.message);
+  }
 }
 
 if (process.argv[1] && process.argv[1].includes('generate_v3_70b')) {
-  const countArg = parseInt(process.argv[2] || '30', 10);
+  const countArg = parseInt(process.argv[2] || '150', 10);
   runV3DatasetSynthesis(countArg).catch(console.error);
 }
