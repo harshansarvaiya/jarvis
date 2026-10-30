@@ -17,6 +17,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { spawnSync } from 'child_process';
 import { jsonrepair } from 'jsonrepair';
 
 interface ToolSchema {
@@ -474,11 +475,78 @@ function parseRawTrajectories(content: string): V3Trajectory[] {
   return trajectories;
 }
 
+function generateAgyBatch(category: typeof MULTI_STEP_CATEGORIES[0]): V3Trajectory[] {
+  const toolsJson = JSON.stringify(V3_SUPPORTED_TOOLS, null, 2);
+  const prompt = `CRITICAL SYSTEM DIRECTIVE: You are synthesizing training data for V.I.S. (Llama-3.3-70B). Output ONLY a single raw valid JSON object starting with { and ending with }. Zero markdown commentary, zero conversational filler.
+
+${JARVIS_SYSTEM_CONTEXT}
+
+Supported Tools:
+${toolsJson}
+
+Category Specification:
+${category.prompt}
+
+Output format:
+{
+  "trajectories": [
+    {
+      "userPrompt": "Vis, ...",
+      "steps": [
+        {
+          "thinking": "Deep, multi-paragraph first-principles reasoning",
+          "toolCall": { "tool": "string", "args": {} },
+          "simulatedToolResult": "string"
+        }
+      ],
+      "finalReply": "Staff Principal response addressing Sir as 'Sir'"
+    }
+  ]
+}`;
+
+  try {
+    const agyBin = fs.existsSync('/home/harshans279/.local/bin/agy')
+      ? '/home/harshans279/.local/bin/agy'
+      : 'agy';
+
+    const res = spawnSync(agyBin, [
+      '-p', prompt,
+      '--model', 'gemini-3.8-flash-high',
+      '--output-format', 'text'
+    ], {
+      encoding: 'utf-8',
+      timeout: 65000
+    });
+
+    if (res.status !== 0 || !res.stdout) {
+      console.warn(`[Antigravity Apex] agy exit code: ${res.status}`);
+      return [];
+    }
+
+    const jsonMatch = res.stdout.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return [];
+
+    return parseRawTrajectories(jsonMatch[0]);
+  } catch (err: any) {
+    console.warn(`[Antigravity Apex] Execution error:`, err.message);
+    return [];
+  }
+}
+
 async function generateV3Batch(category: typeof MULTI_STEP_CATEGORIES[0]): Promise<{ trajectories: V3Trajectory[]; engine: string }> {
+  // 1. Antigravity Sovereign Apex Mind (Gemini 3.8 Flash High - Google Internal Backend)
+  try {
+    const agyBatch = generateAgyBatch(category);
+    if (agyBatch.length > 0) {
+      return { trajectories: agyBatch, engine: '🛡️ Antigravity Apex Gemini 3.8 Flash (High)' };
+    }
+  } catch (err: any) {
+    console.warn(`[V.I.S. v3 Distiller] Antigravity CLI call failed:`, err.message);
+  }
+
+  // 2. Attempt Groq US LPU if not in cooldown
   const now = Date.now();
   const groqKey = getGroqApiKey();
-
-  // 1. Attempt Groq US LPU if not in cooldown
   if (groqKey && now > groqCooldownUntil) {
     try {
       const trajectories = await generateGroqBatch(category, groqKey);
@@ -492,12 +560,12 @@ async function generateV3Batch(category: typeof MULTI_STEP_CATEGORIES[0]): Promi
     }
   }
 
-  // 2. Quantum Failover: Google Gemini 3.8 Flash Substrate (Frontier Apex Engine)
+  // 3. Quantum Failover: Google Gemini Substrate
   try {
     const geminiKey = getGeminiApiKey();
     const trajectories = await generateGeminiBatch(category, geminiKey);
     if (trajectories.length > 0) {
-      return { trajectories, engine: '🧠 Gemini 3.8 Flash (Frontier Apex)' };
+      return { trajectories, engine: '🧠 Gemini Substrate' };
     }
   } catch (err: any) {
     console.error(`[V.I.S. v3 Distiller] ⚠️ Gemini generation failed:`, err.message);
