@@ -90,7 +90,8 @@ export async function runOpenAICompatibleAgent(
     let loopCount = 0;
     let finalContent = '';
 
-    while (loopCount < 3) {
+    // Allow up to 5 multi-step tool chaining loops for deep investigations
+    while (loopCount < 5) {
       loopCount++;
 
       const requestBody: any = {

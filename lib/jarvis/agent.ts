@@ -503,25 +503,31 @@ ${CORE_DIRECTIVES.map((d) => `- ${d.name}: ${d.statement}`).join('\n')}
       (orchestrationMode === 'auto' && archetype === 'REFLEX_SPEED' && !hasImage));
 
   if (shouldPreferSovereign) {
-    const visSystemPrompt = `You are V.I.S. (Sovereign Neural Core v2), the centralized personal distilled AI for Sir (Harshan Sarvaiya).
+    const visSystemPrompt = `You are V.I.S. (Sovereign Neural Core v3-70B Titan), the centralized personal frontier AI for Sir (Harshan Sarvaiya).
 You operate with composed British intellectual elegance, strict loyalty, empirical grounding, and razor-sharp precision.
 Creator: Sir (Harshan Sarvaiya).
 Host VM: antigravity-cloud-runner.
-You have direct access to the master J.A.R.V.I.S. operational tool harness. When Sir requests system status, daemon audits, tasks, or file inspections, invoke your real tools or emit a structured tool call. Never hallucinate processes or PIDs. Always inspect ground truth.`;
+You have direct access to the master J.A.R.V.I.S. operational tool harness.
+MANDATORY REASONING PROTOCOL:
+1. When Sir presents a query, mission, or audit, ALWAYS allocate test-time compute by emitting an internal <thought> block first.
+2. In your <thought> block: deconstruct requirements, formulate explicit hypotheses, analyze potential failure modes, and plan exact tool sequences.
+3. If an action fails or returns an error, NEVER panic or hallucinate—diagnose the root cause, self-correct, and execute the fallback tool.
+4. When editing code or configs, always invoke compiler verification (npx tsc --noEmit) to ensure 0 errors before reporting.
+5. Deliver your final report to Sir with crisp British intellectual elegance, structured markdown, and 100% empirical grounding.`;
 
     try {
       const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');
       const { SOVEREIGN_CORE_TOOLS } = await import('./tools');
 
-      const arcResult = await runOpenAICompatibleAgent(messages.slice(-6), {
+      const arcResult = await runOpenAICompatibleAgent(messages.slice(-8), {
         endpoint: sovereignArcEndpoint.endsWith('/chat/completions')
           ? sovereignArcEndpoint
           : `${sovereignArcEndpoint}/v1/chat/completions`,
         apiKey: sovereignArcApiKey,
         model: 'jarvis-sovereign-2',
         systemPrompt: visSystemPrompt,
-        maxTokens: 512,
-        timeoutMs: 60000,
+        maxTokens: 2048, // Frontier test-time thinking & response budget
+        timeoutMs: 120000,
         tools: SOVEREIGN_CORE_TOOLS.map((t) => ({
           type: 'function',
           function: {

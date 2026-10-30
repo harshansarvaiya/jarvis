@@ -139,6 +139,27 @@ Tool returns real recovery output.
 In Step 3: Assistant reports to Sir, clearly explaining the initial fault and the verified factual resolution with British poise.`
   },
   {
+    name: 'MULTI_STEP_COMPILER_VERIFICATION_LOOPS',
+    prompt: `Generate 2 multi-turn training conversations with CLOSED-LOOP COMPILER VERIFICATION.
+Sir asks Vis to refactor or add a TypeScript interface or utility function in a lib file.
+In Step 1: Assistant reasons in <thought>, executes read_workspace_file on target file.
+Tool returns current implementation.
+In Step 2: Assistant evaluates AST dependencies in <thought>, emits edit plan, and executes cloud_execute_command(command: "npx tsc --noEmit", safeCheck: true).
+Tool returns TypeScript diagnostic output (e.g. "TS2304: Cannot find name 'ConfigOptions'").
+In Step 3: Assistant reads compiler error, does not panic, fixes the missing import in <thought>, executes secondary check "npx tsc --noEmit", receives exit code 0.
+In Step 4: Assistant reports to Sir with compiler-verified confidence and exact diff.`
+  },
+  {
+    name: 'MULTI_STEP_GIT_AND_REPO_HYGIENE',
+    prompt: `Generate 2 multi-turn training conversations with GIT REPOSITORY HYGIENE.
+Sir asks "Vis, check what changes were made recently, verify git status, and summarize uncommitted modifications".
+In Step 1: Assistant evaluates in <thought>, calls cloud_execute_command(command: "git status -s", safeCheck: true).
+Tool returns modified file list.
+In Step 2: Assistant checks git diff in <thought>, calls cloud_execute_command(command: "git diff --stat", safeCheck: true).
+Tool returns stats diff.
+In Step 3: Assistant synthesizes a crisp executive release summary for Sir adhering to conventional commits.`
+  },
+  {
     name: 'MULTI_STEP_PERFORMANCE_AND_PROCESS_AUDIT',
     prompt: `Generate 2 multi-turn training conversations with MULTI-STEP tool chaining.
 Sir asks "Vis, audit our active background daemons, verify if any are consuming excessive memory, and check their uptime".
@@ -253,7 +274,7 @@ Each multi-step conversation object has:
   return trajectories;
 }
 
-export async function runV3DatasetSynthesis(targetCount: number = 200) {
+export async function runV3DatasetSynthesis(targetCount: number = 900) {
   const outDir = path.resolve(process.cwd(), 'data', 'distill', 'v3_70b');
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
@@ -266,7 +287,7 @@ export async function runV3DatasetSynthesis(targetCount: number = 200) {
     existingCount = lines.filter(l => l.trim()).length;
   }
 
-  console.log(`[V.I.S. v3 Distiller] 🚀 Synthesizing 70B Multi-Step Trajectories (Target: ${targetCount}, Existing: ${existingCount})...`);
+  console.log(`[V.I.S. v3 Distiller] 🚀 Synthesizing 70B Master Multi-Step Trajectories (Target: ${targetCount}, Existing: ${existingCount})...`);
 
   let collected = existingCount;
   let cycle = 0;
@@ -296,7 +317,7 @@ export async function runV3DatasetSynthesis(targetCount: number = 200) {
 
   console.log(`[V.I.S. v3 Distiller] 🎉 Complete! Master v3 file holds ${collected} multi-step trajectories in ${masterFile}`);
   
-  // Automatically trigger unified compilation to 300 total trajectories upon completion
+  // Automatically trigger unified compilation to 1,000 total trajectories upon completion
   try {
     const { compileUnifiedV3Corpus } = await import('./prepare_v3_corpus');
     compileUnifiedV3Corpus();
@@ -306,6 +327,6 @@ export async function runV3DatasetSynthesis(targetCount: number = 200) {
 }
 
 if (process.argv[1] && process.argv[1].includes('generate_v3_70b')) {
-  const countArg = parseInt(process.argv[2] || '200', 10);
+  const countArg = parseInt(process.argv[2] || '900', 10);
   runV3DatasetSynthesis(countArg).catch(console.error);
 }
