@@ -1113,11 +1113,14 @@ async function processDirective(
     // Append Telemetry Badge (V.I.S. vs F.R.I.D.A.Y. vs J.A.R.V.I.S.)
     if (result.telemetry) {
       const engineName = result.telemetry.engineUsed || 'Vertex AI Gemini 3.8';
-      const badgePrefix = isVis
-        ? '🧠 `[V.I.S. SOVEREIGN]'
-        : isFriday
-        ? '🛡️ `[F.R.I.D.A.Y. APEX]'
-        : '⚡ `[J.A.R.V.I.S. TACTICAL]';
+      let badgePrefix = '⚡ `[J.A.R.V.I.S. TACTICAL]';
+      if (isVis) {
+        badgePrefix = result.telemetry.failoverOccurred
+          ? '⚠️ `[V.I.S. COLD-FALLBACK]'
+          : '🧠 `[V.I.S. v3-70B TITAN]';
+      } else if (isFriday) {
+        badgePrefix = '🛡️ `[F.R.I.D.A.Y. APEX]';
+      }
       responseText += `\n\n${badgePrefix} ${engineName} // ${result.telemetry.latencyMs}ms\``;
     }
 

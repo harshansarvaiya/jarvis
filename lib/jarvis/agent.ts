@@ -529,7 +529,7 @@ MANDATORY REASONING PROTOCOL:
         model: 'jarvis-sovereign-3',
         systemPrompt: visSystemPrompt,
         maxTokens: 2048, // Frontier test-time thinking & response budget
-        timeoutMs: 120000,
+        timeoutMs: 180000,
         tools: SOVEREIGN_CORE_TOOLS.map((t) => ({
           type: 'function',
           function: {
