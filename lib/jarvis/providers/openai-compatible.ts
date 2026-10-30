@@ -308,6 +308,28 @@ Or deliver your final report to Sir based on your reasoning.`,
 
       // Plain text response received
       finalContent = message.content || message.reasoning || '';
+
+      // Anti-Hesitation Safeguard: Detect when model states intent to search or inspect without executing the tool call
+      const intentToSearchMatch = /(?:let me|i will|i shall|allow me to)\s+(?:search|query|look up|check|retrieve|fetch)\s+(?:the\s+)?(?:web|internet|latest|data|score|information|match|news)/i.test(finalContent);
+      if (intentToSearchMatch && toolCallsExecuted.length === 0 && loopCount < 3) {
+        console.log(`[OpenAICompatible Harness] ⚠️ ${model} stated search intent without executing tool call. Reprompting with action directive...`);
+        formattedMessages.push({
+          role: 'assistant',
+          content: finalContent,
+        });
+        formattedMessages.push({
+          role: 'user',
+          content: `[SYSTEM ACTION REQUIRED]: You announced that you will search the web, but you did not output the tool call. Do not verbally announce your intent to Sir. Immediately execute the tool call via:
+\`\`\`json
+{
+  "tool": "search_web",
+  "args": { "query": "<search query>" }
+}
+\`\`\``,
+        });
+        continue;
+      }
+
       break;
     }
 

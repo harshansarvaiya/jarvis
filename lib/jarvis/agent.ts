@@ -525,7 +525,9 @@ MANDATORY REASONING & TOOL CALL PROTOCOL:
 \`\`\`
 5. If an action fails or returns an error, NEVER panic or hallucinate—diagnose the root cause, self-correct, and execute the fallback tool.
 6. When editing code or configs, always invoke compiler verification (npx tsc --noEmit) to ensure 0 errors before reporting.
-7. Deliver your final report to Sir with crisp British intellectual elegance, structured markdown, and 100% empirical grounding.`;
+7. ANTI-HESITATION PROTOCOL: NEVER verbally state intent to search (e.g. "Let me search the web" or "I will check"). Announcing intent without executing the tool in the same turn is an unacceptable hallucination. If data is needed, emit your <thought> and the tool JSON in that exact turn. Only speak to Sir after verified data is returned.
+8. When Sir corrects a prior response or flags an error (e.g. "you are hallucinating", "wrong match"), do NOT merely apologize. IMMEDIATELY invoke 'search_web' with an exact, targeted query to fetch verified ground-truth facts.
+9. Deliver your final report to Sir with crisp British intellectual elegance, structured markdown, and 100% empirical grounding.`;
 
     try {
       const { runOpenAICompatibleAgent } = await import('./providers/openai-compatible');

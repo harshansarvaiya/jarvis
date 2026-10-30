@@ -757,14 +757,14 @@ export async function executeExaMCP(
   try {
     switch (action) {
       case 'search': {
-        const { query, numResults = 8, useAutoprompt = true, type = 'neural', includeText = true, startPublishedDate } = params;
+        const { query, numResults = 8, useAutoprompt = false, type = 'auto', includeText = true, startPublishedDate } = params;
         if (!query) throw new Error('Parameter "query" is required for Exa search');
 
         const body: Record<string, any> = {
           query,
           numResults,
-          useAutoprompt,
-          type,
+          useAutoprompt: useAutoprompt ?? false,
+          type: type || 'auto',
           contents: { text: includeText ? { maxCharacters: 800 } : false },
         };
         if (startPublishedDate) body.startPublishedDate = startPublishedDate;

@@ -140,7 +140,28 @@ async function runWebSearch(query: string): Promise<any> {
   const exaKey = process.env.EXA_API_KEY;
   if (exaKey) {
     try {
-      const exaRes = await executeExaMCP('search', { query, numResults: 6, useAutoprompt: true, type: 'neural', includeText: true });
+      const isTemporalQuery = /\b(today|tonight|live|score|match|current|now|latest|yesterday|news|price|result|t20|odi|test)\b/i.test(query);
+      const searchParams: Record<string, any> = {
+        query,
+        numResults: 6,
+        useAutoprompt: false,
+        type: 'auto',
+        includeText: true,
+      };
+
+      // For temporal queries (live scores, today's news), constrain to recent publications
+      if (isTemporalQuery) {
+        const d = new Date(Date.now() - 48 * 60 * 60 * 1000);
+        searchParams.startPublishedDate = d.toISOString().split('T')[0];
+      }
+
+      let exaRes = await executeExaMCP('search', searchParams);
+      // Fallback if temporal constraint yielded 0 results
+      if ((!exaRes.success || !exaRes.output?.results?.length) && searchParams.startPublishedDate) {
+        delete searchParams.startPublishedDate;
+        exaRes = await executeExaMCP('search', searchParams);
+      }
+
       if (exaRes.success && Array.isArray(exaRes.output?.results) && exaRes.output.results.length > 0) {
         for (const r of exaRes.output.results) {
           results.push({ title: r.title || query, snippet: r.snippet || '', url: r.url, source: 'Exa Neural Search' });
