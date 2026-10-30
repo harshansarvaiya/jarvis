@@ -17,6 +17,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { jsonrepair } from 'jsonrepair';
 
 interface ToolSchema {
   name: string;
@@ -258,9 +259,14 @@ function safeParseJson(raw: string): any {
   try {
     return JSON.parse(raw);
   } catch {
-    // Sanitize unescaped control characters inside JSON string literals
-    const cleaned = raw.replace(/[\u0000-\u0019]+/g, ' ');
-    return JSON.parse(cleaned);
+    try {
+      const repaired = jsonrepair(raw);
+      return JSON.parse(repaired);
+    } catch {
+      // Sanitize unescaped control characters inside JSON string literals
+      const cleaned = raw.replace(/[\u0000-\u0019]+/g, ' ');
+      return JSON.parse(cleaned);
+    }
   }
 }
 
