@@ -158,13 +158,14 @@ def train_and_export_vis_v3(
 
 @app.local_entrypoint()
 def main(
-    dataset_path: str = "data/distill/v3_70b/train_master_v3.jsonl",
+    dataset_path: str = "data/distill/v3_70b/train_master_v3_unified.jsonl",
+    fallback_v3_path: str = "data/distill/v3_70b/train_master_v3.jsonl",
     fallback_v2_path: str = "data/distill/v2_agentic/train_master_v2.jsonl",
     max_steps: int = 120,
 ):
-    target_path = dataset_path if os.path.exists(dataset_path) else fallback_v2_path
+    target_path = dataset_path if os.path.exists(dataset_path) else (fallback_v3_path if os.path.exists(fallback_v3_path) else fallback_v2_path)
     if not os.path.exists(target_path):
-        print(f"Error: Neither {dataset_path} nor {fallback_v2_path} exists.")
+        print(f"Error: No valid dataset found.")
         sys.exit(1)
 
     with open(target_path, "r", encoding="utf-8") as f:
