@@ -372,37 +372,58 @@ Each multi-step conversation object must have:
   }
 - "finalReply": string (Decisive, highly structured Staff Principal response addressing Sir as "Sir")`;
 
-  const models = ['gemini-flash-lite-latest', 'gemini-3.1-flash-lite'];
+  // Prioritize Gemini 3.8 Flash (Frontier Apex) with graceful quantum cascade
+  const models = [
+    'gemini-3.8-flash',         // PRIMARY: Apex reasoning, full test-time thinking
+    'gemini-3.7-flash',         // SECONDARY: Frontier Flash fallback
+    'gemini-3.6-flash',         // TERTIARY: Frontier Flash fallback
+    'gemini-3.5-flash',         // QUATERNARY: Frontier Flash fallback
+    'gemini-flash-lite-latest'  // QUINARY: Resilient high-throughput safety net
+  ];
 
   for (const model of models) {
-    try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.7,
-            maxOutputTokens: 8192
+    let retries = 0;
+    while (retries < 2) {
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              temperature: 0.7,
+              maxOutputTokens: 8192
+            }
+          }),
+          signal: AbortSignal.timeout(90000)
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          console.warn(`[Gemini Engine] Model ${model} HTTP ${response.status}:`, errText.slice(0, 120));
+          if (response.status === 503 || response.status === 429) {
+            retries++;
+            await new Promise(r => setTimeout(r, 6000));
+            continue;
           }
-        })
-      });
+          break;
+        }
 
-      if (!response.ok) {
-        const errText = await response.text();
-        console.warn(`[Gemini Engine] Model ${model} HTTP ${response.status}:`, errText.slice(0, 120));
-        continue;
+        const data = await response.json();
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!content) {
+          retries++;
+          continue;
+        }
+
+        const trajectories = parseRawTrajectories(content);
+        if (trajectories.length > 0) return trajectories;
+      } catch (e: any) {
+        console.warn(`[Gemini Engine] Execution error on ${model}:`, e.message);
+        retries++;
+        await new Promise(r => setTimeout(r, 4000));
       }
-
-      const data = await response.json();
-      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!content) continue;
-
-      const trajectories = parseRawTrajectories(content);
-      if (trajectories.length > 0) return trajectories;
-    } catch (e: any) {
-      console.warn(`[Gemini Engine] Execution error on ${model}:`, e.message);
     }
   }
 
@@ -483,12 +504,12 @@ async function generateV3Batch(category: typeof MULTI_STEP_CATEGORIES[0]): Promi
     }
   }
 
-  // 2. Quantum Failover: Google Gemini Substrate (High Throughput, Zero Quota Lock)
+  // 2. Quantum Failover: Google Gemini 3.8 Flash Substrate (Frontier Apex Engine)
   try {
     const geminiKey = getGeminiApiKey();
     const trajectories = await generateGeminiBatch(category, geminiKey);
     if (trajectories.length > 0) {
-      return { trajectories, engine: '🧠 Google Gemini Substrate' };
+      return { trajectories, engine: '🧠 Gemini 3.8 Flash (Frontier Apex)' };
     }
   } catch (err: any) {
     console.error(`[V.I.S. v3 Distiller] ⚠️ Gemini generation failed:`, err.message);
@@ -497,7 +518,7 @@ async function generateV3Batch(category: typeof MULTI_STEP_CATEGORIES[0]): Promi
   return { trajectories: [], engine: 'NONE' };
 }
 
-export async function runV3DatasetSynthesis(targetCount: number = 250) {
+export async function runV3DatasetSynthesis(targetCount: number = 900) {
   const outDir = path.resolve(process.cwd(), 'data', 'distill', 'v3_70b');
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
@@ -552,6 +573,6 @@ export async function runV3DatasetSynthesis(targetCount: number = 250) {
 }
 
 if (process.argv[1] && process.argv[1].includes('generate_v3_70b')) {
-  const countArg = parseInt(process.argv[2] || '250', 10);
+  const countArg = parseInt(process.argv[2] || '900', 10);
   runV3DatasetSynthesis(countArg).catch(console.error);
 }
