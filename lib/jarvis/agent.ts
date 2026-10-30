@@ -529,7 +529,7 @@ MANDATORY REASONING PROTOCOL:
         model: 'jarvis-sovereign-3',
         systemPrompt: visSystemPrompt,
         maxTokens: 2048, // Frontier test-time thinking & response budget
-        timeoutMs: 180000,
+        timeoutMs: 300000, // 5m envelope to allow cold-start GPU tensor loading without failover
         tools: SOVEREIGN_CORE_TOOLS.map((t) => ({
           type: 'function',
           function: {

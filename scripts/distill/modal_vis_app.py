@@ -39,7 +39,7 @@ image = (
     gpu="A100-80GB",  # High-capacity 80GB NVIDIA A100 GPU for 70B parameter serving
     volumes={VAULT_MOUNT: vault_volume},
     timeout=600,
-    scaledown_window=180,  # Auto-scales to zero after 3 minutes of idle -> $0 cost
+    scaledown_window=900,  # Keeps warm for 15 minutes during active sparring -> auto-scales to zero after 15m idle
 )
 @modal.web_server(8000, startup_timeout=300)
 def serve():

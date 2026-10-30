@@ -1042,17 +1042,28 @@ async function processDirective(
     const assignedMode = isVisDirective ? 'sovereign-arc' : requestedMode;
     const assignedModel = isVisDirective ? 'vis' : requestedModel;
 
-    const result = await runJarvisAgent(contextMessages, {
-      model: assignedModel,
-      orchestrationMode: assignedMode,
-      specializedAgentId: delegatedAgentId,
-      persona: assignedPersona,
-      incognito: isIncognito,
-      onProgress: async (stepText: string) => {
-        gateway.sendTypingAction(chatId).catch(() => {});
-        console.log(`[Telegram Worker] ${stepText}`);
-      },
-    });
+    // Pulse continuous typing indicator every 4.5s so Sir knows V.I.S. / Friday is actively processing
+    const typingPulse = setInterval(() => {
+      gateway.sendTypingAction(chatId).catch(() => {});
+    }, 4500);
+    gateway.sendTypingAction(chatId).catch(() => {});
+
+    let result: Awaited<ReturnType<typeof runJarvisAgent>>;
+    try {
+      result = await runJarvisAgent(contextMessages, {
+        model: assignedModel,
+        orchestrationMode: assignedMode,
+        specializedAgentId: delegatedAgentId,
+        persona: assignedPersona,
+        incognito: isIncognito,
+        onProgress: async (stepText: string) => {
+          gateway.sendTypingAction(chatId).catch(() => {});
+          console.log(`[Telegram Worker] ${stepText}`);
+        },
+      });
+    } finally {
+      clearInterval(typingPulse);
+    }
 
     // 3. Save Both Records to Universal Storage (Bypassed if Incognito)
     const assistantMsgRecord: ChatMessageRecord = {
