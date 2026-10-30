@@ -171,6 +171,30 @@ In Step 3: Assistant cross-correlates system load with individual process footpr
   }
 ];
 
+
+const JARVIS_SYSTEM_CONTEXT = `
+WORKSPACE REALITIES & GROUND TRUTH (STRICT CONSTRAINTS):
+You MUST ground all trajectories in the ACTUAL architecture of Sir (Harshan Sarvaiya)'s repository:
+- Project: J.A.R.V.I.S. Mark II (Next.js 15 App Router, TypeScript 5.5, Tailwind CSS, Vercel Edge).
+- Host VM: antigravity-cloud-runner (GCP Compute Engine e2-standard-2, 2 vCPUs, 8GB RAM, us-central1, Ubuntu 24.04 LTS).
+- Background Daemons:
+  * scripts/cloud-worker.ts (PID 2511436) - Chrono worker, polls task due dates every 30s.
+  * scripts/telegram-worker.ts (PID 2539689) - 24/7 Sovereign Telegram Uplink Gateway (@harshan_jarvis_bot).
+  * local llama-server (PID 2503939) - Sovereign local CPU fallback on 127.0.0.1:8080.
+- Primary Storage: Upstash Redis REST cluster (witty-grouse-110573.upstash.io) keys: jarvis:state, jarvis:dna, jarvis:memories, jarvis:chat_history.
+- Serverless GPU Substrate: Modal app vis-sovereign-core running on NVIDIA Tesla T4 / A100 (https://harshansarvaiya--vis-sovereign-core-serve.us-east.modal.run).
+- Core Code Files:
+  * lib/jarvis/agent.ts (Main agent dispatcher, model rotation, quantum fallback).
+  * lib/jarvis/tools.ts (Master tool harness, SOVEREIGN_CORE_TOOLS, executeJarvisTool).
+  * lib/jarvis/providers/openai-compatible.ts (OpenAI-compatible multi-turn ReAct tool execution loop).
+  * lib/jarvis/memory.ts (Task CRUD, memory vectors, Upstash client).
+  * next.config.js (Next.js PWA manifest headers and security envelope).
+
+NEGATIVE CONSTRAINTS (HARD BAN):
+- NEVER use generic placeholder names like 'MyApp', 'src/main.py', 'src/auth/oauth.py', 'user_123', 'foo/bar'.
+- NEVER invent fictitious tooling like 'azt inspect', 'docker daemon', 'kubernetes worker'. J.A.R.V.I.S. is 100% cloud-native and dockerless.
+- Every trajectory must read, write, audit, or spar on REAL architectural components of this system.`;
+
 const SYSTEM_PROMPT = `You are V.I.S. (Sovereign Neural Core v3-70B), the centralized personal frontier AI for Sir (Harshan Sarvaiya).
 You operate with composed British intellectual elegance, strict loyalty, empirical grounding, and surgical precision.
 Creator: Sir (Harshan Sarvaiya).
@@ -195,6 +219,9 @@ async function generateV3Batch(category: typeof MULTI_STEP_CATEGORIES[0]): Promi
           content: `You are the master distillation engine synthesizing the v3 (70B-tier) Multi-Step Agentic dataset for V.I.S.
 The user is Sir (Harshan Sarvaiya). Sir always addresses the assistant as "Vis" or "V.I.S."
 The assistant always addresses Sir as "Sir" and speaks with British intellectual elegance and zero filler.
+
+${JARVIS_SYSTEM_CONTEXT}
+
 Supported Tools:
 ${toolsJson}
 
