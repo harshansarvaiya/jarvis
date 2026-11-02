@@ -13,6 +13,18 @@ const nextConfig = {
     '*.ngrok-free.app',
     '*.trycloudflare.com',
   ],
+  async rewrites() {
+    return [
+      {
+        source: '/vis-deck',
+        destination: '/vis',
+      },
+      {
+        source: '/vis-presentation',
+        destination: '/vis',
+      },
+    ];
+  },
   async headers() {
     return [
       {
