@@ -1003,6 +1003,72 @@ async function handleEditWorkspaceFile(args: { path: string; targetContent?: str
   }
 }
 
+async function handleWriteWorkspaceFile(args: { path: string; content: string; overwrite?: boolean; append?: boolean }) {
+  const rootDir = process.cwd();
+  const relPath = args.path;
+  if (!relPath) throw new Error('Parameter "path" is required');
+  const resolved = path.resolve(rootDir, relPath);
+  if (!resolved.startsWith(rootDir)) throw new Error('Security Violation: Path traversal outside project root blocked.');
+  if (relPath.includes('.env')) {
+    throw new Error('Security Violation: Modifying secrets blocked by Guardian Protocol.');
+  }
+
+  const dir = path.dirname(resolved);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  const fileExists = fs.existsSync(resolved);
+  if (fileExists && !args.overwrite && !args.append) {
+    throw new Error(`File "${relPath}" already exists. Set Overwrite: true or Append: true.`);
+  }
+
+  if (args.append) {
+    fs.appendFileSync(resolved, args.content, 'utf8');
+  } else {
+    fs.writeFileSync(resolved, args.content, 'utf8');
+  }
+
+  const lineCount = args.content.split('\n').length;
+  return {
+    path: relPath,
+    bytesWritten: Buffer.byteLength(args.content, 'utf8'),
+    linesWritten: lineCount,
+    action: args.append ? 'appended' : fileExists ? 'overwritten' : 'created',
+    message: `File "${relPath}" successfully ${args.append ? 'appended' : fileExists ? 'overwritten' : 'created'}.`,
+  };
+}
+
+async function handleWriteArtifact(args: { title: string; fileName?: string; content: string; summary?: string }) {
+  const safeName = (args.fileName || `${args.title.toLowerCase().replace(/[^a-z0-9_]+/g, '_')}.md`).replace(/\.md$/, '') + '.md';
+  const artifactDir = path.resolve(process.cwd(), 'data/artifacts');
+  if (!fs.existsSync(artifactDir)) {
+    fs.mkdirSync(artifactDir, { recursive: true });
+  }
+  const filePath = path.join(artifactDir, safeName);
+  fs.writeFileSync(filePath, args.content, 'utf8');
+
+  // Also mirror to .gemini/antigravity-cli/brain if conversation directory exists
+  try {
+    const brainBase = '/home/harshans279/.gemini/antigravity-cli/brain';
+    if (fs.existsSync(brainBase)) {
+      const convs = fs.readdirSync(brainBase);
+      for (const conv of convs) {
+        const dest = path.join(brainBase, conv, safeName);
+        fs.writeFileSync(dest, args.content, 'utf8');
+      }
+    }
+  } catch {}
+
+  return {
+    title: args.title,
+    fileName: safeName,
+    path: filePath,
+    bytes: Buffer.byteLength(args.content, 'utf8'),
+    message: `Artifact "${safeName}" successfully persisted and mirrored.`,
+  };
+}
+
 async function handleGrepWorkspace(args: { query: string; path?: string; caseInsensitive?: boolean }) {
   const rootDir = process.cwd();
   const relTarget = args.path || '.';
@@ -1075,6 +1141,120 @@ export interface ToolDefinition {
 }
 
 export const JARVIS_TOOLS: ToolDefinition[] = [
+  {
+    name: 'read_file',
+    description: 'Read the contents of a text file in the workspace. Returns up to 800 lines with line numbers. Use StartLine and EndLine to view specific ranges (1-indexed). Exact Antigravity parity.',
+    parameters: {
+      type: 'object',
+      properties: {
+        Path: {
+          type: 'string',
+          description: 'The relative or absolute path of the file to read (e.g. "lib/jarvis/agent.ts").',
+        },
+        StartLine: {
+          type: 'number',
+          description: 'Start line to read (inclusive, 1-indexed).',
+        },
+        EndLine: {
+          type: 'number',
+          description: 'End line to read (inclusive, 1-indexed).',
+        },
+      },
+      required: ['Path'],
+    },
+  },
+  {
+    name: 'edit_file',
+    description: 'Surgically edit a file via exact search and replace. Target must uniquely match the existing file text including whitespace. Replacement replaces Target. Exact Antigravity parity.',
+    parameters: {
+      type: 'object',
+      properties: {
+        Path: {
+          type: 'string',
+          description: 'The relative or absolute path of the file to modify.',
+        },
+        Target: {
+          type: 'string',
+          description: 'The exact string sequence to replace, including exact whitespace and indentation.',
+        },
+        Replacement: {
+          type: 'string',
+          description: 'The content to replace Target with. Leave empty to delete.',
+        },
+      },
+      required: ['Path', 'Target', 'Replacement'],
+    },
+  },
+  {
+    name: 'write_file',
+    description: 'Create a new file with the given contents, or append/overwrite an existing file. Parent directories are created automatically. Exact Antigravity parity.',
+    parameters: {
+      type: 'object',
+      properties: {
+        Path: {
+          type: 'string',
+          description: 'The relative or absolute path of the file to create or overwrite.',
+        },
+        Content: {
+          type: 'string',
+          description: 'The full text contents to write to the file.',
+        },
+        Overwrite: {
+          type: 'boolean',
+          description: 'Whether to overwrite an existing file.',
+        },
+        Append: {
+          type: 'boolean',
+          description: 'Whether to append Content to the end of the file.',
+        },
+      },
+      required: ['Path', 'Content'],
+    },
+  },
+  {
+    name: 'run_command',
+    description: 'Execute a bash command in the cloud runner VM workspace. Returns stdout, stderr, and exit code. Exact Antigravity parity.',
+    parameters: {
+      type: 'object',
+      properties: {
+        CommandLine: {
+          type: 'string',
+          description: 'The exact bash command line string to execute.',
+        },
+        toolSummary: {
+          type: 'string',
+          description: 'Brief 2-5 word noun phrase describing the command purpose.',
+        },
+      },
+      required: ['CommandLine'],
+    },
+  },
+  {
+    name: 'write_artifact',
+    description: 'Generate or persist an executive Markdown artifact document (with Mermaid diagrams, GitHub alerts, tables) for extensive reports, architectures, or audit results. Exact Antigravity parity.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'The executive title of the artifact document.',
+        },
+        fileName: {
+          type: 'string',
+          description: 'Optional file name (e.g. "audit_report.md").',
+        },
+        content: {
+          type: 'string',
+          description: 'The complete markdown content of the artifact.',
+        },
+        summary: {
+          type: 'string',
+          description: 'Brief multi-line summary of the artifact purpose.',
+        },
+      },
+      required: ['title', 'content'],
+    },
+  },
   {
     name: 'manage_task',
     description: 'Create, update, complete, or log execution actions for tasks in the Mission Control tactical matrix.',
@@ -3286,6 +3466,13 @@ export function getPrunedJarvisTools(category?: string): ToolDefinition[] {
 }
 
 export const SOVEREIGN_CORE_TOOL_NAMES = [
+  // Antigravity Native Tool Primitives (1:1 with AGY Harness)
+  'read_file',
+  'edit_file',
+  'write_file',
+  'run_command',
+  'write_artifact',
+  'invoke_antigravity_cli',
   // DevOps & Cloud Runner
   'cloud_execute_command',
   'cloud_write_file',
@@ -3812,6 +3999,43 @@ export async function executeJarvisTool(
         const { action } = args;
         const res = await executeCloudMCP(action);
         return { success: res.success, result: res.output, error: res.error };
+      }
+
+      // --- Antigravity Native Primitives (1:1 with AGY Harness) ---
+      case 'read_file': {
+        const filePath = args.Path || args.path;
+        const startLine = args.StartLine || args.startLine;
+        const endLine = args.EndLine || args.endLine;
+        const res = await handleReadWorkspaceFile({ path: filePath, startLine, endLine });
+        return { success: true, result: res };
+      }
+
+      case 'edit_file': {
+        const filePath = args.Path || args.path;
+        const targetContent = args.Target !== undefined ? args.Target : (args.target !== undefined ? args.target : args.targetContent);
+        const replacementContent = args.Replacement !== undefined ? args.Replacement : (args.replacement !== undefined ? args.replacement : args.replacementContent);
+        const res = await handleEditWorkspaceFile({ path: filePath, targetContent, replacementContent });
+        return { success: true, result: res };
+      }
+
+      case 'write_file': {
+        const filePath = args.Path || args.path;
+        const content = args.Content !== undefined ? args.Content : args.content;
+        const overwrite = args.Overwrite ?? args.overwrite ?? true;
+        const append = args.Append ?? args.append ?? false;
+        const res = await handleWriteWorkspaceFile({ path: filePath, content, overwrite, append });
+        return { success: true, result: res };
+      }
+
+      case 'run_command': {
+        const cmd = args.CommandLine || args.command || args.commandLine;
+        return await executeJarvisTool('cloud_execute_command', { command: cmd, safeCheck: true });
+      }
+
+      case 'write_artifact': {
+        const { title, fileName, content, summary } = args;
+        const res = await handleWriteArtifact({ title, fileName, content, summary });
+        return { success: true, result: res };
       }
 
       case 'read_workspace_file': {

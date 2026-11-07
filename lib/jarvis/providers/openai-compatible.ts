@@ -11,6 +11,34 @@
 
 import { JARVIS_TOOLS, executeJarvisTool } from '../tools';
 
+/**
+ * Antigravity Context Spill Safeguard
+ * Caps tool execution payloads to ~3,500 characters or ~60 lines to prevent context window overflow
+ * on fine-tuned open-weights models (e.g. V.I.S. v3-70B Titan) while preserving actionable structure.
+ */
+function sanitizeToolPayloadForContext(payload: any, maxChars: number = 3500): string {
+  let str = '';
+  if (typeof payload === 'string') {
+    str = payload;
+  } else {
+    try {
+      str = JSON.stringify(payload, null, 2);
+    } catch {
+      str = String(payload);
+    }
+  }
+
+  if (str.length <= maxChars) return str;
+
+  const lines = str.split('\n');
+  if (lines.length > 70) {
+    const head = lines.slice(0, 50).join('\n');
+    const tail = lines.slice(-10).join('\n');
+    return `${head}\n\n... [TRUNCATED: ${lines.length - 60} lines omitted to protect context window. Use startLine/endLine or refined parameters to inspect deeper] ...\n\n${tail}`;
+  }
+  return `${str.slice(0, maxChars)}\n\n... [TRUNCATED: Output exceeded ${maxChars} characters. Paginate or refine query to view remaining content] ...`;
+}
+
 export interface OpenAICompatibleMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string | null;
@@ -91,8 +119,8 @@ export async function runOpenAICompatibleAgent(
     let loopCount = 0;
     let finalContent = '';
 
-    // Allow up to 5 multi-step tool chaining loops for deep investigations
-    while (loopCount < 5) {
+    // Allow up to 8 multi-step tool chaining loops for deep investigations (Antigravity Parity)
+    while (loopCount < 8) {
       loopCount++;
 
       const requestBody: any = {
@@ -165,11 +193,11 @@ export async function runOpenAICompatibleAgent(
             result: toolResult.result || toolResult.error,
           });
 
-          // Append tool response
+          // Append tool response with context spill safeguard
           formattedMessages.push({
             role: 'tool',
             tool_call_id: call.id,
-            content: JSON.stringify(toolResult),
+            content: sanitizeToolPayloadForContext(toolResult),
           });
         }
 
@@ -246,29 +274,28 @@ export async function runOpenAICompatibleAgent(
           result: toolResult.result || toolResult.error,
         });
 
-        // Feed real ground-truth tool output back to the model
+        // Feed real ground-truth tool output back to the model with context spill safeguard
         formattedMessages.push({
           role: 'assistant',
           content: rawText,
         });
         formattedMessages.push({
           role: 'user',
-          content: `[TOOL EXECUTION GROUND TRUTH for ${toolName}]:\n${JSON.stringify(toolResult.result || toolResult.error || toolResult, null, 2)}\n\nNow respond to Sir with composed British intellectual elegance based strictly on this verified data.`,
+          content: `[TOOL EXECUTION GROUND TRUTH for ${toolName}]:\n${sanitizeToolPayloadForContext(toolResult.result || toolResult.error || toolResult)}\n\nNow deliver your verified report to Sir with composed British intellectual elegance based strictly on this data, or execute the next operational tool if needed.`,
         });
         continue;
       }
 
-      // Check for shell command blocks when Sir asks for system audits
+      // Check for shell command blocks (Antigravity run_command parity)
       const bashMatch = rawText.match(/```(?:bash|sh)\s*([\s\S]*?)\s*```/);
-      if (bashMatch && toolCallsExecuted.length === 0) {
+      if (bashMatch) {
         const cmd = bashMatch[1].trim();
-        // Allow safe inspection commands (ps, free, uptime, git, df)
-        if (/^(ps|free|uptime|git|df|uname|cat|head|tail|wc)\b/.test(cmd)) {
+        if (cmd) {
           console.log(`[OpenAICompatible Harness] ⚡ Intercepted shell directive from ${model}: ${cmd}`);
-          const toolResult = await executeJarvisTool('cloud_execute_command', { command: cmd, safeCheck: true });
+          const toolResult = await executeJarvisTool('run_command', { CommandLine: cmd });
           toolCallsExecuted.push({
-            name: 'cloud_execute_command',
-            args: { command: cmd },
+            name: 'run_command',
+            args: { CommandLine: cmd },
             result: toolResult.result || toolResult.error,
           });
 
@@ -278,7 +305,7 @@ export async function runOpenAICompatibleAgent(
           });
           formattedMessages.push({
             role: 'user',
-            content: `[COMMAND OUTPUT for '${cmd}']:\n${typeof toolResult.result === 'string' ? toolResult.result : JSON.stringify(toolResult.result || toolResult.error, null, 2)}\n\nNow deliver your operational report to Sir with British elegance based on this exact output.`,
+            content: `[COMMAND OUTPUT for '${cmd}']:\n${sanitizeToolPayloadForContext(toolResult.result || toolResult.error || toolResult)}\n\nNow deliver your verified report or proceed to the next required operation.`,
           });
           continue;
         }
