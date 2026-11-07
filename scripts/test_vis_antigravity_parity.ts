@@ -27,8 +27,8 @@ async function main() {
     [{ role: 'user', content: prompt }],
     {
       orchestrationMode: 'sovereign-arc',
-      modelOverride: 'vis-sovereign-core',
-      isAutonomousTask: true,
+      model: 'vis',
+      persona: 'VIS',
     }
   );
 

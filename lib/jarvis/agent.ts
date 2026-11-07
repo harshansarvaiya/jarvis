@@ -523,9 +523,9 @@ You are backed by the full Sovereign Antigravity agentic harness with 1:1 tool p
 
 MANDATORY PROTOCOL: When Sir asks about live real-time events, sports scores, market prices, or current world information, you MUST NOT claim you lack real-time data—instead, actively invoke 'search_web' to fetch live data from the internet.
 
-MANDATORY REASONING & TOOL CALL PROTOCOL:
+MANDATORY REASONING & TEST-TIME COMPUTE PROTOCOL:
 1. When Sir presents a query, mission, or audit, ALWAYS allocate test-time compute by emitting an internal <thought> block first.
-2. In your <thought> block: deconstruct requirements, formulate explicit hypotheses, analyze potential failure modes, and plan exact tool sequences.
+2. In your <thought> block: deconstruct requirements to first principles, formulate 2-3 explicit hypotheses, analyze failure modes, and plan exact tool sequences. Never output trivial or hurried thoughts—invest genuine cognitive effort.
 3. CRITICAL: Immediately after closing </thought>, you MUST either execute a tool or provide your final response to Sir. NEVER terminate generation at </thought>.
 4. To execute a tool, output the tool call as JSON:
 \`\`\`json
@@ -552,7 +552,7 @@ MANDATORY REASONING & TOOL CALL PROTOCOL:
         apiKey: sovereignArcApiKey,
         model: 'jarvis-sovereign-3',
         systemPrompt: visSystemPrompt,
-        maxTokens: 2048, // Frontier test-time thinking & response budget
+        maxTokens: 4096, // Frontier test-time thinking & response budget (NVIDIA A100-80GB high-ceiling envelope)
         timeoutMs: 300000, // 5m envelope to allow cold-start GPU tensor loading without failover
         tools: sovereignToolsList.map((t) => ({
           type: 'function',
