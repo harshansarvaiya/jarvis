@@ -59,6 +59,7 @@ next-env.d.ts
 /data/deliverables-history.json
 /data/records/
 *.pdf
+!public/Jainisha_Sarvaiya_Resume.pdf
 scripts/inspect-chats.ts
 /scratch/
 /public/generated-images/*
