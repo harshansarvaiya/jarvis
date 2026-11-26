@@ -18,6 +18,8 @@ import {
   ShieldAlert,
   Sparkles,
   Swords,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import {
   classifyMoveDelta,
@@ -35,6 +37,7 @@ interface CoachFeedback {
   gukeshPrinciple: string;
   challenge: string | null;
   model: string;
+  audioBase64?: string | null;
 }
 
 type ArrowTuple = [Square, Square, string?];
@@ -68,6 +71,9 @@ export default function ChessArenaPage() {
   const [copiedPgn, setCopiedPgn] = useState<boolean>(false);
   const [authRequired, setAuthRequired] = useState<boolean>(false);
   const [boardWidth, setBoardWidth] = useState<number>(480);
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(true);
+  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [coach, setCoach] = useState<CoachFeedback>({
     verdict: 'Book',
@@ -81,6 +87,56 @@ export default function ChessArenaPage() {
   });
 
   const boardContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const stopCoachAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+  }, []);
+
+  const playCoachAudio = useCallback(
+    (feedback: CoachFeedback) => {
+      stopCoachAudio();
+      if (!voiceEnabled) return;
+
+      if (feedback.audioBase64) {
+        try {
+          const audio = new Audio(`data:audio/mp3;base64,${feedback.audioBase64}`);
+          audioRef.current = audio;
+          setIsSpeaking(true);
+          audio.onended = () => setIsSpeaking(false);
+          audio.onerror = () => setIsSpeaking(false);
+          void audio.play().catch(() => setIsSpeaking(false));
+          return;
+        } catch {
+          setIsSpeaking(false);
+        }
+      }
+
+      // Browser SpeechSynthesis fallback if neural TTS buffer wasn't returned
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        const text = [feedback.explanation, feedback.challenge || ''].filter(Boolean).join(' ');
+        if (!text) return;
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.rate = 1.03;
+        utter.onstart = () => setIsSpeaking(true);
+        utter.onend = () => setIsSpeaking(false);
+        utter.onerror = () => setIsSpeaking(false);
+        window.speechSynthesis.speak(utter);
+      }
+    },
+    [stopCoachAudio, voiceEnabled]
+  );
+
+  useEffect(() => {
+    return () => stopCoachAudio();
+  }, [stopCoachAudio]);
 
   // Responsive board sizing
   useEffect(() => {
@@ -118,6 +174,7 @@ export default function ChessArenaPage() {
             ...payload,
             playerColor,
             sparringElo,
+            speak: voiceEnabled,
           }),
         });
 
@@ -130,6 +187,9 @@ export default function ChessArenaPage() {
           const data: CoachFeedback = await res.json();
           setAuthRequired(false);
           setCoach(data);
+          if (voiceEnabled) {
+            playCoachAudio(data);
+          }
         }
       } catch (err) {
         console.warn('[Chess Coach] Request failed:', err);
@@ -137,7 +197,7 @@ export default function ChessArenaPage() {
         setIsCoachThinking(false);
       }
     },
-    [playerColor, sparringElo]
+    [playerColor, playCoachAudio, sparringElo, voiceEnabled]
   );
 
   // Trigger engine move when it's AI's turn
@@ -528,6 +588,22 @@ export default function ChessArenaPage() {
           </select>
 
           <button
+            onClick={() => {
+              if (voiceEnabled) stopCoachAudio();
+              setVoiceEnabled((v) => !v);
+            }}
+            className={`px-2.5 py-1.5 rounded-lg border text-xs font-mono flex items-center gap-1.5 transition-colors ${
+              voiceEnabled
+                ? 'bg-cyan-950/80 border-cyan-500/50 text-cyan-300 hover:border-cyan-400'
+                : 'bg-slate-900 border-slate-700/80 text-slate-400 hover:text-slate-200'
+            }`}
+            title={voiceEnabled ? 'Mute Coach Voice' : 'Enable Coach Voice'}
+          >
+            {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            <span>{voiceEnabled ? 'Voice On' : 'Muted'}</span>
+          </button>
+
+          <button
             onClick={() => handleNewGame(playerColor === 'w' ? 'b' : 'w')}
             className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700/80 hover:border-cyan-500/50 text-xs font-mono text-slate-200 flex items-center gap-1.5"
             title="Switch Sides & Start New Game"
@@ -675,6 +751,17 @@ export default function ChessArenaPage() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => (isSpeaking ? stopCoachAudio() : playCoachAudio(coach))}
+                  className={`p-1 rounded border text-[11px] font-mono transition-colors ${
+                    isSpeaking
+                      ? 'bg-cyan-500/20 border-cyan-400/60 text-cyan-300 animate-pulse'
+                      : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-cyan-300'
+                  }`}
+                  title={isSpeaking ? 'Stop Voice' : 'Replay Coach Voice'}
+                >
+                  {isSpeaking ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                </button>
                 <span
                   className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded border ${verdictBadgeClass}`}
                 >

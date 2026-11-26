@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyHmacSession } from '@/lib/jarvis/security/auth-gate';
 import { callVertexAIGenerate, isVertexAIAvailable } from '@/lib/jarvis/vertex';
+import { synthesizeMovieVoice } from '@/lib/jarvis/tts';
 import { jsonrepair } from 'jsonrepair';
 
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,7 @@ interface ChessCoachRequest {
   pvSan?: string[];
   sparringElo?: number;
   question?: string;
+  speak?: boolean;
 }
 
 interface ChessCoachResponse {
@@ -27,6 +29,52 @@ interface ChessCoachResponse {
   gukeshPrinciple: string;
   challenge: string | null;
   model: string;
+  audioBase64?: string | null;
+}
+
+function formatChessForSpeech(text: string): string {
+  return text
+    .replace(/\bO-O-O\b/g, 'castles queenside')
+    .replace(/\bO-O\b/g, 'castles kingside')
+    .replace(/\b([KQRBN])x([a-h][1-8])\+/g, (_, p, sq) => `${pieceWord(p)} takes ${sq}, check`)
+    .replace(/\b([KQRBN])x([a-h][1-8])/g, (_, p, sq) => `${pieceWord(p)} takes ${sq}`)
+    .replace(/\b([KQRBN])([a-h][1-8])\+/g, (_, p, sq) => `${pieceWord(p)} ${sq}, check`)
+    .replace(/\b([KQRBN])([a-h][1-8])/g, (_, p, sq) => `${pieceWord(p)} ${sq}`)
+    .replace(/\b([a-h])x([a-h][1-8])/g, '$1 takes $2');
+}
+
+function pieceWord(p: string): string {
+  switch (p) {
+    case 'K': return 'King';
+    case 'Q': return 'Queen';
+    case 'R': return 'Rook';
+    case 'B': return 'Bishop';
+    case 'N': return 'Knight';
+    default: return p;
+  }
+}
+
+async function attachCoachVoice(
+  coachRes: ChessCoachResponse,
+  speak?: boolean
+): Promise<ChessCoachResponse> {
+  if (!speak) return coachRes;
+  try {
+    const spokenRaw = [
+      coachRes.explanation,
+      coachRes.challenge ? coachRes.challenge : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const spokenText = formatChessForSpeech(spokenRaw);
+    const buf = await synthesizeMovieVoice(spokenText, 'FRIDAY');
+    if (buf && buf.length > 0) {
+      return { ...coachRes, audioBase64: buf.toString('base64') };
+    }
+  } catch (err: any) {
+    console.warn('[Chess Coach] TTS synthesis failed:', err?.message);
+  }
+  return { ...coachRes, audioBase64: null };
 }
 
 const GUKESH_SYSTEM_PROMPT = `You are F.R.I.D.A.Y., embodying a World-Champion Grandmaster chess coach inspired by Gukesh D's calm, deep-calculating, classical-meets-dynamic style, coaching Sir (Harshan Sarvaiya).
@@ -130,14 +178,18 @@ Coach Sir on this exact moment in JSON.`;
           data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
         if (rawText) {
           const parsed = JSON.parse(jsonrepair(rawText));
-          return NextResponse.json({
-            verdict: body.question ? 'Coach Q&A' : body.verdict,
-            headline: parsed.headline || `${body.verdict}: ${body.lastMoveSan || ''}`,
-            explanation: parsed.explanation || '',
-            gukeshPrinciple: parsed.gukeshPrinciple || '',
-            challenge: parsed.challenge || null,
-            model: '🧠 GEMINI 3.8 FLASH',
-          } satisfies ChessCoachResponse);
+          const payload = await attachCoachVoice(
+            {
+              verdict: body.question ? 'Coach Q&A' : body.verdict,
+              headline: parsed.headline || `${body.verdict}: ${body.lastMoveSan || ''}`,
+              explanation: parsed.explanation || '',
+              gukeshPrinciple: parsed.gukeshPrinciple || '',
+              challenge: parsed.challenge || null,
+              model: '🧠 GEMINI 3.8 FLASH',
+            },
+            body.speak
+          );
+          return NextResponse.json(payload);
         }
       }
     } catch (err: any) {
@@ -173,14 +225,18 @@ Coach Sir on this exact moment in JSON.`;
         const rawText = data?.choices?.[0]?.message?.content || '';
         if (rawText) {
           const parsed = JSON.parse(jsonrepair(rawText));
-          return NextResponse.json({
-            verdict: body.question ? 'Coach Q&A' : body.verdict,
-            headline: parsed.headline || `${body.verdict}: ${body.lastMoveSan || ''}`,
-            explanation: parsed.explanation || '',
-            gukeshPrinciple: parsed.gukeshPrinciple || '',
-            challenge: parsed.challenge || null,
-            model: '⚡ GROQ GPT-OSS 120B',
-          } satisfies ChessCoachResponse);
+          const payload = await attachCoachVoice(
+            {
+              verdict: body.question ? 'Coach Q&A' : body.verdict,
+              headline: parsed.headline || `${body.verdict}: ${body.lastMoveSan || ''}`,
+              explanation: parsed.explanation || '',
+              gukeshPrinciple: parsed.gukeshPrinciple || '',
+              challenge: parsed.challenge || null,
+              model: '⚡ GROQ GPT-OSS 120B',
+            },
+            body.speak
+          );
+          return NextResponse.json(payload);
         }
       }
     } catch (err: any) {
@@ -189,5 +245,6 @@ Coach Sir on this exact moment in JSON.`;
   }
 
   // 3. Deterministic fallback
-  return NextResponse.json(buildDeterministicFallback(body));
+  const fallbackPayload = await attachCoachVoice(buildDeterministicFallback(body), body.speak);
+  return NextResponse.json(fallbackPayload);
 }
