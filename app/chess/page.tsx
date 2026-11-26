@@ -88,6 +88,49 @@ export default function ChessArenaPage() {
 
   const boardContainerRef = useRef<HTMLDivElement | null>(null);
 
+  const playChessSound = useCallback((type: 'move' | 'capture' | 'check') => {
+    if (typeof window === 'undefined') return;
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      const now = ctx.currentTime;
+      if (type === 'check') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(760, now + 0.12);
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        osc.start(now);
+        osc.stop(now + 0.19);
+      } else if (type === 'capture') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(95, now + 0.08);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+        osc.start(now);
+        osc.stop(now + 0.1);
+      } else {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(110, now + 0.06);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      }
+      setTimeout(() => void ctx.close().catch(() => {}), 250);
+    } catch {
+      // Ignore audio context restrictions
+    }
+  }, []);
+
   const stopCoachAudio = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -230,8 +273,8 @@ export default function ChessArenaPage() {
 
       setIsEngineThinking(true);
       try {
-        // Small UI yield so player's move renders smoothly before search
-        await new Promise((r) => setTimeout(r, 120));
+        // Natural Chess.com-style pacing before AI piece glides
+        await new Promise((r) => setTimeout(r, 240));
 
         const evalResult = await evaluateAndPickMove(currentChess.fen(), sparringElo, true);
         if (!evalResult) return;
@@ -272,6 +315,9 @@ export default function ChessArenaPage() {
         setPgn(nextChess.pgn());
         setEvalCp(newCp);
         setLastMoveSquares({ from: engineMove.from as Square, to: engineMove.to as Square });
+        playChessSound(
+          nextChess.inCheck() ? 'check' : engineMove.captured ? 'capture' : 'move'
+        );
 
         if (cpLoss >= 90 && preMoveBestFrom && preMoveBestTo) {
           setCoachArrows([
@@ -338,6 +384,9 @@ export default function ChessArenaPage() {
       setSelectedSquare(null);
       setLastMoveSquares({ from, to });
       setCoachArrows([]);
+      playChessSound(
+        clone.inCheck() ? 'check' : moveResult.captured ? 'capture' : 'move'
+      );
 
       // Trigger engine reply + coaching
       void triggerEngineTurn(
@@ -541,6 +590,87 @@ export default function ChessArenaPage() {
     return pairs;
   }, [game]);
 
+  // Compute captured pieces & net material advantage (Chess.com style)
+  const capturedInfo = useMemo(() => {
+    const startCounts: Record<'q' | 'r' | 'b' | 'n' | 'p', number> = {
+      q: 1,
+      r: 2,
+      b: 2,
+      n: 2,
+      p: 8,
+    };
+    const values: Record<'q' | 'r' | 'b' | 'n' | 'p', number> = {
+      q: 9,
+      r: 5,
+      b: 3,
+      n: 3,
+      p: 1,
+    };
+    const whiteSymbols: Record<'q' | 'r' | 'b' | 'n' | 'p', string> = {
+      q: '♕',
+      r: '♖',
+      b: '♗',
+      n: '♘',
+      p: '♙',
+    };
+    const blackSymbols: Record<'q' | 'r' | 'b' | 'n' | 'p', string> = {
+      q: '♛',
+      r: '♜',
+      b: '♝',
+      n: '♞',
+      p: '♟',
+    };
+
+    const onBoardW: Record<string, number> = { q: 0, r: 0, b: 0, n: 0, p: 0 };
+    const onBoardB: Record<string, number> = { q: 0, r: 0, b: 0, n: 0, p: 0 };
+    let matW = 0;
+    let matB = 0;
+
+    const board = game.board();
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const sq = board[r][c];
+        if (!sq || sq.type === 'k') continue;
+        const t = sq.type as 'q' | 'r' | 'b' | 'n' | 'p';
+        if (sq.color === 'w') {
+          onBoardW[t] = (onBoardW[t] || 0) + 1;
+          matW += values[t];
+        } else {
+          onBoardB[t] = (onBoardB[t] || 0) + 1;
+          matB += values[t];
+        }
+      }
+    }
+
+    const order: ('q' | 'r' | 'b' | 'n' | 'p')[] = ['q', 'r', 'b', 'n', 'p'];
+    const capturedByWhite: string[] = [];
+    const capturedByBlack: string[] = [];
+
+    for (const p of order) {
+      const missingB = Math.max(0, startCounts[p] - (onBoardB[p] || 0));
+      for (let i = 0; i < missingB; i++) capturedByWhite.push(blackSymbols[p]);
+
+      const missingW = Math.max(0, startCounts[p] - (onBoardW[p] || 0));
+      for (let i = 0; i < missingW; i++) capturedByBlack.push(whiteSymbols[p]);
+    }
+
+    return {
+      capturedByWhite,
+      capturedByBlack,
+      whiteLead: matW > matB ? matW - matB : 0,
+      blackLead: matB > matW ? matB - matW : 0,
+    };
+  }, [game]);
+
+  const topColor = boardOrientation === 'white' ? 'b' : 'w';
+  const bottomColor = boardOrientation === 'white' ? 'w' : 'b';
+  const topCaptured =
+    topColor === 'w' ? capturedInfo.capturedByWhite : capturedInfo.capturedByBlack;
+  const bottomCaptured =
+    bottomColor === 'w' ? capturedInfo.capturedByWhite : capturedInfo.capturedByBlack;
+  const topLead = topColor === 'w' ? capturedInfo.whiteLead : capturedInfo.blackLead;
+  const bottomLead = bottomColor === 'w' ? capturedInfo.whiteLead : capturedInfo.blackLead;
+
   const whiteBarPct = evalToWhitePercent(evalCp);
   const verdictBadgeClass =
     VERDICT_STYLES[coach.verdict] || 'bg-slate-800 text-slate-200 border-slate-600';
@@ -641,8 +771,41 @@ export default function ChessArenaPage() {
 
       {/* Main Arena Grid */}
       <main className="flex-1 max-w-6xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* Left/Center: Eval Bar + Chessboard + Action Bar */}
+        {/* Left/Center: Eval Bar + Chessboard + Captured Pieces + Action Bar */}
         <section className="lg:col-span-7 flex flex-col items-center" ref={boardContainerRef}>
+          {/* Top Player & Captured Pieces Strip */}
+          <div
+            className="flex items-center justify-between gap-2 px-2 py-1.5 mb-1.5 rounded-lg bg-slate-950/80 border border-slate-800/80 text-xs font-mono"
+            style={{ width: boardWidth + 38 }}
+          >
+            <div className="flex items-center gap-2 shrink-0">
+              <span
+                className={`w-2.5 h-2.5 rounded-sm border ${
+                  topColor === 'w'
+                    ? 'bg-slate-100 border-slate-300'
+                    : 'bg-slate-800 border-slate-500'
+                }`}
+              />
+              <span className="text-slate-200 font-semibold">
+                {topColor === playerColor ? 'Sir (You)' : `F.R.I.D.A.Y. (${sparringElo})`}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 overflow-hidden">
+              <div className="flex items-center flex-wrap text-base leading-none tracking-tight text-slate-200">
+                {topCaptured.map((sym, i) => (
+                  <span key={i} className="-ml-0.5 first:ml-0 drop-shadow-sm">
+                    {sym}
+                  </span>
+                ))}
+              </div>
+              {topLead > 0 && (
+                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300">
+                  +{topLead}
+                </span>
+              )}
+            </div>
+          </div>
+
           <div className="flex items-stretch gap-2.5">
             {/* Vertical Eval Bar */}
             <div className="w-7 rounded-lg overflow-hidden border border-slate-800 bg-slate-900 flex flex-col justify-between relative select-none">
@@ -676,8 +839,41 @@ export default function ChessArenaPage() {
                 customArrows={coachArrows}
                 customDarkSquareStyle={{ backgroundColor: '#1e293b' }}
                 customLightSquareStyle={{ backgroundColor: '#475569' }}
-                animationDuration={180}
+                animationDuration={280}
               />
+            </div>
+          </div>
+
+          {/* Bottom Player & Captured Pieces Strip */}
+          <div
+            className="flex items-center justify-between gap-2 px-2 py-1.5 mt-1.5 rounded-lg bg-slate-950/80 border border-slate-800/80 text-xs font-mono"
+            style={{ width: boardWidth + 38 }}
+          >
+            <div className="flex items-center gap-2 shrink-0">
+              <span
+                className={`w-2.5 h-2.5 rounded-sm border ${
+                  bottomColor === 'w'
+                    ? 'bg-slate-100 border-slate-300'
+                    : 'bg-slate-800 border-slate-500'
+                }`}
+              />
+              <span className="text-slate-200 font-semibold">
+                {bottomColor === playerColor ? 'Sir (You)' : `F.R.I.D.A.Y. (${sparringElo})`}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 overflow-hidden">
+              <div className="flex items-center flex-wrap text-base leading-none tracking-tight text-slate-200">
+                {bottomCaptured.map((sym, i) => (
+                  <span key={i} className="-ml-0.5 first:ml-0 drop-shadow-sm">
+                    {sym}
+                  </span>
+                ))}
+              </div>
+              {bottomLead > 0 && (
+                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300">
+                  +{bottomLead}
+                </span>
+              )}
             </div>
           </div>
 
