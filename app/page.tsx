@@ -32,6 +32,7 @@ import {
   PhoneCall,
   EyeOff,
   Ghost,
+  Crown,
 } from 'lucide-react';
 import { ArcReactorOrb } from '@/components/ArcReactorOrb';
 import { DirectiveBadge } from '@/components/DirectiveBadge';
@@ -1075,6 +1076,15 @@ export default function JarvisDashboard() {
           >
             <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
             <span className="hidden sm:inline">LIVE CALL</span>
+          </a>
+
+          <a
+            href="/chess"
+            title="Launch F.R.I.D.A.Y. Gukesh-Level Chess Sparring Arena"
+            className="px-2.5 py-1.5 rounded-lg bg-amber-950/60 border border-amber-400/50 hover:border-amber-300 text-amber-300 hover:text-white transition-all shadow-[0_0_12px_rgba(245,158,11,0.18)] flex items-center space-x-1.5 text-xs font-mono font-bold"
+          >
+            <Crown className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">CHESS</span>
           </a>
 
           <button
