@@ -72,6 +72,7 @@ export default function ChessArenaPage() {
   const [authRequired, setAuthRequired] = useState<boolean>(false);
   const [boardWidth, setBoardWidth] = useState<number>(480);
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(true);
+  const voiceEnabledRef = useRef<boolean>(true);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -89,7 +90,7 @@ export default function ChessArenaPage() {
   const boardContainerRef = useRef<HTMLDivElement | null>(null);
 
   const playChessSound = useCallback((type: 'move' | 'capture' | 'check') => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !voiceEnabledRef.current) return;
     try {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtx) return;
@@ -144,9 +145,9 @@ export default function ChessArenaPage() {
   }, []);
 
   const playCoachAudio = useCallback(
-    (feedback: CoachFeedback) => {
+    (feedback: CoachFeedback, force: boolean = false) => {
       stopCoachAudio();
-      if (!voiceEnabled) return;
+      if (!force && !voiceEnabledRef.current) return;
 
       if (feedback.audioBase64) {
         try {
@@ -174,7 +175,7 @@ export default function ChessArenaPage() {
         window.speechSynthesis.speak(utter);
       }
     },
-    [stopCoachAudio, voiceEnabled]
+    [stopCoachAudio]
   );
 
   useEffect(() => {
@@ -217,7 +218,7 @@ export default function ChessArenaPage() {
             ...payload,
             playerColor,
             sparringElo,
-            speak: voiceEnabled,
+            speak: voiceEnabledRef.current,
           }),
         });
 
@@ -230,7 +231,7 @@ export default function ChessArenaPage() {
           const data: CoachFeedback = await res.json();
           setAuthRequired(false);
           setCoach(data);
-          if (voiceEnabled) {
+          if (voiceEnabledRef.current) {
             playCoachAudio(data);
           }
         }
@@ -719,8 +720,12 @@ export default function ChessArenaPage() {
 
           <button
             onClick={() => {
-              if (voiceEnabled) stopCoachAudio();
-              setVoiceEnabled((v) => !v);
+              const next = !voiceEnabledRef.current;
+              voiceEnabledRef.current = next;
+              setVoiceEnabled(next);
+              if (!next) {
+                stopCoachAudio();
+              }
             }}
             className={`px-2.5 py-1.5 rounded-lg border text-xs font-mono flex items-center gap-1.5 transition-colors ${
               voiceEnabled
@@ -948,7 +953,7 @@ export default function ChessArenaPage() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => (isSpeaking ? stopCoachAudio() : playCoachAudio(coach))}
+                  onClick={() => (isSpeaking ? stopCoachAudio() : playCoachAudio(coach, true))}
                   className={`p-1 rounded border text-[11px] font-mono transition-colors ${
                     isSpeaking
                       ? 'bg-cyan-500/20 border-cyan-400/60 text-cyan-300 animate-pulse'
