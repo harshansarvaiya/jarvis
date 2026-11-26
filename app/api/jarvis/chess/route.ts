@@ -166,7 +166,8 @@ Coach Sir on this exact moment in JSON.`;
         contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
         generationConfig: {
           temperature: 0.35,
-          maxOutputTokens: 700,
+          maxOutputTokens: 2048,
+          thinkingConfig: { thinkingBudget: 512 },
           responseMimeType: 'application/json',
         },
         signal: AbortSignal.timeout(15000),
